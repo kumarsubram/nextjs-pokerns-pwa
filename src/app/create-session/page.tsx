@@ -109,11 +109,13 @@ export default function CreateSessionPage() {
       });
 
       // Update with table setup (dealer is set as the seat before small blind)
-      const dealerSeat = (tableSetup.smallBlindSeat! - 1 + sessionData.seats) % sessionData.seats;
+      const buttonSeat = (tableSetup.smallBlindSeat! - 1 + sessionData.seats) % sessionData.seats;
+      const dealerSeat = 0; // Fixed dealer position at seat 0 (top of table)
       await updateSession(session.id, {
         bigBlindPosition: tableSetup.bigBlindSeat!,
         smallBlindPosition: tableSetup.smallBlindSeat!,
         heroPosition: tableSetup.heroSeat!,
+        buttonPosition: buttonSeat,
         dealerPosition: dealerSeat,
       });
 
@@ -405,7 +407,8 @@ export default function CreateSessionPage() {
                   smallBlindSeat={tableSetup.smallBlindSeat ?? undefined}
                   bigBlindSeat={tableSetup.bigBlindSeat ?? undefined}
                   selectedSeat={tableSetup.heroSeat ?? undefined}
-                  dealerSeat={tableSetup.smallBlindSeat ? (tableSetup.smallBlindSeat - 1 + sessionData.seats) % sessionData.seats : 0}
+                  buttonSeat={tableSetup.smallBlindSeat ? (tableSetup.smallBlindSeat - 1 + sessionData.seats) % sessionData.seats : 0}
+                  dealerSeat={0}
                   allowHeroAsBlind={true}
                   showPositions={true}
                 />

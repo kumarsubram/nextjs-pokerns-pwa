@@ -162,6 +162,7 @@ export default function SessionPage() {
               smallBlindSeat={session.smallBlindPosition}
               bigBlindSeat={session.bigBlindPosition}
               selectedSeat={session.heroPosition}
+              buttonSeat={session.buttonPosition || 0}
               dealerSeat={session.dealerPosition || 0}
               allowHeroAsBlind={true}
               showPositions={true}

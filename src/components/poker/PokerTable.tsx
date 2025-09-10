@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { User, Crown, DollarSign, UserCheck, ChevronDown } from 'lucide-react';
+import { User, Crown, DollarSign, UserCheck, ChevronDown, Spade } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -18,6 +18,7 @@ interface PokerTableProps {
   selectedSeat?: number;
   smallBlindSeat?: number;
   bigBlindSeat?: number;
+  buttonSeat?: number;
   dealerSeat?: number;
   showSeatSelection?: boolean;
   showBlindSelection?: boolean;
@@ -35,6 +36,7 @@ export function PokerTable({
   selectedSeat,
   smallBlindSeat,
   bigBlindSeat,
+  buttonSeat,
   dealerSeat,
   showSeatSelection = true,
   showBlindSelection = true,
@@ -64,31 +66,31 @@ export function PokerTable({
     }
   }, [tempSmallBlind, tempBigBlind, seats, showBlindSelection, onBlindsSelect]);
 
-  // Get poker position abbreviation based on dealer position
+  // Get poker position abbreviation based on button position
   const getPositionAbbreviation = (seatIndex: number): string => {
-    if (!dealerSeat && dealerSeat !== 0) return '';
+    if (!buttonSeat && buttonSeat !== 0) return '';
     
-    const dealerPos = dealerSeat;
-    let positionsFromDealer = (seatIndex - dealerPos + seats) % seats;
+    const buttonPos = buttonSeat;
+    let positionsFromButton = (seatIndex - buttonPos + seats) % seats;
     
-    // Positions relative to dealer (clockwise)
+    // Positions relative to button (clockwise)
     switch (seats) {
       case 2:
-        return positionsFromDealer === 0 ? 'BTN' : 'BB';
+        return positionsFromButton === 0 ? 'BTN' : 'BB';
       case 4:
-        const pos4 = ['BTN', 'SB', 'BB', 'CO'][positionsFromDealer];
+        const pos4 = ['BTN', 'SB', 'BB', 'CO'][positionsFromButton];
         return pos4;
       case 6:
-        const pos6 = ['BTN', 'SB', 'BB', 'UTG', 'MP', 'CO'][positionsFromDealer];
+        const pos6 = ['BTN', 'SB', 'BB', 'UTG', 'MP', 'CO'][positionsFromButton];
         return pos6;
       case 8:
-        const pos8 = ['BTN', 'SB', 'BB', 'UTG', 'UTG+1', 'MP', 'MP+1', 'CO'][positionsFromDealer];
+        const pos8 = ['BTN', 'SB', 'BB', 'UTG', 'UTG+1', 'MP', 'MP+1', 'CO'][positionsFromButton];
         return pos8;
       case 9:
-        const pos9 = ['BTN', 'SB', 'BB', 'UTG', 'UTG+1', 'MP', 'MP+1', 'MP+2', 'CO'][positionsFromDealer];
+        const pos9 = ['BTN', 'SB', 'BB', 'UTG', 'UTG+1', 'MP', 'MP+1', 'MP+2', 'CO'][positionsFromButton];
         return pos9;
       case 10:
-        const pos10 = ['BTN', 'SB', 'BB', 'UTG', 'UTG+1', 'UTG+2', 'MP', 'MP+1', 'MP+2', 'CO'][positionsFromDealer];
+        const pos10 = ['BTN', 'SB', 'BB', 'UTG', 'UTG+1', 'UTG+2', 'MP', 'MP+1', 'MP+2', 'CO'][positionsFromButton];
         return pos10;
       default:
         return '';
@@ -125,8 +127,8 @@ export function PokerTable({
     if (seatIndex === smallBlindSeat || seatIndex === tempSmallBlind) return 'SB';
     if (seatIndex === bigBlindSeat || seatIndex === tempBigBlind) return 'BB';
     
-    // Show position abbreviations if dealer is set and showPositions is true
-    if (showPositions && (dealerSeat || dealerSeat === 0)) {
+    // Show position abbreviations if button is set and showPositions is true
+    if (showPositions && (buttonSeat || buttonSeat === 0)) {
       const position = getPositionAbbreviation(seatIndex);
       if (position) return position;
     }
@@ -136,7 +138,8 @@ export function PokerTable({
 
   const getSeatColor = (seatIndex: number): string => {
     if (seatIndex === selectedSeat) return 'bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-lg';
-    if (seatIndex === dealerSeat) return 'bg-gradient-to-br from-yellow-400 to-yellow-500 text-white border-4 border-yellow-300 shadow-xl ring-4 ring-yellow-200';
+    if (seatIndex === buttonSeat) return 'bg-gradient-to-br from-yellow-400 to-yellow-500 text-white border-4 border-yellow-300 shadow-xl ring-4 ring-yellow-200';
+    if (seatIndex === dealerSeat) return 'bg-gradient-to-br from-purple-500 to-purple-600 text-white border-2 border-purple-300 shadow-lg';
     if (seatIndex === smallBlindSeat || seatIndex === tempSmallBlind) return 'bg-gradient-to-br from-blue-500 to-blue-600 text-white';
     if (seatIndex === bigBlindSeat || seatIndex === tempBigBlind) return 'bg-gradient-to-br from-orange-500 to-orange-600 text-white';
     return 'bg-white border-2 border-gray-300 text-gray-700 hover:border-emerald-500 hover:text-emerald-600';
@@ -253,8 +256,10 @@ export function PokerTable({
               disabled={isDisabled}
             >
               <div className="flex flex-col items-center">
-                {seatIndex === dealerSeat ? (
+                {seatIndex === buttonSeat ? (
                   <Crown className="h-4 w-4" />
+                ) : seatIndex === dealerSeat ? (
+                  <Spade className="h-4 w-4" />
                 ) : seatIndex === selectedSeat ? (
                   <User className="h-4 w-4" />
                 ) : (seatIndex === smallBlindSeat || seatIndex === tempSmallBlind || seatIndex === bigBlindSeat || seatIndex === tempBigBlind) ? (
@@ -273,6 +278,10 @@ export function PokerTable({
       <div className="flex justify-center flex-wrap gap-4 text-xs">
         <div className="flex items-center space-x-1">
           <div className="w-3 h-3 rounded-full bg-gradient-to-br from-yellow-500 to-yellow-600"></div>
+          <span className="text-gray-600">Button</span>
+        </div>
+        <div className="flex items-center space-x-1">
+          <div className="w-3 h-3 rounded-full bg-gradient-to-br from-purple-500 to-purple-600"></div>
           <span className="text-gray-600">Dealer</span>
         </div>
         <div className="flex items-center space-x-1">

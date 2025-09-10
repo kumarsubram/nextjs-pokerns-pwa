@@ -44,7 +44,8 @@ export interface Session {
   bigBlindPosition?: number; // Seat number (0-indexed)
   smallBlindPosition?: number; // Seat number (0-indexed)
   heroPosition?: number; // Seat number (0-indexed)
-  dealerPosition?: number; // Seat number (0-indexed)
+  buttonPosition?: number; // Seat number (0-indexed) - rotates each hand
+  dealerPosition?: number; // Seat number (0-indexed) - fixed position
   // Sync metadata
   createdAt: Date;
   updatedAt: Date;

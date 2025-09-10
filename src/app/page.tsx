@@ -177,7 +177,12 @@ export default function Home() {
           <div className="text-center mb-8">
             <h2 className="text-2xl font-semibold text-gray-900 mb-2">Get started</h2>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 mb-6">
+          {/* Conditional grid layout based on active sessions */}
+          <div className={`grid gap-3 mb-6 ${
+            activeSessions.length > 0 
+              ? 'sm:grid-cols-1 lg:grid-cols-3' // 3 buttons when active sessions exist
+              : 'sm:grid-cols-1 lg:grid-cols-2 max-w-2xl mx-auto' // 2 centered buttons for first-time users
+          }`}>
             {/* Start New Session */}
             <div 
               className="bg-gradient-to-r from-emerald-500 to-green-600 rounded-xl p-4 cursor-pointer hover:from-emerald-600 hover:to-green-700 transition-all transform hover:scale-105 shadow-lg"
@@ -194,7 +199,7 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Continue Active Session */}
+            {/* Continue Active Session - Only show when active sessions exist */}
             {activeSessions.length > 0 && (
               <div className="bg-gradient-to-r from-orange-500 to-red-600 rounded-xl p-4 cursor-pointer hover:from-orange-600 hover:to-red-700 transition-all transform hover:scale-105 shadow-lg relative">
                 <div className="flex items-center text-white">

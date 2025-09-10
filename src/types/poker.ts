@@ -46,11 +46,19 @@ export interface Hand {
     river?: string;
   };
   
-  // Actions
+  // Actions - detailed for each stage
   preflop: Action[];
   flop?: Action[];
   turn?: Action[];
   river?: Action[];
+  
+  // Hero's primary action for each stage (for statistics)
+  heroActions: {
+    preflop: 'raise' | 'call' | 'fold' | 'check' | 'bet' | 'all-in';
+    flop?: 'raise' | 'call' | 'fold' | 'check' | 'bet' | 'all-in';
+    turn?: 'raise' | 'call' | 'fold' | 'check' | 'bet' | 'all-in';
+    river?: 'raise' | 'call' | 'fold' | 'check' | 'bet' | 'all-in';
+  };
   
   // Hand progression tracking
   stagesReached: {
@@ -101,6 +109,45 @@ export interface AppSettings {
   theme?: 'light' | 'dark' | 'system';
   autoSync?: boolean;
   lastBackupDate?: Date;
+}
+
+// Action statistics for tracking performance by stage
+export interface StageActionStats {
+  stage: 'preflop' | 'flop' | 'turn' | 'river';
+  totalHands: number;
+  actions: {
+    raise: number;
+    call: number;
+    fold: number;
+    check: number;
+    bet: number;
+    allIn: number;
+  };
+  percentages: {
+    raise: number;
+    call: number;
+    fold: number;
+    check: number;
+    bet: number;
+    allIn: number;
+  };
+}
+
+export interface HandProgressionStats {
+  totalHands: number;
+  stageStats: {
+    preflop: StageActionStats;
+    flop: StageActionStats;
+    turn: StageActionStats;
+    river: StageActionStats;
+  };
+  reachPercentages: {
+    preflop: number; // Always 100%
+    flop: number;
+    turn: number;
+    river: number;
+    showdown: number;
+  };
 }
 
 // Sync queue for future remote sync

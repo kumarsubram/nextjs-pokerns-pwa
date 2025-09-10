@@ -6,7 +6,9 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "update-pwa": "node scripts/update-sw-version.js",
+    "push": "npm run update-pwa && git add . && git commit && git push"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",

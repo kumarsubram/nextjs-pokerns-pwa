@@ -5,7 +5,7 @@ import { useSessions } from '@/hooks/useSessions';
 import { SessionCard } from '@/components/session/SessionCard';
 import { OnlineStatusIndicator } from '@/components/OnlineStatusIndicator';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -18,7 +18,12 @@ import {
   Target, 
   CheckCircle, 
   XCircle, 
-  Clock 
+  Clock,
+  TrendingUp,
+  Users,
+  Zap,
+  BarChart3,
+  Layers
 } from 'lucide-react';
 
 export default function Home() {
@@ -35,8 +40,18 @@ export default function Home() {
   const totalHands = sessions.reduce((sum, s) => sum + s.totalHands, 0);
   
   // Calculate win/loss stats from hands (mock for now - will connect to real hand data later)
-  const mockHandsWon = Math.floor(totalHands * 0.4); // 40% win rate as example
-  const mockHandsLost = totalHands - mockHandsWon;
+  const mockHandsWon = Math.floor(totalHands * 0.35); // 35% win rate
+  const mockHandsLost = Math.floor(totalHands * 0.45); // 45% lost
+  const mockHandsFolded = totalHands - mockHandsWon - mockHandsLost; // 20% folded
+  
+  // Mock stage progression stats
+  const mockStageStats = {
+    preflop: totalHands,
+    flop: Math.floor(totalHands * 0.65), // 65% see flop
+    turn: Math.floor(totalHands * 0.45), // 45% see turn
+    river: Math.floor(totalHands * 0.30), // 30% see river
+    showdown: Math.floor(totalHands * 0.25) // 25% go to showdown
+  };
 
   const handleCreateSession = async () => {
     if (!newSession.name || !newSession.buyIn) return;
@@ -146,110 +161,180 @@ export default function Home() {
       </header>
 
       {/* Main Content */}
-      <main className="container max-w-7xl mx-auto px-4 py-6">
+      <main className="container max-w-7xl mx-auto px-4 py-4">
         {/* Quick Actions */}
-        <div className="mb-8">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-6">
+        <div className="mb-6">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 mb-6">
             {/* Start New Session */}
-            <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setIsCreateDialogOpen(true)}>
-              <CardContent className="flex items-center justify-center p-6">
-                <div className="text-center">
-                  <div className="bg-green-100 rounded-full p-3 w-12 h-12 flex items-center justify-center mx-auto mb-3">
-                    <Plus className="h-6 w-6 text-green-600" />
-                  </div>
-                  <h3 className="font-semibold text-lg mb-1">Start New Session</h3>
-                  <p className="text-sm text-muted-foreground">Begin tracking a new poker session</p>
+            <div 
+              className="bg-gradient-to-r from-emerald-500 to-green-600 rounded-xl p-4 cursor-pointer hover:from-emerald-600 hover:to-green-700 transition-all transform hover:scale-105 shadow-lg"
+              onClick={() => setIsCreateDialogOpen(true)}
+            >
+              <div className="flex items-center text-white">
+                <div className="bg-white/20 rounded-lg p-2 mr-3">
+                  <Plus className="h-8 w-8 text-white" />
                 </div>
-              </CardContent>
-            </Card>
+                <div>
+                  <h3 className="font-bold text-lg">Start Session</h3>
+                  <p className="text-white/90 text-sm">Begin new game</p>
+                </div>
+              </div>
+            </div>
 
             {/* Continue Active Session */}
             {activeSessions.length > 0 && (
-              <Card className="hover:shadow-md transition-shadow cursor-pointer border-green-200 bg-green-50/50">
-                <CardContent className="flex items-center justify-center p-6">
-                  <div className="text-center">
-                    <div className="bg-green-100 rounded-full p-3 w-12 h-12 flex items-center justify-center mx-auto mb-3 relative">
-                      <Play className="h-6 w-6 text-green-600" />
-                      <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-                      </span>
-                    </div>
-                    <h3 className="font-semibold text-lg mb-1">Continue Session</h3>
-                    <p className="text-sm text-muted-foreground">{activeSessions.length} active session{activeSessions.length > 1 ? 's' : ''}</p>
+              <div className="bg-gradient-to-r from-orange-500 to-red-600 rounded-xl p-4 cursor-pointer hover:from-orange-600 hover:to-red-700 transition-all transform hover:scale-105 shadow-lg relative">
+                <div className="flex items-center text-white">
+                  <div className="bg-white/20 rounded-lg p-2 mr-3 relative">
+                    <Play className="h-8 w-8 text-white" />
+                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+                    </span>
                   </div>
-                </CardContent>
-              </Card>
+                  <div>
+                    <h3 className="font-bold text-lg">Continue</h3>
+                    <p className="text-white/90 text-sm">{activeSessions.length} active</p>
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* View Hand History */}
-            <Card className="hover:shadow-md transition-shadow cursor-pointer">
-              <CardContent className="flex items-center justify-center p-6">
-                <div className="text-center">
-                  <div className="bg-blue-100 rounded-full p-3 w-12 h-12 flex items-center justify-center mx-auto mb-3">
-                    <History className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <h3 className="font-semibold text-lg mb-1">Hand History</h3>
-                  <p className="text-sm text-muted-foreground">Review your past hands</p>
+            <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl p-4 cursor-pointer hover:from-blue-600 hover:to-purple-700 transition-all transform hover:scale-105 shadow-lg">
+              <div className="flex items-center text-white">
+                <div className="bg-white/20 rounded-lg p-2 mr-3">
+                  <History className="h-8 w-8 text-white" />
                 </div>
-              </CardContent>
-            </Card>
+                <div>
+                  <h3 className="font-bold text-lg">History</h3>
+                  <p className="text-white/90 text-sm">Review hands</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Stats Overview */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Sessions</CardTitle>
-              <Trophy className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{sessions.length}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {activeSessions.length} active
-              </p>
+        {/* Stats Grid */}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+          {/* Sessions */}
+          <Card className="border-l-4 border-l-yellow-500">
+            <CardContent className="flex items-center p-4">
+              <div className="bg-yellow-100 p-3 rounded-full mr-4">
+                <Trophy className="h-8 w-8 text-yellow-600" />
+              </div>
+              <div className="flex-1">
+                <div className="text-2xl font-bold text-gray-900">{sessions.length}</div>
+                <p className="text-sm text-gray-600">Sessions</p>
+                <p className="text-xs text-yellow-600 font-medium">{activeSessions.length} active</p>
+              </div>
             </CardContent>
           </Card>
           
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Hands</CardTitle>
-              <Target className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalHands}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Across all sessions
-              </p>
+          {/* Total Hands */}
+          <Card className="border-l-4 border-l-blue-500">
+            <CardContent className="flex items-center p-4">
+              <div className="bg-blue-100 p-3 rounded-full mr-4">
+                <Target className="h-8 w-8 text-blue-600" />
+              </div>
+              <div className="flex-1">
+                <div className="text-2xl font-bold text-gray-900">{totalHands}</div>
+                <p className="text-sm text-gray-600">Total Hands</p>
+                <p className="text-xs text-blue-600 font-medium">All sessions</p>
+              </div>
             </CardContent>
           </Card>
           
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Hands Won</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{mockHandsWon}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {totalHands > 0 ? Math.round((mockHandsWon / totalHands) * 100) : 0}% win rate
-              </p>
+          {/* Hands Won */}
+          <Card className="border-l-4 border-l-green-500">
+            <CardContent className="flex items-center p-4">
+              <div className="bg-green-100 p-3 rounded-full mr-4">
+                <CheckCircle className="h-8 w-8 text-green-600" />
+              </div>
+              <div className="flex-1">
+                <div className="text-2xl font-bold text-green-600">{mockHandsWon}</div>
+                <p className="text-sm text-gray-600">Hands Won</p>
+                <p className="text-xs text-green-600 font-medium">
+                  {totalHands > 0 ? Math.round((mockHandsWon / totalHands) * 100) : 0}% win rate
+                </p>
+              </div>
             </CardContent>
           </Card>
           
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Hands Lost</CardTitle>
-              <XCircle className="h-4 w-4 text-red-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">{mockHandsLost}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {totalHands > 0 ? Math.round((mockHandsLost / totalHands) * 100) : 0}% lost
-              </p>
+          {/* Hands Lost */}
+          <Card className="border-l-4 border-l-red-500">
+            <CardContent className="flex items-center p-4">
+              <div className="bg-red-100 p-3 rounded-full mr-4">
+                <XCircle className="h-8 w-8 text-red-600" />
+              </div>
+              <div className="flex-1">
+                <div className="text-2xl font-bold text-red-600">{mockHandsLost}</div>
+                <p className="text-sm text-gray-600">Hands Lost</p>
+                <p className="text-xs text-red-600 font-medium">
+                  {totalHands > 0 ? Math.round((mockHandsLost / totalHands) * 100) : 0}% lost
+                </p>
+              </div>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Hand Progression Stats */}
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold mb-3 flex items-center">
+            <Layers className="h-5 w-5 mr-2 text-purple-600" />
+            Hand Progression
+          </h2>
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-5">
+            <Card className="bg-gray-50">
+              <CardContent className="flex items-center justify-between p-3">
+                <div>
+                  <div className="text-lg font-bold text-gray-800">{mockStageStats.preflop}</div>
+                  <p className="text-xs text-gray-600">Preflop</p>
+                </div>
+                <Users className="h-6 w-6 text-gray-500" />
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-blue-50">
+              <CardContent className="flex items-center justify-between p-3">
+                <div>
+                  <div className="text-lg font-bold text-blue-700">{mockStageStats.flop}</div>
+                  <p className="text-xs text-blue-600">Flop</p>
+                </div>
+                <Layers className="h-6 w-6 text-blue-500" />
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-orange-50">
+              <CardContent className="flex items-center justify-between p-3">
+                <div>
+                  <div className="text-lg font-bold text-orange-700">{mockStageStats.turn}</div>
+                  <p className="text-xs text-orange-600">Turn</p>
+                </div>
+                <TrendingUp className="h-6 w-6 text-orange-500" />
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-purple-50">
+              <CardContent className="flex items-center justify-between p-3">
+                <div>
+                  <div className="text-lg font-bold text-purple-700">{mockStageStats.river}</div>
+                  <p className="text-xs text-purple-600">River</p>
+                </div>
+                <Zap className="h-6 w-6 text-purple-500" />
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-green-50">
+              <CardContent className="flex items-center justify-between p-3">
+                <div>
+                  <div className="text-lg font-bold text-green-700">{mockStageStats.showdown}</div>
+                  <p className="text-xs text-green-600">Showdown</p>
+                </div>
+                <BarChart3 className="h-6 w-6 text-green-500" />
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         {/* Sessions List */}

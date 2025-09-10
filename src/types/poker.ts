@@ -52,6 +52,16 @@ export interface Hand {
   turn?: Action[];
   river?: Action[];
   
+  // Hand progression tracking
+  stagesReached: {
+    preflop: boolean;
+    flop: boolean;
+    turn: boolean;
+    river: boolean;
+    showdown: boolean;
+  };
+  foldedAt?: 'preflop' | 'flop' | 'turn' | 'river';
+  
   // Result
   potSize: number;
   result: 'won' | 'lost' | 'folded' | 'chopped';

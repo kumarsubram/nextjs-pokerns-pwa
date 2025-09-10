@@ -1,23 +1,18 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useSessions } from '@/hooks/useSessions';
 import { PokerService } from '@/services/poker.service';
 import { HandProgressionStats } from '@/types/poker';
 import { SessionCard } from '@/components/session/SessionCard';
-import { OnlineStatusIndicator } from '@/components/OnlineStatusIndicator';
 import { HeroSection } from '@/components/home/HeroSection';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { 
   Plus, 
   Trophy, 
   Play, 
-  History, 
   Target, 
   CheckCircle, 
   XCircle, 
@@ -30,15 +25,9 @@ import {
 } from 'lucide-react';
 
 export default function Home() {
-  const { sessions, loading, createSession } = useSessions();
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const { sessions, loading } = useSessions();
   const [progressionStats, setProgressionStats] = useState<HandProgressionStats | null>(null);
-  const [newSession, setNewSession] = useState({
-    name: '',
-    type: 'cash' as 'cash' | 'tournament',
-    buyIn: '',
-    location: ''
-  });
+  const router = useRouter();
 
   const activeSessions = sessions.filter(s => !s.endTime);
   const totalHands = sessions.reduce((sum, s) => sum + s.totalHands, 0);
@@ -61,113 +50,8 @@ export default function Home() {
     loadProgressionStats();
   }, [sessions]); // Reload when sessions change
 
-  const handleCreateSession = async () => {
-    if (!newSession.name || !newSession.buyIn) return;
-    
-    await createSession({
-      name: newSession.name,
-      type: newSession.type,
-      buyIn: parseFloat(newSession.buyIn),
-      location: newSession.location || undefined,
-      startTime: new Date(),
-      totalHands: 0
-    });
-    
-    setIsCreateDialogOpen(false);
-    setNewSession({ name: '', type: 'cash', buyIn: '', location: '' });
-  };
-
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container max-w-7xl mx-auto flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold">Poker Notes</h1>
-            <div className="hidden sm:block">
-              <OnlineStatusIndicator />
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <div className="block sm:hidden">
-              <OnlineStatusIndicator />
-            </div>
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="bg-green-600 hover:bg-green-700">
-                  <Plus className="h-4 w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">New Session</span>
-                </Button>
-              </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create New Session</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 pt-4">
-                <div>
-                  <Label htmlFor="name">Session Name</Label>
-                  <Input
-                    id="name"
-                    placeholder="Friday Night Game"
-                    value={newSession.name}
-                    onChange={(e) => setNewSession({ ...newSession, name: e.target.value })}
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="type">Game Type</Label>
-                  <Select 
-                    value={newSession.type} 
-                    onValueChange={(value: 'cash' | 'tournament') => 
-                      setNewSession({ ...newSession, type: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cash">Cash Game</SelectItem>
-                      <SelectItem value="tournament">Tournament</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <Label htmlFor="buyin">Buy-in ($)</Label>
-                  <Input
-                    id="buyin"
-                    type="number"
-                    placeholder="100"
-                    value={newSession.buyIn}
-                    onChange={(e) => setNewSession({ ...newSession, buyIn: e.target.value })}
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="location">Location (Optional)</Label>
-                  <Input
-                    id="location"
-                    placeholder="Home Game"
-                    value={newSession.location}
-                    onChange={(e) => setNewSession({ ...newSession, location: e.target.value })}
-                  />
-                </div>
-                
-                <Button 
-                  className="w-full" 
-                  onClick={handleCreateSession}
-                  disabled={!newSession.name || !newSession.buyIn}
-                >
-                  Start Session
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-          </div>
-        </div>
-      </header>
-
+    <>
       <HeroSection />
 
       {/* Main Content */}
@@ -186,7 +70,7 @@ export default function Home() {
             {/* Start New Session */}
             <div 
               className="bg-gradient-to-r from-emerald-500 to-green-600 rounded-xl p-4 cursor-pointer hover:from-emerald-600 hover:to-green-700 transition-all transform hover:scale-105 shadow-lg"
-              onClick={() => setIsCreateDialogOpen(true)}
+              onClick={() => router.push('/create-session')}
             >
               <div className="flex items-center text-white">
                 <div className="bg-white/20 rounded-lg p-2 mr-3">
@@ -201,7 +85,18 @@ export default function Home() {
 
             {/* Continue Active Session - Only show when active sessions exist */}
             {activeSessions.length > 0 && (
-              <div className="bg-gradient-to-r from-orange-500 to-red-600 rounded-xl p-4 cursor-pointer hover:from-orange-600 hover:to-red-700 transition-all transform hover:scale-105 shadow-lg relative">
+              <div 
+                className="bg-gradient-to-r from-orange-500 to-red-600 rounded-xl p-4 cursor-pointer hover:from-orange-600 hover:to-red-700 transition-all transform hover:scale-105 shadow-lg relative"
+                onClick={() => {
+                  // Navigate to the most recent active session
+                  const mostRecentSession = activeSessions.sort((a, b) => 
+                    new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+                  )[0];
+                  
+                  console.log('Continue session:', mostRecentSession);
+                  router.push(`/session/${mostRecentSession.id}`);
+                }}
+              >
                 <div className="flex items-center text-white">
                   <div className="bg-white/20 rounded-lg p-2 mr-3 relative">
                     <Play className="h-8 w-8 text-white" />
@@ -211,25 +106,13 @@ export default function Home() {
                     </span>
                   </div>
                   <div>
-                    <h3 className="font-bold text-lg">Continue</h3>
+                    <h3 className="font-bold text-lg">Continue Session</h3>
                     <p className="text-white/90 text-sm">{activeSessions.length} active</p>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* View Hand History */}
-            <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl p-4 cursor-pointer hover:from-blue-600 hover:to-purple-700 transition-all transform hover:scale-105 shadow-lg">
-              <div className="flex items-center text-white">
-                <div className="bg-white/20 rounded-lg p-2 mr-3">
-                  <History className="h-8 w-8 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-lg">History</h3>
-                  <p className="text-white/90 text-sm">Review hands</p>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -461,7 +344,7 @@ export default function Home() {
                 <Button 
                   size="lg"
                   className="bg-green-600 hover:bg-green-700"
-                  onClick={() => setIsCreateDialogOpen(true)}
+                  onClick={() => router.push('/create-session')}
                 >
                   <Plus className="h-5 w-5 mr-2" />
                   Start Your First Session
@@ -483,6 +366,6 @@ export default function Home() {
           )}
         </div>
       </main>
-    </div>
+    </>
   );
 }

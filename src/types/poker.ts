@@ -1,5 +1,19 @@
 // Core types that will work both offline and with future remote DB
 
+export type Currency = 'USD' | 'EUR' | 'GBP' | 'CAD' | 'AUD' | 'JPY' | 'INR' | 'BRL' | 'MXN';
+
+export const CURRENCY_SYMBOLS: Record<Currency, string> = {
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+  CAD: 'C$',
+  AUD: 'A$',
+  JPY: '¥',
+  INR: '₹',
+  BRL: 'R$',
+  MXN: '$'
+};
+
 export interface User {
   id: string;
   email?: string;
@@ -13,13 +27,24 @@ export interface Session {
   userId?: string; // Optional for now, required when auth is added
   name: string;
   type: 'tournament' | 'cash';
+  currency: Currency;
   buyIn: number;
+  seats: 2 | 4 | 6 | 8 | 9 | 10;
   startTime: Date;
   endTime?: Date;
   location?: string;
   notes?: string;
   totalHands: number;
   profit?: number;
+  // Blind structure
+  smallBlind: number;
+  bigBlind: number;
+  ante?: number; // Optional ante
+  // Table setup
+  bigBlindPosition?: number; // Seat number (0-indexed)
+  smallBlindPosition?: number; // Seat number (0-indexed)
+  heroPosition?: number; // Seat number (0-indexed)
+  dealerPosition?: number; // Seat number (0-indexed)
   // Sync metadata
   createdAt: Date;
   updatedAt: Date;
@@ -54,7 +79,7 @@ export interface Hand {
   
   // Hero's primary action for each stage (for statistics)
   heroActions: {
-    preflop: 'raise' | 'call' | 'fold' | 'check' | 'bet' | 'all-in';
+    preflop: 'raise' | 'call' | 'fold' | 'check' | 'bet' | 'all-in' | 'straddle';
     flop?: 'raise' | 'call' | 'fold' | 'check' | 'bet' | 'all-in';
     turn?: 'raise' | 'call' | 'fold' | 'check' | 'bet' | 'all-in';
     river?: 'raise' | 'call' | 'fold' | 'check' | 'bet' | 'all-in';
@@ -96,8 +121,11 @@ export interface VillainPosition {
 
 export interface Action {
   player: 'hero' | Position;
-  action: 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'all-in';
-  amount?: number;
+  action: 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'all-in' | 'straddle';
+  amount?: number; // Bet/raise amount
+  raiseAmount?: number; // Amount raised on top of previous bet
+  totalPot?: number; // Pot size after this action
+  isStraddle?: boolean; // True if this is a straddle bet
 }
 
 // Settings stored locally
@@ -122,6 +150,7 @@ export interface StageActionStats {
     check: number;
     bet: number;
     allIn: number;
+    straddle: number;
   };
   percentages: {
     raise: number;
@@ -130,6 +159,7 @@ export interface StageActionStats {
     check: number;
     bet: number;
     allIn: number;
+    straddle: number;
   };
 }
 

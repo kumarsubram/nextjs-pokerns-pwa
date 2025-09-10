@@ -84,6 +84,9 @@ export default function CreateSessionPage() {
       smallBlindSeat: smallBlind,
       bigBlindSeat: bigBlind,
     }));
+    
+    // Automatically advance to seat selection step
+    setStep('seat');
   };
 
   const handleSeatSelect = (seatIndex: number) => {
@@ -124,7 +127,7 @@ export default function CreateSessionPage() {
         dealerPosition: dealerSeat,
       });
 
-      router.push('/');
+      router.push(`/session/${session.id}`);
     } catch (error) {
       console.error('Failed to create session:', error);
     }
@@ -249,7 +252,14 @@ export default function CreateSessionPage() {
         <Card className="max-w-2xl mx-auto">
           <CardContent className="p-4 sm:p-6 md:p-8">
             <div className="text-center mb-6 sm:mb-8">
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">{getStepTitle()}</h2>
+              <h2 className={`text-xl sm:text-2xl font-bold text-gray-900 mb-2 ${
+                (step === 'blinds' && tableSetup.smallBlindSeat === null) || 
+                (step === 'seat' && tableSetup.heroSeat === null)
+                  ? 'animate-pulse' 
+                  : ''
+              }`}>
+                {getStepTitle()}
+              </h2>
               <p className="text-sm sm:text-base text-gray-600">{getStepDescription()}</p>
             </div>
 
@@ -437,29 +447,31 @@ export default function CreateSessionPage() {
                 <span className="xs:hidden">Back</span>
               </Button>
 
-              <Button
-                onClick={step === 'seat' ? handleComplete : handleNextStep}
-                disabled={
-                  (step === 'details' && !canProceedFromDetails()) ||
-                  (step === 'blinds' && !canProceedFromBlinds()) ||
-                  (step === 'seat' && !canComplete())
-                }
-                className="flex-1 sm:flex-none h-10 sm:h-auto bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700"
-              >
-                {step === 'seat' ? (
-                  <>
-                    <Play className="h-4 w-4 mr-1 sm:mr-2" />
-                    <span className="hidden xs:inline">Start Session</span>
-                    <span className="xs:hidden">Start</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="hidden xs:inline">Next</span>
-                    <span className="xs:hidden">Next</span>
-                    <ArrowRight className="h-4 w-4 ml-1 sm:ml-2" />
-                  </>
-                )}
-              </Button>
+              {/* Only show next/start button for details and seat steps */}
+              {step !== 'blinds' && (
+                <Button
+                  onClick={step === 'seat' ? handleComplete : handleNextStep}
+                  disabled={
+                    (step === 'details' && !canProceedFromDetails()) ||
+                    (step === 'seat' && !canComplete())
+                  }
+                  className="flex-1 sm:flex-none h-10 sm:h-auto bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700"
+                >
+                  {step === 'seat' ? (
+                    <>
+                      <Play className="h-4 w-4 mr-1 sm:mr-2" />
+                      <span className="hidden xs:inline">Start Session</span>
+                      <span className="xs:hidden">Start</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="hidden xs:inline">Next</span>
+                      <span className="xs:hidden">Next</span>
+                      <ArrowRight className="h-4 w-4 ml-1 sm:ml-2" />
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>

@@ -92,36 +92,135 @@ src/
 - `User`: User account information
 - `Currency`: Multi-currency support with symbols
 
+## Poker Rules & Game Logic Implementation
+
+### Texas Hold'em Betting Rules
+**Location**: `src/app/session/[id]/page.tsx`
+
+#### Betting Round Structure
+1. **Preflop**: After hole cards are dealt, betting starts UTG (Under the Gun)
+2. **Flop**: After 3 community cards, betting starts with player after big blind
+3. **Turn**: After 4th community card, betting continues
+4. **River**: After 5th community card, final betting round
+5. **Showdown**: Remaining players reveal cards
+
+#### Betting Actions & Logic
+- **Fold**: Player exits the hand, removed from `playersMatchedBet` tracking
+- **Check**: Player stays in without betting (only when current bet is 0)
+- **Call**: Player matches the current bet by adding `(currentBet - playerCurrentBet)`
+- **Raise**: Player increases the bet to a new amount, resets `playersMatchedBet` to only include raiser
+- **All-in**: Player bets their remaining stack, marked in `allInPlayers` set
+
+#### Betting Round Completion Rules
+A betting round completes when:
+1. Only one player remains (all others folded)
+2. All active players have acted AND matched the current bet (or are all-in)
+3. We've gone full circle and everyone who can act has matched the bet
+4. All remaining players are all-in (no more betting possible)
+
+**Key State Tracking**:
+```typescript
+const [playersActedThisRound, setPlayersActedThisRound] = useState<Set<number>>(new Set());
+const [playersMatchedBet, setPlayersMatchedBet] = useState<Set<number>>(new Set());
+const [playerBetsThisRound, setPlayerBetsThisRound] = useState<Map<number, number>>(new Map());
+const [currentBet, setCurrentBet] = useState<number>(0);
+const [allInPlayers, setAllInPlayers] = useState<Set<number>>(new Set());
+```
+
+### Card Selection & Duplicate Prevention
+
+#### Hole Card Selection (`src/components/poker/HoleCardSelector.tsx`)
+- **Feature**: Interactive suit buttons + rank dropdown for 2 hole cards
+- **Duplicate Prevention**: Cards used in hole cards cannot be selected for community cards
+- **State Management**: Auto-advances to straddle selection when both cards selected
+- **Validation**: `getUsedCards()` function prevents selecting same card twice
+
+#### Community Card Selection (`src/components/poker/CommunityCardSelector.tsx`)
+- **Progressive Reveal**: Shows cards based on betting round (flop=3, turn=1, river=1)
+- **Duplicate Prevention**: Cards used in hole cards or other community positions unavailable
+- **Visual Feedback**: Unavailable cards shown with opacity reduction and "(used)" label
+- **Integration**: Receives `holeCards` prop to enforce cross-component duplicate prevention
+
+#### Card Format & Display
+- **Format**: Rank + Suit symbol (e.g., "A♠", "K♥", "Q♦", "J♣")  
+- **Suits**: Spades (♠), Hearts (♥), Diamonds (♦), Clubs (♣)
+- **Colors**: Hearts and Diamonds display in red (`text-red-600`), Spades and Clubs in black
+- **Validation**: 52-card deck with proper suit/rank combinations
+
+### Side Pot & All-In Logic
+
+#### All-In Scenarios (`src/app/session/[id]/page.tsx`)
+- **Short Stack All-In**: When player goes all-in for less than current bet, creates side pot scenario
+- **Effective Stack**: Other players can only win amount equal to all-in player's contribution
+- **State Flag**: `allInScenario` boolean tracks when side pots are needed
+- **Action Availability**: All-in button hidden when player can afford to call
+
+#### Pot Calculation
+- **Main Pot**: Tracks total chips contributed by all players
+- **Side Pot Logic**: When `allInScenario` is true, separate calculations for different stack sizes
+- **Bet Tracking**: `playerBetsThisRound` Map tracks each player's total contribution per round
+
+### Session Creation Flow
+
+#### Multi-Step Wizard (`src/app/create-session/page.tsx`)
+1. **Step 1**: Session details (name, buy-in, location, blinds)
+2. **Step 2**: Blind position selection (auto-advances after small blind selection)
+3. **Step 3**: Hero seat selection with animated prompts
+4. **Auto-Progression**: Removes manual "Next" clicks for smoother UX
+
+#### Seat & Position Logic
+```typescript
+// Dealer is always one seat before small blind
+const dealerSeat = (smallBlindSeat - 1 + totalSeats) % totalSeats;
+
+// Position abbreviations based on table size and dealer position  
+const getPositionAbbreviation = (seatIndex: number, dealerSeat: number, totalSeats: number) => {
+  const positionsFromDealer = (seatIndex - dealerSeat + totalSeats) % totalSeats;
+  // Returns: UTG, UTG+1, MP, MP+1, CO, BTN, SB, BB
+};
+```
+
+### Hand Progression & State Management
+
+#### Betting Round State Machine
+- **waitingForCards**: Boolean flag when community cards need to be selected
+- **waitingForHoleCards**: Initial state before hole cards are chosen  
+- **currentActionSeat**: Tracks whose turn it is to act
+- **currentBettingRound**: 'preflop' | 'flop' | 'turn' | 'river' | 'showdown'
+
+#### Player Action Processing
+```typescript
+const handlePlayerAction = (action: 'fold' | 'call' | 'raise' | 'check' | 'all-in', amount?: number) => {
+  // Calculate actual amounts based on current bet and player's existing bet
+  // Update pot size, player actions, and betting tracking state
+  // Move to next player or complete betting round
+};
+```
+
 ## Recent Improvements Made
 
-### Navigation Refactor
-- **Problem**: Duplicate navigation components on each page
-- **Solution**: Moved AppHeader and BottomNav to root layout
-- **Files Modified**: All page components, `layout.tsx`
+### Betting Logic Bug Fixes
+- **Problem**: Betting rounds not completing when all players matched current bet
+- **Root Cause**: Call action was incorrectly setting total bet instead of adding to existing bet
+- **Solution**: Fixed `handlePlayerAction` to properly track cumulative bet amounts
+- **Files Modified**: `src/app/session/[id]/page.tsx` lines 291-308
 
-### Dealer Button Enhancement  
-- **Problem**: Dealer button not visible or prominent enough
-- **Solution**: Enhanced styling with ring effects, proper positioning logic
-- **Key Changes**: 
-  - Added `dealerSeat` prop to create-session page
-  - Enhanced CSS with `ring-4 ring-yellow-200`, `border-4`, `shadow-xl`
-  - Crown icon for clear identification
+### Streamlined Hole Card Selection  
+- **Problem**: Manual "Continue to Straddle" button slowing down gameplay
+- **Solution**: Auto-show straddle dialog when both hole cards selected
+- **UX Improvement**: Combined hole card and straddle selection into single step
+- **Files Modified**: `src/components/poker/HoleCardSelector.tsx`
 
-### Community Cards System
-- **Feature**: 5 interactive card slots in table center
-- **Implementation**: Dropdown menus with full 52-card deck
-- **Cards**: Proper suit symbols (♠♥♦♣) with red/black coloring
-- **Integration**: Only shows on active sessions
+### Duplicate Card Prevention
+- **Feature**: Cross-component validation preventing same card selection
+- **Implementation**: `getUsedCards()` and `isCardAvailable()` functions
+- **Scope**: Works across hole cards and community cards
+- **Visual Feedback**: Disabled state and "(used)" labels for unavailable cards
 
-### Quick Session Creation
-- **Problem**: Too many required fields slowing down session creation
-- **Solution**: Smart defaults for common values
-- **Defaults**:
-  - Name: "Poker Session [Date]"
-  - Buy-in: $100
-  - Location: "Home Game"
-  - Blinds: $1/$2
-  - Seats: 9 players
+### All-In Action Availability  
+- **Problem**: Duplicate all-in buttons when hero couldn't afford to call
+- **Solution**: Hide separate all-in button when call action forces all-in
+- **Logic**: Smart button availability based on stack size vs. call amount
 
 ## Development Workflow
 

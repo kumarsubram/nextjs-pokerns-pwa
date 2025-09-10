@@ -1,14 +1,18 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { User, Crown, DollarSign, UserCheck, ChevronDown, Spade } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { User, Crown, DollarSign, ChevronDown, Spade } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+
+interface PlayerAction {
+  action: 'fold' | 'call' | 'raise' | 'check' | 'bet' | 'all-in';
+  amount?: number;
+}
 
 interface PokerTableProps {
   seats: 2 | 4 | 6 | 8 | 9 | 10;
@@ -26,6 +30,14 @@ interface PokerTableProps {
   showPositions?: boolean;
   showCommunityCards?: boolean;
   communityCards?: (string | null)[];
+  playerActions?: Map<number, PlayerAction>; // Track actions for each seat
+  currentActionSeat?: number; // Highlight current action seat
+  foldedSeats?: Set<number>; // Track folded players
+  smallBlindAmount?: number; // Amount for small blind
+  bigBlindAmount?: number; // Amount for big blind
+  potSize?: number; // Current pot size to display
+  currency?: string; // Currency symbol
+  heroHoleCards?: (string | null)[]; // Hero's hole cards to display
 }
 
 export function PokerTable({
@@ -44,6 +56,14 @@ export function PokerTable({
   showPositions = false,
   showCommunityCards = false,
   communityCards = [null, null, null, null, null],
+  playerActions,
+  currentActionSeat,
+  foldedSeats = new Set(),
+  smallBlindAmount,
+  bigBlindAmount,
+  potSize,
+  currency = '$',
+  heroHoleCards = [null, null],
 }: PokerTableProps) {
   const [tempSmallBlind, setTempSmallBlind] = useState<number | null>(null);
   const [tempBigBlind, setTempBigBlind] = useState<number | null>(null);
@@ -128,23 +148,64 @@ export function PokerTable({
     }
   };
 
-  const getSeatLabel = (seatIndex: number): string => {
-    if (seatIndex === selectedSeat) return 'YOU';
-    if (seatIndex === dealerSeat) return 'D';
-    if (seatIndex === smallBlindSeat || seatIndex === tempSmallBlind) return 'SB';
-    if (seatIndex === bigBlindSeat || seatIndex === tempBigBlind) return 'BB';
+  const getSeatLabel = (seatIndex: number): { main: string; action?: string; blind?: string } => {
+    // Base label
+    let mainLabel = '';
+    let blindAmount = '';
     
-    // Show position abbreviations if button is set and showPositions is true
-    if (showPositions && (buttonSeat || buttonSeat === 0)) {
+    if (seatIndex === selectedSeat) {
+      mainLabel = 'YOU';
+    } else if (seatIndex === dealerSeat) {
+      mainLabel = 'D';
+    } else if (seatIndex === smallBlindSeat || seatIndex === tempSmallBlind) {
+      mainLabel = 'SB';
+      if (smallBlindAmount) {
+        blindAmount = `$${smallBlindAmount}`;
+      }
+    } else if (seatIndex === bigBlindSeat || seatIndex === tempBigBlind) {
+      mainLabel = 'BB';
+      if (bigBlindAmount) {
+        blindAmount = `$${bigBlindAmount}`;
+      }
+    } else if (showPositions && (buttonSeat || buttonSeat === 0)) {
       const position = getPositionAbbreviation(seatIndex);
-      if (position) return position;
+      if (position) mainLabel = position;
     }
     
-    // For seat numbering: dealer is "D", other seats numbered 1, 2, 3... (excluding dealer)
-    return seatIndex === 0 ? 'D' : `${seatIndex}`;
+    // Default to seat number if no special label
+    if (!mainLabel) {
+      mainLabel = seatIndex === 0 ? 'D' : `${seatIndex}`;
+    }
+    
+    // Check for player action
+    const action = playerActions?.get(seatIndex);
+    if (action) {
+      const actionLabel = 
+        action.action === 'fold' ? 'F' :
+        action.action === 'call' ? 'C' :
+        action.action === 'raise' ? 'R' :
+        action.action === 'check' ? 'X' :
+        action.action === 'bet' ? 'B' :
+        action.action === 'all-in' ? 'AI' : '';
+      
+      const amountStr = action.amount ? ` $${action.amount}` : '';
+      return { main: mainLabel, action: `${actionLabel}${amountStr}`, blind: blindAmount };
+    }
+    
+    return { main: mainLabel, blind: blindAmount };
   };
 
   const getSeatColor = (seatIndex: number): string => {
+    // Folded seats are grayed out
+    if (foldedSeats.has(seatIndex)) {
+      return 'bg-gray-200 text-gray-400 border-2 border-gray-300 opacity-50';
+    }
+    
+    // Current action seat has a pulsing effect
+    if (seatIndex === currentActionSeat) {
+      return 'bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg animate-pulse';
+    }
+    
     if (seatIndex === selectedSeat) return 'bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-lg';
     if (seatIndex === dealerSeat) return 'bg-gradient-to-br from-gray-800 to-black text-white border-2 border-gray-600 shadow-lg';
     // Only show colors after small blind is selected
@@ -193,8 +254,8 @@ export function PokerTable({
           
           {/* Community Cards */}
           {showCommunityCards ? (
-            <div className="absolute inset-1/4 flex items-center justify-center">
-              <div className="flex gap-1">
+            <div className="absolute inset-1/4 flex flex-col items-center justify-center">
+              <div className="flex gap-1 mb-2">
                 {Array.from({ length: 5 }).map((_, cardIndex) => (
                   <DropdownMenu key={cardIndex}>
                     <DropdownMenuTrigger asChild>
@@ -241,6 +302,12 @@ export function PokerTable({
                   </DropdownMenu>
                 ))}
               </div>
+              {/* Pot Size Display */}
+              {potSize !== undefined && potSize > 0 && (
+                <div className="bg-gray-800/90 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg">
+                  Pot: {currency}{potSize}
+                </div>
+              )}
             </div>
           ) : (
             <div className="absolute inset-1/3 bg-gradient-to-br from-green-600 to-green-700 rounded-full border border-green-500 opacity-30"></div>
@@ -268,47 +335,79 @@ export function PokerTable({
               }}
               disabled={isDisabled}
             >
-              <div className="flex flex-col items-center">
-                {seatIndex === dealerSeat ? (
-                  <Spade className="h-4 w-4" />
-                ) : (tempSmallBlind !== null || smallBlindSeat !== undefined) && seatIndex === buttonSeat ? (
-                  <Crown className="h-4 w-4" />
-                ) : seatIndex === selectedSeat ? (
-                  <User className="h-4 w-4" />
-                ) : (seatIndex === smallBlindSeat || seatIndex === tempSmallBlind || seatIndex === bigBlindSeat || seatIndex === tempBigBlind) ? (
-                  <DollarSign className="h-3 w-3" />
-                ) : (
-                  <User className="h-4 w-4 text-gray-400" />
-                )}
-                <span className="text-[10px] mt-0.5">{getSeatLabel(seatIndex)}</span>
+              <div className="flex flex-col items-center justify-center">
+                {(() => {
+                  const label = getSeatLabel(seatIndex);
+                  return (
+                    <>
+                      {seatIndex === dealerSeat ? (
+                        <Spade className="h-3 w-3" />
+                      ) : (tempSmallBlind !== null || smallBlindSeat !== undefined) && seatIndex === buttonSeat ? (
+                        <Crown className="h-3 w-3" />
+                      ) : seatIndex === selectedSeat ? (
+                        <User className="h-3 w-3" />
+                      ) : (seatIndex === smallBlindSeat || seatIndex === tempSmallBlind || seatIndex === bigBlindSeat || seatIndex === tempBigBlind) ? (
+                        <DollarSign className="h-3 w-3" />
+                      ) : (
+                        <User className="h-3 w-3 text-gray-400" />
+                      )}
+                      <span className="text-[9px] leading-none">{label.main}</span>
+                      {label.blind && !label.action && (
+                        <span className="text-[7px] leading-none text-gray-300 mt-0.5">{label.blind}</span>
+                      )}
+                      {label.action && (
+                        <span className="text-[8px] leading-none font-semibold mt-0.5">{label.action}</span>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </button>
           );
         })}
-      </div>
 
-      {/* Legend */}
-      <div className="flex justify-center flex-wrap gap-4 text-xs">
-        <div className="flex items-center space-x-1">
-          <div className="w-3 h-3 rounded-full bg-gradient-to-br from-yellow-500 to-yellow-600"></div>
-          <span className="text-gray-600">Button</span>
-        </div>
-        <div className="flex items-center space-x-1">
-          <div className="w-3 h-3 rounded-full bg-gradient-to-br from-gray-800 to-black"></div>
-          <span className="text-gray-600">Dealer</span>
-        </div>
-        <div className="flex items-center space-x-1">
-          <div className="w-3 h-3 rounded-full bg-gradient-to-br from-blue-500 to-blue-600"></div>
-          <span className="text-gray-600">Small Blind</span>
-        </div>
-        <div className="flex items-center space-x-1">
-          <div className="w-3 h-3 rounded-full bg-gradient-to-br from-orange-500 to-orange-600"></div>
-          <span className="text-gray-600">Big Blind</span>
-        </div>
-        <div className="flex items-center space-x-1">
-          <div className="w-3 h-3 rounded-full bg-gradient-to-br from-emerald-500 to-green-600"></div>
-          <span className="text-gray-600">Your Seat</span>
-        </div>
+        {/* Hero Hole Cards - Display above hero's position if hole cards exist */}
+        {selectedSeat !== undefined && heroHoleCards && (heroHoleCards[0] || heroHoleCards[1]) && (
+          (() => {
+            const heroPosition = getSeatPosition(selectedSeat);
+            // Calculate position above hero seat
+            const cardDisplayY = heroPosition.y - 8; // 8% higher than hero seat
+            
+            return (
+              <div
+                className="absolute flex gap-1"
+                style={{
+                  left: `${heroPosition.x}%`,
+                  top: `${cardDisplayY}%`,
+                  transform: 'translate(-50%, -50%)',
+                }}
+              >
+                {heroHoleCards.map((card, index) => (
+                  <div
+                    key={index}
+                    className={`w-6 h-8 rounded border-2 text-[10px] font-bold flex items-center justify-center shadow-md ${
+                      card 
+                        ? 'bg-white border-gray-300 text-gray-800' 
+                        : 'bg-gray-100 border-dashed border-gray-400 text-gray-500'
+                    }`}
+                  >
+                    {card ? (
+                      <div className={`text-center ${
+                        card.includes('♥') || card.includes('♦') 
+                          ? 'text-red-600' 
+                          : 'text-black'
+                      }`}>
+                        {card}
+                      </div>
+                    ) : (
+                      '?'
+                    )}
+                  </div>
+                ))}
+              </div>
+            );
+          })()
+        )}
       </div>
     </div>
   );

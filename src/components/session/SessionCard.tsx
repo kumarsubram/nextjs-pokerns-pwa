@@ -3,23 +3,16 @@
 import { Session } from '@/types/poker';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar, DollarSign, MapPin, Trophy, Clock, MoreVertical } from 'lucide-react';
+import { Calendar, DollarSign, MapPin, Trophy, Clock, Eye, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 
 interface SessionCardProps {
   session: Session;
-  onEdit?: (session: Session) => void;
   onDelete?: (session: Session) => void;
   onView?: (session: Session) => void;
 }
 
-export function SessionCard({ session, onEdit, onDelete, onView }: SessionCardProps) {
+export function SessionCard({ session, onDelete, onView }: SessionCardProps) {
   const isActive = !session.endTime;
   const duration = session.endTime 
     ? Math.round((new Date(session.endTime).getTime() - new Date(session.startTime).getTime()) / 1000 / 60)
@@ -44,29 +37,29 @@ export function SessionCard({ session, onEdit, onDelete, onView }: SessionCardPr
       )}
       
       <CardHeader className="pb-3">
-        <div className="flex justify-between items-start">
+        <div className="flex justify-between items-start mb-2">
           <CardTitle className="text-lg">{session.name}</CardTitle>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onView?.(session)}>
-                View Details
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onEdit?.(session)}>
-                Edit Session
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => onDelete?.(session)}
-                className="text-red-600"
-              >
-                Delete Session
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        </div>
+        
+        <div className="flex justify-end gap-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => onView?.(session)}
+            className="h-7 px-2 text-xs"
+          >
+            <Eye className="h-3 w-3 mr-1" />
+            View
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => onDelete?.(session)}
+            className="h-7 px-2 text-xs text-red-600 border-red-200 hover:bg-red-50"
+          >
+            <Trash2 className="h-3 w-3 mr-1" />
+            Delete
+          </Button>
         </div>
         
         <div className="flex gap-2 mt-2">

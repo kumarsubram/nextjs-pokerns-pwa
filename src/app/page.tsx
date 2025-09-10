@@ -58,18 +58,17 @@ export default function Home() {
       <main className="container max-w-7xl mx-auto px-4 py-2">
         {/* Quick Actions */}
         <div className="mb-10">
-          <div className="text-center mb-8">
-            <h2 className="text-2xl font-semibold text-gray-900 mb-2">Get started</h2>
-          </div>
           {/* Conditional grid layout based on active sessions */}
-          <div className={`grid gap-3 mb-6 ${
+          <div className={`${
             activeSessions.length > 0 
-              ? 'sm:grid-cols-1 lg:grid-cols-3' // 3 buttons when active sessions exist
-              : 'sm:grid-cols-1 lg:grid-cols-2 max-w-2xl mx-auto' // 2 centered buttons for first-time users
+              ? 'grid gap-3 mb-6 sm:grid-cols-1 lg:grid-cols-3' // 3 buttons when active sessions exist
+              : 'flex justify-center mb-6' // Single centered button for first-time users
           }`}>
             {/* Start New Session */}
             <div 
-              className="bg-gradient-to-r from-emerald-500 to-green-600 rounded-xl p-4 cursor-pointer hover:from-emerald-600 hover:to-green-700 transition-all transform hover:scale-105 shadow-lg"
+              className={`bg-gradient-to-r from-emerald-500 to-green-600 rounded-xl p-4 cursor-pointer hover:from-emerald-600 hover:to-green-700 transition-all transform hover:scale-105 shadow-lg ${
+                activeSessions.length === 0 ? 'inline-flex' : ''
+              }`}
               onClick={() => router.push('/create-session')}
             >
               <div className="flex items-center text-white">
@@ -78,7 +77,6 @@ export default function Home() {
                 </div>
                 <div>
                   <h3 className="font-bold text-lg">Start Session</h3>
-                  <p className="text-white/90 text-sm">Begin new game</p>
                 </div>
               </div>
             </div>
@@ -357,8 +355,7 @@ export default function Home() {
                 <SessionCard
                   key={session.id}
                   session={session}
-                  onView={(s) => console.log('View session:', s)}
-                  onEdit={(s) => console.log('Edit session:', s)}
+                  onView={(s) => router.push(`/session/${s.id}/view`)}
                   onDelete={(s) => console.log('Delete session:', s)}
                 />
               ))}

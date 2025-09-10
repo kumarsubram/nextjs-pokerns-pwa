@@ -108,8 +108,13 @@ export default function CreateSessionPage() {
         totalHands: 0,
       });
 
-      // Update with table setup (dealer is set as the seat before small blind)
-      const buttonSeat = (tableSetup.smallBlindSeat! - 1 + sessionData.seats) % sessionData.seats;
+      // Update with table setup (button is 1 seat left of SB, but can't be dealer at seat 0)
+      const totalSeats = sessionData.seats + 1;
+      let buttonSeat = (tableSetup.smallBlindSeat! - 1 + totalSeats) % totalSeats;
+      // If button would be on dealer seat (0), move it to the last player seat
+      if (buttonSeat === 0) {
+        buttonSeat = totalSeats - 1;
+      }
       const dealerSeat = 0; // Fixed dealer position at seat 0 (top of table)
       await updateSession(session.id, {
         bigBlindPosition: tableSetup.bigBlindSeat!,
@@ -145,7 +150,7 @@ export default function CreateSessionPage() {
       case 'details':
         return 'Session Details';
       case 'blinds':
-        return 'Set Blind Positions';
+        return 'Select Small Blind Position';
       case 'seat':
         return 'Choose Your Seat';
       default:
@@ -158,9 +163,9 @@ export default function CreateSessionPage() {
       case 'details':
         return 'Enter the basic details for your poker session';
       case 'blinds':
-        return 'Select the Small Blind and Big Blind positions at the table';
+        return '';
       case 'seat':
-        return 'Choose where you want to sit (you can be a blind too!)';
+        return '';
       default:
         return '';
     }
@@ -407,10 +412,14 @@ export default function CreateSessionPage() {
                   smallBlindSeat={tableSetup.smallBlindSeat ?? undefined}
                   bigBlindSeat={tableSetup.bigBlindSeat ?? undefined}
                   selectedSeat={tableSetup.heroSeat ?? undefined}
-                  buttonSeat={tableSetup.smallBlindSeat ? (tableSetup.smallBlindSeat - 1 + sessionData.seats) % sessionData.seats : 0}
+                  buttonSeat={tableSetup.smallBlindSeat ? (() => {
+                    const totalSeats = sessionData.seats + 1;
+                    let btn = (tableSetup.smallBlindSeat - 1 + totalSeats) % totalSeats;
+                    return btn === 0 ? totalSeats - 1 : btn;
+                  })() : 0}
                   dealerSeat={0}
                   allowHeroAsBlind={true}
-                  showPositions={true}
+                  showPositions={tableSetup.smallBlindSeat !== null}
                 />
               </div>
             )}

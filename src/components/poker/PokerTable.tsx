@@ -37,7 +37,7 @@ export function PokerTable({
   smallBlindSeat,
   bigBlindSeat,
   buttonSeat,
-  dealerSeat,
+  dealerSeat = 0,
   showSeatSelection = true,
   showBlindSelection = true,
   allowHeroAsBlind = false,
@@ -99,8 +99,9 @@ export function PokerTable({
 
   // Calculate seat positions around the table
   const getSeatPosition = (seatIndex: number): { x: number; y: number } => {
-    const angle = (seatIndex * 2 * Math.PI) / seats - Math.PI / 2; // Start from top
-    const radiusX = 45; // Horizontal radius percentage
+    const totalSeats = seats + 1; // Include dealer seat
+    const angle = (seatIndex * 2 * Math.PI) / totalSeats - Math.PI / 2; // Start from top
+    const radiusX = 45; // Horizontal radius percentage  
     const radiusY = 35; // Vertical radius percentage
     
     return {
@@ -110,6 +111,11 @@ export function PokerTable({
   };
 
   const handleSeatClick = (seatIndex: number) => {
+    // Prevent clicking on dealer seat
+    if (seatIndex === dealerSeat) {
+      return;
+    }
+    
     if (showBlindSelection && (!smallBlindSeat || !bigBlindSeat)) {
       // Handle blind selection first
       if (!tempSmallBlind) {
@@ -124,6 +130,7 @@ export function PokerTable({
 
   const getSeatLabel = (seatIndex: number): string => {
     if (seatIndex === selectedSeat) return 'YOU';
+    if (seatIndex === dealerSeat) return 'D';
     if (seatIndex === smallBlindSeat || seatIndex === tempSmallBlind) return 'SB';
     if (seatIndex === bigBlindSeat || seatIndex === tempBigBlind) return 'BB';
     
@@ -133,13 +140,15 @@ export function PokerTable({
       if (position) return position;
     }
     
-    return `${seatIndex + 1}`;
+    // For seat numbering: dealer is "D", other seats numbered 1, 2, 3... (excluding dealer)
+    return seatIndex === 0 ? 'D' : `${seatIndex}`;
   };
 
   const getSeatColor = (seatIndex: number): string => {
     if (seatIndex === selectedSeat) return 'bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-lg';
-    if (seatIndex === buttonSeat) return 'bg-gradient-to-br from-yellow-400 to-yellow-500 text-white border-4 border-yellow-300 shadow-xl ring-4 ring-yellow-200';
-    if (seatIndex === dealerSeat) return 'bg-gradient-to-br from-purple-500 to-purple-600 text-white border-2 border-purple-300 shadow-lg';
+    if (seatIndex === dealerSeat) return 'bg-gradient-to-br from-gray-800 to-black text-white border-2 border-gray-600 shadow-lg';
+    // Only show colors after small blind is selected
+    if ((tempSmallBlind !== null || smallBlindSeat !== undefined) && seatIndex === buttonSeat) return 'bg-gradient-to-br from-yellow-400 to-yellow-500 text-white border-4 border-yellow-300 shadow-xl ring-4 ring-yellow-200';
     if (seatIndex === smallBlindSeat || seatIndex === tempSmallBlind) return 'bg-gradient-to-br from-blue-500 to-blue-600 text-white';
     if (seatIndex === bigBlindSeat || seatIndex === tempBigBlind) return 'bg-gradient-to-br from-orange-500 to-orange-600 text-white';
     return 'bg-white border-2 border-gray-300 text-gray-700 hover:border-emerald-500 hover:text-emerald-600';
@@ -150,23 +159,27 @@ export function PokerTable({
       if (!tempSmallBlind) return 'Select Small Blind position';
       if (!tempBigBlind) return 'Select Big Blind position';
     }
-    if (showSeatSelection && selectedSeat === undefined) {
-      return 'Choose your seat at the table';
+    // Remove seat selection instruction text
+    return '';
+  };
+
+  const getSubInstructionText = (): string => {
+    if (showBlindSelection && !smallBlindSeat && !bigBlindSeat) {
+      if (!tempSmallBlind) return 'Click on any seat to set as Small Blind';
+      if (!tempBigBlind) return 'Big Blind will auto-select next seat';
     }
+    // Remove seat selection sub-instruction text
     return '';
   };
 
   return (
     <div className="flex flex-col items-center space-y-6">
-      {/* Instructions */}
-      {getInstructionText() && (
+      {/* Instructions - only show for seat selection, not blind selection */}
+      {showSeatSelection && getInstructionText() && (
         <div className="text-center">
           <p className="text-lg font-semibold text-gray-900 mb-2">{getInstructionText()}</p>
           <p className="text-sm text-gray-600">
-            {showBlindSelection && !smallBlindSeat && !bigBlindSeat
-              ? 'First select Small Blind, then Big Blind positions'
-              : 'Click on any available seat to join the table'
-            }
+            {getSubInstructionText()}
           </p>
         </div>
       )}
@@ -235,11 +248,11 @@ export function PokerTable({
         </div>
 
         {/* Seat Positions */}
-        {Array.from({ length: seats }).map((_, seatIndex) => {
+        {Array.from({ length: seats + 1 }).map((_, seatIndex) => {
           const position = getSeatPosition(seatIndex);
           const isBlindSeat = seatIndex === smallBlindSeat || seatIndex === bigBlindSeat;
           const isSelectedSeat = seatIndex === selectedSeat;
-          const isDisabled = showSeatSelection && !allowHeroAsBlind && isBlindSeat && !isSelectedSeat;
+          const isDisabled = seatIndex === dealerSeat || (showSeatSelection && !allowHeroAsBlind && isBlindSeat && !isSelectedSeat);
           
           return (
             <button
@@ -256,10 +269,10 @@ export function PokerTable({
               disabled={isDisabled}
             >
               <div className="flex flex-col items-center">
-                {seatIndex === buttonSeat ? (
-                  <Crown className="h-4 w-4" />
-                ) : seatIndex === dealerSeat ? (
+                {seatIndex === dealerSeat ? (
                   <Spade className="h-4 w-4" />
+                ) : (tempSmallBlind !== null || smallBlindSeat !== undefined) && seatIndex === buttonSeat ? (
+                  <Crown className="h-4 w-4" />
                 ) : seatIndex === selectedSeat ? (
                   <User className="h-4 w-4" />
                 ) : (seatIndex === smallBlindSeat || seatIndex === tempSmallBlind || seatIndex === bigBlindSeat || seatIndex === tempBigBlind) ? (
@@ -281,7 +294,7 @@ export function PokerTable({
           <span className="text-gray-600">Button</span>
         </div>
         <div className="flex items-center space-x-1">
-          <div className="w-3 h-3 rounded-full bg-gradient-to-br from-purple-500 to-purple-600"></div>
+          <div className="w-3 h-3 rounded-full bg-gradient-to-br from-gray-800 to-black"></div>
           <span className="text-gray-600">Dealer</span>
         </div>
         <div className="flex items-center space-x-1">

@@ -68,7 +68,7 @@ export function TableSetupModal({
   const getStepTitle = () => {
     switch (step) {
       case 'blinds':
-        return 'Set Blind Positions';
+        return 'Select Small Blind Position';
       case 'seat':
         return 'Choose Your Seat';
       default:
@@ -79,7 +79,7 @@ export function TableSetupModal({
   const getStepDescription = () => {
     switch (step) {
       case 'blinds':
-        return 'First, select the Small Blind and Big Blind positions at the table';
+        return '';
       case 'seat':
         return 'Now choose where you want to sit at the table';
       default:

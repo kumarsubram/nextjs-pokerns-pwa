@@ -3,23 +3,26 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-// import { Card, CardContent } from '@/components/ui/card'; // Unused imports
 
-interface CommunityCardSelectorProps {
-  currentBettingRound: 'preflop' | 'flop' | 'turn' | 'river' | 'showdown';
-  communityCards: (string | null)[];
+interface OpponentCardSelectorProps {
+  seatNumber: number;
+  opponentCards: (string | null)[];
   onCardSelect: (cardIndex: number, card: string) => void;
-  onComplete: () => void;
-  holeCards?: (string | null)[]; // To prevent duplicates with hole cards
+  onMucked: () => void;
+  holeCards?: (string | null)[];
+  communityCards?: (string | null)[];
+  allOpponentCards?: Map<number, (string | null)[]>; // All other opponents' cards to prevent duplicates
 }
 
-export function CommunityCardSelector({
-  currentBettingRound,
-  communityCards,
+export function OpponentCardSelector({
+  seatNumber,
+  opponentCards,
   onCardSelect,
-  onComplete,
+  onMucked,
   holeCards = [null, null],
-}: CommunityCardSelectorProps) {
+  communityCards = [null, null, null, null, null],
+  allOpponentCards = new Map(),
+}: OpponentCardSelectorProps) {
   const [selectedRanks, setSelectedRanks] = useState<{ [key: number]: string }>({});
   const [selectedSuits, setSelectedSuits] = useState<{ [key: number]: string }>({});
 
@@ -32,41 +35,48 @@ export function CommunityCardSelector({
 
   const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
-  // Get all cards that are already used (hole cards + other community cards)
+  // Get all cards that are already used (hero cards + community cards + other opponents' cards)
   const getUsedCards = (): Set<string> => {
     const usedCards = new Set<string>();
     
-    // Add hole cards
+    // Add hero hole cards
     holeCards.forEach(card => {
       if (card) usedCards.add(card);
     });
     
-    // Add other community cards (but not current card being edited)
+    // Add community cards
     communityCards.forEach(card => {
+      if (card) usedCards.add(card);
+    });
+    
+    // Add all other opponents' cards
+    allOpponentCards.forEach((cards, seat) => {
+      if (seat !== seatNumber) {
+        cards.forEach(card => {
+          if (card) usedCards.add(card);
+        });
+      }
+    });
+    
+    // Add current opponent's other card (but not current card being edited)
+    opponentCards.forEach(card => {
       if (card) usedCards.add(card);
     });
     
     return usedCards;
   };
 
-  // Check if a card combination is available for a specific community card slot
+  // Check if a card combination is available for a specific opponent card slot
   const isCardAvailable = (cardIndex: number, rank: string, suit: string): boolean => {
     const cardToCheck = `${rank}${suit}`;
     const usedCards = getUsedCards();
     
     // Remove current card being edited from used cards
-    if (communityCards[cardIndex]) {
-      usedCards.delete(communityCards[cardIndex]!);
+    if (opponentCards[cardIndex]) {
+      usedCards.delete(opponentCards[cardIndex]!);
     }
     
     return !usedCards.has(cardToCheck);
-  };
-
-  const getCardsToShow = () => {
-    if (currentBettingRound === 'flop') return [0, 1, 2];
-    if (currentBettingRound === 'turn') return [3];
-    if (currentBettingRound === 'river') return [4];
-    return [];
   };
 
   const handleSuitSelect = (cardIndex: number, suit: string) => {
@@ -103,37 +113,28 @@ export function CommunityCardSelector({
     }
   };
 
-  const isComplete = () => {
-    const cardsToShow = getCardsToShow();
-    return cardsToShow.every(index => communityCards[index] !== null);
-  };
-
-  // const getCardName = (index: number) => {
-  //   if (index === 0) return 'Flop Card 1';
-  //   if (index === 1) return 'Flop Card 2';
-  //   if (index === 2) return 'Flop Card 3';
-  //   if (index === 3) return 'Turn Card';
-  //   if (index === 4) return 'River Card';
-  //   return `Card ${index + 1}`;
-  // }; // Keeping for potential future use
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 bg-gray-50 border border-gray-200 rounded-lg p-4">
       <div className="text-center">
-        <h3 className="text-lg font-semibold text-orange-600 mb-2">
-          Select {currentBettingRound === 'flop' ? 'Flop Cards' : 
-                  currentBettingRound === 'turn' ? 'Turn Card' : 'River Card'}
-        </h3>
+        <h4 className="text-md font-semibold text-gray-700 mb-2">
+          Seat {seatNumber} Cards
+        </h4>
+        <div className="flex justify-center gap-2 mb-3">
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs px-3 py-1 bg-red-50 hover:bg-red-100 text-red-700 border-red-300"
+            onClick={onMucked}
+          >
+            Mucked
+          </Button>
+        </div>
       </div>
 
-      {getCardsToShow().map((cardIndex) => (
+      {[0, 1].map((cardIndex) => (
         <div key={cardIndex} className="flex items-center gap-3 justify-center">
-          <span className="text-sm font-medium text-gray-700 w-8">
-            {cardIndex === 0 ? 'CC1' :
-             cardIndex === 1 ? 'CC2' :
-             cardIndex === 2 ? 'CC3' :
-             cardIndex === 3 ? 'Turn' :
-             cardIndex === 4 ? 'River' : `CC${cardIndex + 1}`}
+          <span className="text-sm font-medium text-gray-700 w-12">
+            {cardIndex === 0 ? 'Card 1' : 'Card 2'}
           </span>
           
           {/* Suit Selection */}
@@ -155,7 +156,7 @@ export function CommunityCardSelector({
                       ? 'opacity-30 cursor-not-allowed bg-gray-100'
                       : 'hover:bg-gray-50'
                   }`}
-                  aria-label={`Select ${suit.name} suit for community card ${cardIndex + 1}`}
+                  aria-label={`Select ${suit.name} suit for seat ${seatNumber} card ${cardIndex + 1}`}
                   onClick={() => handleSuitSelect(cardIndex, suit.symbol)}
                 >
                   <span className={`text-sm ${isUnavailable ? 'text-gray-400' : suit.color}`}>
@@ -171,7 +172,7 @@ export function CommunityCardSelector({
             value={selectedRanks[cardIndex] || ""} 
             onValueChange={(value) => handleRankSelect(cardIndex, value)}
           >
-            <SelectTrigger className="w-16 h-8" aria-label={`Select rank for community card ${cardIndex + 1}`}>
+            <SelectTrigger className="w-16 h-8" aria-label={`Select rank for seat ${seatNumber} card ${cardIndex + 1}`}>
               <SelectValue placeholder="?" />
             </SelectTrigger>
             <SelectContent>
@@ -195,28 +196,16 @@ export function CommunityCardSelector({
           </Select>
           
           {/* Show selected card */}
-          {communityCards[cardIndex] && (
+          {opponentCards[cardIndex] && (
             <div className={`text-sm font-bold ml-2 ${
-              communityCards[cardIndex]?.includes('♥') || communityCards[cardIndex]?.includes('♦')
+              opponentCards[cardIndex]?.includes('♥') || opponentCards[cardIndex]?.includes('♦')
                 ? 'text-red-600' : 'text-black'
             }`}>
-              {communityCards[cardIndex]}
+              {opponentCards[cardIndex]}
             </div>
           )}
         </div>
       ))}
-
-      {isComplete() && (
-        <div className="flex justify-center mt-6">
-          <Button
-            onClick={onComplete}
-            className="bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700"
-          >
-            Continue to {currentBettingRound === 'flop' ? 'Flop Betting' : 
-                        currentBettingRound === 'turn' ? 'Turn Betting' : 'River Betting'}
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

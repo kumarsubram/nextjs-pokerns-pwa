@@ -199,42 +199,68 @@ const handlePlayerAction = (action: 'fold' | 'call' | 'raise' | 'check' | 'all-i
 
 ## Recent Improvements Made
 
-### Betting Logic Bug Fixes
-- **Problem**: Betting rounds not completing when all players matched current bet
-- **Root Cause**: Call action was incorrectly setting total bet instead of adding to existing bet
-- **Solution**: Fixed `handlePlayerAction` to properly track cumulative bet amounts
-- **Files Modified**: `src/app/session/[id]/page.tsx` lines 291-308
+### Critical Betting Logic Bug Fixes
+- **Problem**: Betting rounds not completing when all players matched current bet after BB re-raise scenario
+- **Root Cause**: React state timing issue - `moveToNextPlayer()` was using stale `currentBet` values from async `setCurrentBet()`
+- **Solution**: Modified `moveToNextPlayer()` to accept updated parameters and pass them directly from `handlePlayerAction()`
+- **Files Modified**: `src/app/session/[id]/page.tsx` lines 400-450
+- **Key Learning**: React state updates are asynchronous - pass updated values directly instead of relying on state
 
-### Streamlined Hole Card Selection  
-- **Problem**: Manual "Continue to Straddle" button slowing down gameplay
-- **Solution**: Auto-show straddle dialog when both hole cards selected
-- **UX Improvement**: Combined hole card and straddle selection into single step
-- **Files Modified**: `src/components/poker/HoleCardSelector.tsx`
+### Advanced Card Selection System
+#### Enhanced Community Card Selection (`src/components/poker/CommunityCardSelector.tsx`)
+- **Duplicate Prevention**: Cannot select cards already used in hole cards or other community cards
+- **Visual Feedback**: Unavailable suit buttons disabled with grayed-out styling and cursor-not-allowed
+- **Dropdown Filtering**: Rank dropdown shows "(used)" indicator for unavailable ranks
+- **Cross-Component Integration**: Receives `holeCards` prop to enforce duplicate prevention
 
-### Duplicate Card Prevention
-- **Feature**: Cross-component validation preventing same card selection
-- **Implementation**: `getUsedCards()` and `isCardAvailable()` functions
-- **Scope**: Works across hole cards and community cards
-- **Visual Feedback**: Disabled state and "(used)" labels for unavailable cards
+#### Opponent Card Selection for Showdown (`src/components/poker/OpponentCardSelector.tsx`)
+- **Professional Interface**: Matches styling of hole card and community card selectors  
+- **Comprehensive Duplicate Prevention**: Prevents selection across hero cards, community cards, and other opponents' cards
+- **State Management**: `opponentCards` Map tracks each opponent's selected cards
+- **Mucked Cards**: "Mucked" button for opponents who don't reveal cards
+- **Integration**: Replaces simple text inputs with sophisticated card selection UI
 
-### All-In Action Availability  
-- **Problem**: Duplicate all-in buttons when hero couldn't afford to call
-- **Solution**: Hide separate all-in button when call action forces all-in
-- **Logic**: Smart button availability based on stack size vs. call amount
+### Accessibility & Form Standards Implementation
+- **Dialog Accessibility**: Added `DialogDescription` to all dialogs to fix "Missing Description" warnings
+- **Form Field Standards**: Added `id`, `name`, and `aria-label` attributes to all input fields
+- **Card Selector Labels**: Comprehensive `aria-label` attributes for all suit buttons and rank dropdowns
+- **Screen Reader Support**: All interactive elements properly labeled for accessibility compliance
+- **Files Modified**: All card selector components + main session page
+
+### Re-Raise Button & Event Tracking System
+#### Smart Button Display Logic
+- **Dynamic Button Text**: Shows "Bet", "Raise", or "Re-Raise" based on betting round state
+- **Logic**: `{currentBet === 0 ? 'Bet' : (lastRaiserSeat !== null ? 'Re-Raise' : 'Raise')}`
+- **State Tracking**: `lastRaiserSeat` tracks who raised first in current round
+
+#### Enhanced Action Tracking for Hand Replay
+- **Extended Action Types**: Added 're-raise' to Action interface in `src/types/poker.ts`
+- **Smart Event Logging**: Distinguishes between 'raise' and 're-raise' in `handActions` array
+- **Timestamp Tracking**: All actions logged with precise timestamps for future replay functionality
+- **Sequential Tracking**: Actions maintain proper order within betting rounds for accurate replay
+
+### State Management Improvements
+- **Proper State Resets**: `lastRaiserSeat` properly reset in new hands and betting rounds
+- **React State Timing**: Learned to pass updated values directly instead of relying on async state updates
+- **Cross-Component State**: `opponentCards` Map properly managed and reset between hands
 
 ## Development Workflow
 
 ### Running the App
 ```bash
-npm run dev          # Start development server
+# Kill any existing processes on port 3000 first
+lsof -ti:3000 | xargs kill -9 2>/dev/null
+
+npm run dev          # Start development server on port 3000
 npm run build        # Build for production
 npm run start        # Start production server
 ```
 
 ### Key Commands
-- **Server**: http://localhost:3000
+- **Server**: http://localhost:3000 (always use port 3000 for consistency)
 - **Build Output**: `.next/` directory
 - **Static Assets**: `public/` directory
+- **Port Conflicts**: Always kill existing processes on port 3000 before starting dev server
 
 ## Component Patterns
 

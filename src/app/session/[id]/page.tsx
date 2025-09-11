@@ -7,12 +7,14 @@ import { Session, Action } from '@/types/poker';
 import { PokerTable } from '@/components/poker/PokerTable';
 import { CommunityCardSelector } from '@/components/poker/CommunityCardSelector';
 import { HoleCardSelector } from '@/components/poker/HoleCardSelector';
+import { OpponentCardSelector } from '@/components/poker/OpponentCardSelector';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -37,10 +39,11 @@ export default function SessionPage() {
   const [playerActions, setPlayerActions] = useState<Map<number, { action: 'fold' | 'call' | 'raise' | 'check' | 'bet' | 'all-in'; amount?: number }>>(new Map());
   const [communityCards, setCommunityCards] = useState<(string | null)[]>([null, null, null, null, null]);
   const [waitingForCards, setWaitingForCards] = useState(false);
-  const [roundStartSeat, setRoundStartSeat] = useState<number | null>(null);
+  // const [roundStartSeat, setRoundStartSeat] = useState<number | null>(null); // For future use
   const [playersActedThisRound, setPlayersActedThisRound] = useState<Set<number>>(new Set());
-  const [playersMatchedBet, setPlayersMatchedBet] = useState<Set<number>>(new Set());
+  // Removed playersMatchedBet - now tracking actual bet amounts in playerBetsThisRound
   const [playerBetsThisRound, setPlayerBetsThisRound] = useState<Map<number, number>>(new Map());
+  const [lastRaiserSeat, setLastRaiserSeat] = useState<number | null>(null);
   const [heroStack, setHeroStack] = useState<number>(0);
   const [allInPlayers, setAllInPlayers] = useState<Set<number>>(new Set());
   const [showAllInDialog, setShowAllInDialog] = useState(false);
@@ -56,10 +59,11 @@ export default function SessionPage() {
   const [showStraddleDialog, setShowStraddleDialog] = useState(false);
   const [customStraddleAmount, setCustomStraddleAmount] = useState('');
   const [rebuyAmount, setRebuyAmount] = useState('');
-  const [effectivePotSize, setEffectivePotSize] = useState(0); // For side pot calculations
-  const [allInScenario, setAllInScenario] = useState(false); // Track if we're in an all-in scenario
-  const [handResult, setHandResult] = useState<'won' | 'lost' | null>(null);
+  // const [effectivePotSize, setEffectivePotSize] = useState(0); // For side pot calculations
+  // const [allInScenario, setAllInScenario] = useState(false); // Track if we're in an all-in scenario
+  // const [handResult, setHandResult] = useState<'won' | 'lost' | null>(null); // For showdown results
   const [holeCardsCompleted, setHoleCardsCompleted] = useState(false);
+  const [opponentCards, setOpponentCards] = useState<Map<number, (string | null)[]>>(new Map());
 
   const sessionId = params.id as string;
 
@@ -87,23 +91,25 @@ export default function SessionPage() {
     setCurrentBettingRound('preflop');
     setWaitingForCards(false);
     setPlayersActedThisRound(new Set());
-    setPlayersMatchedBet(new Set());
+    // Reset for new betting round
     setPlayerBetsThisRound(new Map());
     setAllInPlayers(new Set());
     setHoleCards([null, null]);
     setWaitingForHoleCards(true);
     setShowdownPlayers(new Map());
-    setEffectivePotSize(0);
-    setAllInScenario(false);
-    setHandResult(null);
+    // setEffectivePotSize(0);
+    // setAllInScenario(false);
+    // setHandResult(null);
     setHoleCardsCompleted(false);
+    setOpponentCards(new Map());
     
     // Reset straddle state and ask about straddle
     setStraddleSeat(null);
     setStraddleAmount(0);
     setShowStraddleDialog(true);
     setCurrentActionSeat(null);
-    setRoundStartSeat(null);
+    setLastRaiserSeat(null);
+    // setRoundStartSeat(null);
     
     // Initial pot is just the blinds for now
     setPotSize((session.smallBlind || 0) + (session.bigBlind || 0));
@@ -138,7 +144,7 @@ export default function SessionPage() {
       }
       
       setCurrentActionSeat(firstActionSeat);
-      setRoundStartSeat(firstActionSeat);
+      // setRoundStartSeat(firstActionSeat);
       
       // Log straddle action
       const straddleAction: Action & { seatNumber: number; bettingRound: string; timestamp: Date } = {
@@ -159,8 +165,7 @@ export default function SessionPage() {
       actionMap.set(seat, { action: 'raise' as const, amount: straddleAmt });
       setPlayerActions(actionMap);
       
-      // Initialize matched bet tracking - straddle seat has matched their own bet
-      setPlayersMatchedBet(new Set([seat]));
+      // Straddle seat has made their bet
       
       // Initialize bet tracking for this round
       const roundBets = new Map();
@@ -180,12 +185,9 @@ export default function SessionPage() {
       const actualFirstSeat = firstActionSeat === 0 ? 1 : firstActionSeat;
       
       setCurrentActionSeat(actualFirstSeat);
-      setRoundStartSeat(actualFirstSeat);
+      // setRoundStartSeat(actualFirstSeat);
       
-      // Initialize matched bet tracking - big blind has initially matched their blind
-      if (session?.bigBlindPosition !== undefined) {
-        setPlayersMatchedBet(new Set([session.bigBlindPosition]));
-      }
+      // Big blind has made their initial blind bet
       
       // Initialize bet tracking for this round
       const roundBets = new Map();
@@ -201,6 +203,17 @@ export default function SessionPage() {
 
   const handlePlayerAction = (action: 'fold' | 'call' | 'raise' | 'check' | 'all-in', amount?: number) => {
     if (currentActionSeat === null || !session) return;
+    
+    console.log(`=== PLAYER ACTION START ===`);
+    console.log(`Player ${currentActionSeat} (${currentActionSeat === session.heroPosition ? 'HERO' : 'BOT'}) action: ${action}`, amount ? `amount: ${amount}` : '');
+    console.log('State before action:', {
+      currentBet,
+      currentActionSeat,
+      playersActedThisRound: Array.from(playersActedThisRound),
+      playerBetsThisRound: Array.from(playerBetsThisRound.entries()),
+      lastRaiserSeat,
+      potSize
+    });
     
     // Handle all-in from other players - prompt for amount
     if (action === 'all-in' && currentActionSeat !== session.heroPosition) {
@@ -246,14 +259,16 @@ export default function SessionPage() {
       }
     }
     
-    // Create detailed action log
+    // Create detailed action log - distinguish raise vs re-raise for tracking
+    const trackedAction = action === 'raise' && lastRaiserSeat !== null ? 're-raise' : action;
+    
     const newAction: Action & { 
       seatNumber: number; 
       bettingRound: string; 
       timestamp: Date 
     } = {
       player: currentActionSeat === session.heroPosition ? 'hero' : 'BTN',
-      action: action,
+      action: trackedAction as Action['action'],
       amount: actualAmount,
       totalPot: potSize + actualAmount,
       seatNumber: currentActionSeat,
@@ -285,40 +300,35 @@ export default function SessionPage() {
     
     if (action === 'fold') {
       setPlayerFolded(new Set([...playerFolded, currentActionSeat]));
-      const newMatchedBet = new Set(playersMatchedBet);
-      newMatchedBet.delete(currentActionSeat);
-      setPlayersMatchedBet(newMatchedBet);
+      // Player folded - they're out of the hand
     } else if (action === 'call') {
       // Call means they're adding to their bet to match the current bet
       const newTotalBet = playerCurrentBet + actualAmount;
       newBetsThisRound.set(currentActionSeat, newTotalBet);
       setPotSize(potSize + actualAmount);
-      const newMatchedPlayers = new Set([...playersMatchedBet, currentActionSeat]);
-      console.log(`Player ${currentActionSeat} called ${actualAmount}, total bet now ${newTotalBet} - matched players:`, Array.from(newMatchedPlayers));
-      setPlayersMatchedBet(newMatchedPlayers);
+      console.log(`Player ${currentActionSeat} called ${actualAmount}, total bet now ${newTotalBet}`);
     } else if (action === 'check') {
-      // Check means they're staying with their current bet (usually 0)
-      setPlayersMatchedBet(new Set([...playersMatchedBet, currentActionSeat]));
+      // Check means they're staying with their current bet (should equal currentBet already)
+      console.log(`Player ${currentActionSeat} checked`);
     } else if (actualAction === 'raise') {
       // Raise - amount is the total bet they're making this round, actualAmount is just the additional amount
       const totalBetAmount = amount || currentBet;
       setCurrentBet(totalBetAmount);
       newBetsThisRound.set(currentActionSeat, totalBetAmount);
       setPotSize(potSize + actualAmount);
-      console.log(`Player ${currentActionSeat} raised to ${totalBetAmount} (added ${actualAmount}) - resetting matched players to only raiser`);
-      setPlayersMatchedBet(new Set([currentActionSeat]));
+      console.log(`Player ${currentActionSeat} raised to ${totalBetAmount} (added ${actualAmount})`);
+      setLastRaiserSeat(currentActionSeat);
     } else if (action === 'all-in') {
       // All-in - set their bet to their total contribution
       const totalBet = playerCurrentBet + actualAmount;
       newBetsThisRound.set(currentActionSeat, totalBet);
       setPotSize(potSize + actualAmount);
-      setPlayersMatchedBet(new Set([...playersMatchedBet, currentActionSeat]));
       setAllInPlayers(new Set([...allInPlayers, currentActionSeat]));
       
       // Check if this creates a side pot scenario
       if (totalBet < currentBet) {
         // Player went all-in for less than the current bet - this creates side pots
-        setAllInScenario(true);
+        // setAllInScenario(true);
         // The effective bet for this all-in player is their total
         // Other players can only win the amount this player contributed
       }
@@ -326,8 +336,18 @@ export default function SessionPage() {
     
     setPlayerBetsThisRound(newBetsThisRound);
     
-    // Move to next player
-    moveToNextPlayer();
+    console.log('State after action processing:', {
+      currentBet: action === 'raise' ? (amount || currentBet) : currentBet,
+      playersActedThisRound: Array.from([...playersActedThisRound, currentActionSeat]),
+      playerBetsThisRound: Array.from(newBetsThisRound.entries()),
+      lastRaiserSeat,
+      potSize: potSize + (action !== 'fold' && action !== 'check' ? actualAmount : 0)
+    });
+    console.log(`=== CALLING moveToNextPlayer() ===`);
+    
+    // Move to next player - pass updated values if we raised
+    const updatedCurrentBet = actualAction === 'raise' ? (amount || currentBet) : undefined;
+    moveToNextPlayer(updatedCurrentBet, newBetsThisRound);
   };
 
   const handleAllInConfirm = (amount: number) => {
@@ -371,38 +391,34 @@ export default function SessionPage() {
     setPlayerBetsThisRound(newBetsThisRound);
     
     setPotSize(potSize + actualAmountAdded);
-    setPlayersMatchedBet(new Set([...playersMatchedBet, allInSeat]));
+    // All-in player has made their bet
     setAllInPlayers(new Set([...allInPlayers, allInSeat]));
     
     // If amount is greater than current bet, it's a raise
     if (amount > currentBet) {
       setCurrentBet(amount);
-      setPlayersMatchedBet(new Set([allInSeat]));
+      // All-in created a new high bet
     }
     
     setAllInSeat(null);
     setAllInAmount('');
     
-    // Move to next player
-    moveToNextPlayer();
+    // Move to next player - pass updated values for all-in scenarios
+    const updatedCurrentBet = amount > currentBet ? amount : undefined;
+    moveToNextPlayer(updatedCurrentBet, newBetsThisRound);
   };
 
-  const moveToNextPlayer = () => {
+  const moveToNextPlayer = (updatedCurrentBet?: number, updatedPlayerBets?: Map<number, number>) => {
     if (!session || currentActionSeat === null) return;
     
-    let nextSeat = currentActionSeat;
-    const totalSeats = session.seats + 1;
+    console.log(`=== moveToNextPlayer() START ===`);
+    console.log(`Current action seat: ${currentActionSeat}`);
     
-    // Find next active player (not folded, not dealer)
-    do {
-      nextSeat = (nextSeat + 1) % totalSeats;
-      // Skip dealer seat (0) and folded players
-      if (nextSeat !== 0 && !playerFolded.has(nextSeat)) {
-        break;
-      }
-    } while (nextSeat !== currentActionSeat);
+    // Use updated values if provided, otherwise use current state
+    const effectiveCurrentBet = updatedCurrentBet ?? currentBet;
+    const effectivePlayerBets = updatedPlayerBets ?? playerBetsThisRound;
     
-    // Check if betting round is complete according to Texas Hold'em rules
+    // First, check if betting round is complete according to Texas Hold'em rules
     const activePlayerSeats = [];
     for (let i = 1; i <= session.seats; i++) {
       if (!playerFolded.has(i)) {
@@ -412,38 +428,144 @@ export default function SessionPage() {
     
     const activeNonAllInPlayers = activePlayerSeats.filter(seat => !allInPlayers.has(seat));
     
-    const isRoundComplete = 
-      // Game ends if only one player remains
-      playerFolded.size >= session.seats - 1 ||
-      // All active players have acted and matched the current bet (or are all-in)
-      (playersActedThisRound.size >= activePlayerSeats.length && 
-       activePlayerSeats.every(seat => playersMatchedBet.has(seat) || allInPlayers.has(seat))) ||
-      // We've gone full circle and everyone who needs to act has matched the bet
-      (nextSeat === roundStartSeat && 
-       playersActedThisRound.has(nextSeat) && 
-       activePlayerSeats.every(seat => playerFolded.has(seat) || playersMatchedBet.has(seat) || allInPlayers.has(seat))) ||
-      // All remaining players are all-in (no more betting possible)
-      activeNonAllInPlayers.length <= 1;
-    
-    // Debug logging for betting round completion
-    console.log('Betting round check:', {
-      activePlayerSeats,
-      playersActedThisRound: Array.from(playersActedThisRound),
-      playersMatchedBet: Array.from(playersMatchedBet),
-      allInPlayers: Array.from(allInPlayers),
-      currentBet,
-      playerBetsThisRound: Array.from(playerBetsThisRound.entries()),
-      nextSeat,
-      roundStartSeat,
-      isRoundComplete
+    // Check if everyone has matched the current bet OR is all-in
+    const allActivePlayersSettled = activePlayerSeats.every(seat => {
+      const playerBet = effectivePlayerBets.get(seat) || 0;
+      const hasMatchedCurrentBet = playerBet >= effectiveCurrentBet;
+      const isAllIn = allInPlayers.has(seat);
+      
+      // A player is "settled" if they've matched the current bet OR they're all-in
+      const isSettled = hasMatchedCurrentBet || isAllIn;
+      
+      if (!isSettled) {
+        console.log(`❌ Player ${seat} has NOT settled:`, {
+          playerBet,
+          currentBet: effectiveCurrentBet,
+          needsToAdd: effectiveCurrentBet - playerBet,
+          isAllIn
+        });
+      }
+      
+      return isSettled;
     });
-
-    if (isRoundComplete) {
-      console.log('Round complete - moving to next round');
-      moveToNextRound();
-    } else {
-      setCurrentActionSeat(nextSeat);
+    
+    // Check if everyone who can act has acted at least once
+    // Special handling for blinds: SB and BB are considered to have "acted" initially
+    const blindsHaveActed = new Set<number>();
+    if (currentBettingRound === 'preflop') {
+      if (session.smallBlindPosition !== undefined) {
+        blindsHaveActed.add(session.smallBlindPosition);
+      }
+      if (session.bigBlindPosition !== undefined) {
+        blindsHaveActed.add(session.bigBlindPosition);
+      }
     }
+    
+    const allPlayersHaveActed = activePlayerSeats.every(seat => {
+      const hasActed = playersActedThisRound.has(seat) || blindsHaveActed.has(seat);
+      const isAllIn = allInPlayers.has(seat);
+      return hasActed || isAllIn;
+    });
+    
+    console.log('Round completion check details:', {
+      activePlayerSeats,
+      activeNonAllInPlayers,
+      playerFoldedSize: playerFolded.size,
+      totalSeats: session.seats,
+      playersActedThisRound: Array.from(playersActedThisRound),
+      allInPlayers: Array.from(allInPlayers),
+      currentBet: effectiveCurrentBet,
+      lastRaiserSeat,
+      allActivePlayersSettled,
+      allPlayersHaveActed,
+      currentBettingRound,
+      bbPosition: session.bigBlindPosition,
+      playerBets: Array.from(effectivePlayerBets.entries())
+    });
+    
+    // Log each active player's status explicitly
+    console.log('=== PER-PLAYER STATUS CHECK ===');
+    activePlayerSeats.forEach(seat => {
+      const hasActed = playersActedThisRound.has(seat);
+      const isAllIn = allInPlayers.has(seat);
+      const playerBet = effectivePlayerBets.get(seat) || 0;
+      const hasMatchedBet = playerBet >= effectiveCurrentBet;
+      
+      console.log(`Player ${seat}:`, {
+        hasActed,
+        isAllIn,
+        playerBet,
+        currentBet: effectiveCurrentBet,
+        hasMatchedBet,
+        needsToAdd: hasMatchedBet ? 0 : (effectiveCurrentBet - playerBet),
+        isSettled: hasMatchedBet || isAllIn
+      });
+    });
+    
+    // Betting round is complete when:
+    // 1. Only one player remains (everyone else folded)
+    // 2. All remaining players are all-in except possibly one  
+    // 3. All active players have matched the current bet (or are all-in) AND
+    //    - For preflop: BB has had their option (has acted at least once)
+    //    - For other rounds: Just need all bets matched
+    const gameEndsOnePlayerRemains = activePlayerSeats.length <= 1;
+    const allButOneAllIn = activeNonAllInPlayers.length <= 1;
+    
+    // Special handling for preflop: BB must have acted at least once
+    let bbHasActed = true; // Default to true for non-preflop rounds
+    if (currentBettingRound === 'preflop' && session.bigBlindPosition !== undefined) {
+      bbHasActed = playersActedThisRound.has(session.bigBlindPosition);
+      if (!bbHasActed && !playerFolded.has(session.bigBlindPosition)) {
+        console.log(`BB (seat ${session.bigBlindPosition}) hasn't acted yet - round continues`);
+      }
+    }
+    
+    // The round is complete if all active players have settled (matched bet or all-in)
+    // AND the BB has had their option (in preflop)
+    const allBetsMatched = allActivePlayersSettled && bbHasActed;
+    
+    console.log('Round completion conditions:', {
+      gameEndsOnePlayerRemains,
+      allButOneAllIn,
+      allBetsMatched,
+      allActivePlayersSettled,
+      bbHasActed,
+      willCompleteRound: gameEndsOnePlayerRemains || allButOneAllIn || allBetsMatched
+    });
+    
+    const isRoundComplete = gameEndsOnePlayerRemains || allButOneAllIn || allBetsMatched;
+    
+    console.log(`Round complete? ${isRoundComplete}`);
+    
+    // If round is complete, move to next round
+    if (isRoundComplete) {
+      console.log('🎯 Round complete - moving to next round');
+      moveToNextRound();
+      return;
+    }
+    
+    console.log('🔄 Round not complete, finding next player...');
+    
+    // Find next active player (not folded, not dealer)
+    let nextSeat = currentActionSeat;
+    const totalSeats = session.seats + 1;
+    
+    console.log(`Looking for next player after seat ${currentActionSeat}, total seats: ${totalSeats}`);
+    
+    do {
+      nextSeat = (nextSeat + 1) % totalSeats;
+      console.log(`Checking seat ${nextSeat}: dealer=${nextSeat === 0}, folded=${playerFolded.has(nextSeat)}`);
+      // Skip dealer seat (0) and folded players
+      if (nextSeat !== 0 && !playerFolded.has(nextSeat)) {
+        break;
+      }
+    } while (nextSeat !== currentActionSeat);
+    
+    console.log(`Next seat calculated: ${nextSeat}`);
+    console.log(`✅ Setting current action seat to: ${nextSeat}`);
+    console.log(`=== moveToNextPlayer() END ===`);
+
+    setCurrentActionSeat(nextSeat);
   };
 
   const moveToNextRound = () => {
@@ -485,9 +607,10 @@ export default function SessionPage() {
     
     setPlayerActions(preservedActions);
     setPlayersActedThisRound(new Set());
-    setPlayersMatchedBet(new Set());
+    // Reset for new betting round
     setPlayerBetsThisRound(new Map());
     setCurrentBet(0);
+    setLastRaiserSeat(null);
     
     // Determine next round
     if (currentBettingRound === 'preflop') {
@@ -552,10 +675,10 @@ export default function SessionPage() {
     }
   };
 
-  const handleHoleCardComplete = () => {
-    // This function is no longer needed since we auto-detect completed cards
-    // and show straddle dialog automatically
-  };
+  // const handleHoleCardComplete = () => {
+  //   // This function is no longer needed since we auto-detect completed cards
+  //   // and show straddle dialog automatically
+  // }; // For future use
 
   const handleCommunityCardComplete = () => {
     setWaitingForCards(false);
@@ -589,7 +712,7 @@ export default function SessionPage() {
     
     if (attempts < totalSeats) {
       setCurrentActionSeat(firstSeat);
-      setRoundStartSeat(firstSeat);
+      // setRoundStartSeat(firstSeat);
     } else {
       // No one can act - proceed to next round
       moveToNextRound();
@@ -629,6 +752,27 @@ export default function SessionPage() {
     const newShowdown = new Map(showdownPlayers);
     newShowdown.set(seatNumber, cards);
     setShowdownPlayers(newShowdown);
+  };
+
+  const handleOpponentCardSelect = (seatNumber: number, cardIndex: number, card: string) => {
+    const newOpponentCards = new Map(opponentCards);
+    const currentCards = newOpponentCards.get(seatNumber) || [null, null];
+    currentCards[cardIndex] = card;
+    newOpponentCards.set(seatNumber, [...currentCards]);
+    setOpponentCards(newOpponentCards);
+    
+    // Also update showdown players for consistency
+    const cardString = currentCards.filter(c => c !== null).join(' ');
+    if (cardString) {
+      handleShowdown(seatNumber, cardString);
+    }
+  };
+
+  const handleOpponentMucked = (seatNumber: number) => {
+    const newOpponentCards = new Map(opponentCards);
+    newOpponentCards.set(seatNumber, [null, null]);
+    setOpponentCards(newOpponentCards);
+    handleShowdown(seatNumber, 'mucked');
   };
 
   const handleRaise = () => {
@@ -687,7 +831,7 @@ export default function SessionPage() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold mb-2">Session not found</h2>
-          <p className="text-muted-foreground mb-4">The session you're looking for doesn't exist.</p>
+          <p className="text-muted-foreground mb-4">The session you&apos;re looking for doesn&apos;t exist.</p>
           <Button onClick={() => router.push('/')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Home
@@ -812,12 +956,15 @@ export default function SessionPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           <Input
+                            id="rebuy-amount"
+                            name="rebuyAmount"
                             type="number"
                             min="1"
                             placeholder="Rebuy amount"
                             className="w-32 h-8 text-center text-sm"
                             value={rebuyAmount}
                             onChange={(e) => setRebuyAmount(e.target.value)}
+                            aria-label="Rebuy amount"
                           />
                           <Button
                             variant="outline"
@@ -902,6 +1049,7 @@ export default function SessionPage() {
                     communityCards={communityCards}
                     onCardSelect={handleCardSelectorSelect}
                     onComplete={handleCardSelectorClose}
+                    holeCards={holeCards}
                   />
                 </div>
               </div>
@@ -1050,7 +1198,7 @@ export default function SessionPage() {
                     className="bg-green-50 hover:bg-green-100 text-green-700 border-green-300"
                     onClick={handleRaise}
                   >
-                    {currentBet === 0 ? 'Bet' : 'Raise'}
+                    {currentBet === 0 ? 'Bet' : (lastRaiserSeat !== null ? 'Re-Raise' : 'Raise')}
                   </Button>
                   {/* Only show separate All-In button if hero can afford the call or there's no current bet */}
                   {(() => {
@@ -1094,7 +1242,7 @@ export default function SessionPage() {
                       size="sm"
                       className="bg-green-50 hover:bg-green-100 text-green-700 border-green-300"
                       onClick={() => {
-                        setHandResult('won');
+                        // setHandResult('won');
                         completeHand();
                       }}
                     >
@@ -1105,7 +1253,7 @@ export default function SessionPage() {
                       size="sm"
                       className="bg-red-50 hover:bg-red-100 text-red-700 border-red-300"
                       onClick={() => {
-                        setHandResult('lost');
+                        // setHandResult('lost');
                         completeHand();
                       }}
                     >
@@ -1116,34 +1264,25 @@ export default function SessionPage() {
                 
                 {/* Opponent Cards - Optional */}
                 <div className="border-t pt-4">
-                  <div className="text-center mb-3">
+                  <div className="text-center mb-4">
                     <p className="text-sm font-medium text-gray-700">Opponent Cards (Optional)</p>
-                    <p className="text-xs text-gray-500">Enter cards that were revealed</p>
+                    <p className="text-xs text-gray-500">Select cards that were revealed</p>
                   </div>
                   
-                  <div className="space-y-2">
+                  <div className="space-y-4">
                     {Array.from({ length: session.seats + 1 }).map((_, seatIndex) => {
                       if (seatIndex === 0 || playerFolded.has(seatIndex) || seatIndex === session.heroPosition) return null;
                       return (
-                        <div key={seatIndex} className="flex items-center justify-between max-w-md mx-auto">
-                          <span className="text-sm font-medium">Seat {seatIndex}:</span>
-                          <div className="flex items-center gap-2">
-                            <Input
-                              type="text"
-                              placeholder="e.g., AhKs or folded"
-                              className="w-32 h-8 text-sm"
-                              onChange={(e) => handleShowdown(seatIndex, e.target.value)}
-                            />
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-xs px-2 py-1"
-                              onClick={() => handleShowdown(seatIndex, 'mucked')}
-                            >
-                              Mucked
-                            </Button>
-                          </div>
-                        </div>
+                        <OpponentCardSelector
+                          key={seatIndex}
+                          seatNumber={seatIndex}
+                          opponentCards={opponentCards.get(seatIndex) || [null, null]}
+                          onCardSelect={(cardIndex, card) => handleOpponentCardSelect(seatIndex, cardIndex, card)}
+                          onMucked={() => handleOpponentMucked(seatIndex)}
+                          holeCards={holeCards}
+                          communityCards={communityCards}
+                          allOpponentCards={opponentCards}
+                        />
                       );
                     })}
                   </div>
@@ -1209,10 +1348,15 @@ export default function SessionPage() {
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Enter Raise Amount</DialogTitle>
+              <DialogDescription>
+                Enter the amount you want to raise to (minimum: ${(currentBet + 1).toFixed(2)})
+              </DialogDescription>
             </DialogHeader>
             <div className="flex items-center space-x-2">
               <div className="grid flex-1 gap-2">
                 <Input
+                  id="raise-amount"
+                  name="raiseAmount"
                   type="number"
                   step="0.01"
                   min={currentBet + 1}
@@ -1220,6 +1364,7 @@ export default function SessionPage() {
                   value={raiseAmount}
                   onChange={(e) => setRaiseAmount(e.target.value)}
                   className="h-10"
+                  aria-label="Raise amount"
                 />
               </div>
               <Button
@@ -1241,13 +1386,15 @@ export default function SessionPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {handActions.map((action: any, index) => (
+                {handActions.map((action, index) => {
+                  const extAction = action as Action & { seatNumber?: number; bettingRound?: string; timestamp?: Date };
+                  return (
                   <div key={index} className="flex justify-between items-center text-sm border-b pb-1">
                     <div className="flex-1">
                       <span className="font-medium">
-                        {action.bettingRound && `[${action.bettingRound.charAt(0).toUpperCase() + action.bettingRound.slice(1)}] `}
-                        Seat {action.seatNumber || (action.player === 'hero' ? session.heroPosition : action.player)}
-                        {action.seatNumber === session.heroPosition && ' (You)'}:
+                        {extAction.bettingRound && `[${extAction.bettingRound.charAt(0).toUpperCase() + extAction.bettingRound.slice(1)}] `}
+                        Seat {extAction.seatNumber || (action.player === 'hero' ? session.heroPosition : action.player)}
+                        {extAction.seatNumber === session.heroPosition && ' (You)'}:
                       </span>
                     </div>
                     <span className={`font-medium ${
@@ -1259,10 +1406,11 @@ export default function SessionPage() {
                       'text-gray-600'
                     }`}>
                       {action.action.charAt(0).toUpperCase() + action.action.slice(1)}
-                      {action.amount && ` $${action.amount.toFixed(2)}`}
+                      {action.amount && action.action !== 'fold' && action.action !== 'check' ? ` $${action.amount.toFixed(2)}` : ''}
                     </span>
                   </div>
-                ))}
+                  )
+                })}
                 <div className="pt-2 text-xs text-gray-500">
                   Total Actions: {handActions.length} | Pot: ${potSize.toFixed(2)}
                 </div>
@@ -1277,20 +1425,26 @@ export default function SessionPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>All-In Amount</DialogTitle>
+            <DialogDescription>
+              Enter the amount for the all-in bet.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-gray-600">
-              Seat #{allInSeat} is going all-in. Enter the amount they're betting:
+              Seat #{allInSeat} is going all-in. Enter the amount they&apos;re betting:
             </p>
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">$</span>
               <Input
+                id="allin-amount"
+                name="allInAmount"
                 type="number"
                 min={currentBet}
                 placeholder="All-in amount"
                 className="flex-1"
                 value={allInAmount}
                 onChange={(e) => setAllInAmount(e.target.value)}
+                aria-label="All-in bet amount"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     const amount = parseFloat(allInAmount) || 0;

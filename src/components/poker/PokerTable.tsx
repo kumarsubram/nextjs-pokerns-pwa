@@ -91,7 +91,7 @@ export function PokerTable({
     if (!buttonSeat && buttonSeat !== 0) return '';
     
     const buttonPos = buttonSeat;
-    let positionsFromButton = (seatIndex - buttonPos + seats) % seats;
+    const positionsFromButton = (seatIndex - buttonPos + seats) % seats;
     
     // Positions relative to button (clockwise)
     switch (seats) {

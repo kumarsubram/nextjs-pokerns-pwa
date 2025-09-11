@@ -126,6 +126,7 @@ export function HoleCardSelector({
                       ? 'opacity-30 cursor-not-allowed bg-gray-100'
                       : 'hover:bg-gray-50'
                   }`}
+                  aria-label={`Select ${suit.name} suit for hole card ${cardIndex + 1}`}
                   onClick={() => handleSuitSelect(cardIndex, suit.symbol)}
                 >
                   <span className={`text-sm ${isUnavailable ? 'text-gray-400' : suit.color}`}>
@@ -141,7 +142,7 @@ export function HoleCardSelector({
             value={selectedRanks[cardIndex] || ""} 
             onValueChange={(value) => handleRankSelect(cardIndex, value)}
           >
-            <SelectTrigger className="w-16 h-8">
+            <SelectTrigger className="w-16 h-8" aria-label={`Select rank for hole card ${cardIndex + 1}`}>
               <SelectValue placeholder="?" />
             </SelectTrigger>
             <SelectContent>

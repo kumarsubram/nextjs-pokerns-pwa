@@ -8,18 +8,14 @@ import { CURRENCY_SYMBOLS } from '@/types/poker';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
-  ArrowLeft, 
   Calendar, 
   Clock, 
-  DollarSign, 
   Trash2, 
   Play, 
   Users, 
   MapPin,
-  Filter,
   Search,
   MoreVertical,
-  Edit,
   Eye
 } from 'lucide-react';
 import {

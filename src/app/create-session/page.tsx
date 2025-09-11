@@ -424,7 +424,7 @@ export default function CreateSessionPage() {
                   selectedSeat={tableSetup.heroSeat ?? undefined}
                   buttonSeat={tableSetup.smallBlindSeat ? (() => {
                     const totalSeats = sessionData.seats + 1;
-                    let btn = (tableSetup.smallBlindSeat - 1 + totalSeats) % totalSeats;
+                    const btn = (tableSetup.smallBlindSeat - 1 + totalSeats) % totalSeats;
                     return btn === 0 ? totalSeats - 1 : btn;
                   })() : 0}
                   dealerSeat={0}

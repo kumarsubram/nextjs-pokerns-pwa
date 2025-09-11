@@ -180,8 +180,8 @@ export class PokerService {
       return {
         stage,
         totalHands: 0,
-        actions: { raise: 0, call: 0, fold: 0, check: 0, bet: 0, allIn: 0 },
-        percentages: { raise: 0, call: 0, fold: 0, check: 0, bet: 0, allIn: 0 },
+        actions: { raise: 0, call: 0, fold: 0, check: 0, bet: 0, allIn: 0, straddle: 0 },
+        percentages: { raise: 0, call: 0, fold: 0, check: 0, bet: 0, allIn: 0, straddle: 0 },
       };
     }
 
@@ -192,6 +192,7 @@ export class PokerService {
       check: 0,
       bet: 0,
       allIn: 0,
+      straddle: 0,
     };
 
     // Count actions (for now using mock data, will be real when hands have heroActions)
@@ -222,7 +223,7 @@ export class PokerService {
       stage,
       totalHands: stageHands,
       actions,
-      percentages,
+      percentages: { ...percentages, straddle: actions.straddle ? (actions.straddle / stageHands) * 100 : 0 },
     };
   }
 
@@ -243,8 +244,8 @@ export class PokerService {
     const emptyStageStats: StageActionStats = {
       stage: 'preflop',
       totalHands: 0,
-      actions: { raise: 0, call: 0, fold: 0, check: 0, bet: 0, allIn: 0 },
-      percentages: { raise: 0, call: 0, fold: 0, check: 0, bet: 0, allIn: 0 },
+      actions: { raise: 0, call: 0, fold: 0, check: 0, bet: 0, allIn: 0, straddle: 0 },
+      percentages: { raise: 0, call: 0, fold: 0, check: 0, bet: 0, allIn: 0, straddle: 0 },
     };
 
     return {
@@ -266,10 +267,10 @@ export class PokerService {
   }
 
   // Future sync methods (placeholder)
-  private static async queueForSync(entityType: string, entityId: string, operation: string, data: any) {
-    // Will be implemented when adding remote sync
-    // Check if online, queue operation, attempt sync
-  }
+  // private static async queueForSync(_entityType: string, _entityId: string, _operation: string, _data: unknown) {
+  //   // Will be implemented when adding remote sync
+  //   // Check if online, queue operation, attempt sync
+  // }
 
   static async syncWithRemote() {
     // Will be implemented when adding remote sync

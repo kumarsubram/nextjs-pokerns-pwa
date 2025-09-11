@@ -122,7 +122,7 @@ export interface VillainPosition {
 
 export interface Action {
   player: 'hero' | Position;
-  action: 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'all-in' | 'straddle';
+  action: 'fold' | 'check' | 'call' | 'bet' | 'raise' | 're-raise' | 'all-in' | 'straddle';
   amount?: number; // Bet/raise amount
   raiseAmount?: number; // Amount raised on top of previous bet
   totalPot?: number; // Pot size after this action
@@ -187,7 +187,7 @@ export interface SyncQueueItem {
   entityType: 'session' | 'hand' | 'user' | 'settings';
   entityId: string;
   operation: 'create' | 'update' | 'delete';
-  data: any;
+  data: unknown;
   timestamp: Date;
   retryCount: number;
   status: 'pending' | 'processing' | 'failed';

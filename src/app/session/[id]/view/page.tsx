@@ -74,19 +74,6 @@ export default function SessionViewPage() {
     return `${hours}h ${mins}m`;
   };
 
-  // Format hand data for display
-  const formatHandAction = (hand: Hand) => {
-    const preflopAction = hand.heroActions.preflop;
-    const flopAction = hand.heroActions.flop;
-    const turnAction = hand.heroActions.turn;
-    const riverAction = hand.heroActions.river;
-    
-    // Get the most significant action
-    if (riverAction) return riverAction;
-    if (turnAction) return turnAction;
-    if (flopAction) return flopAction;
-    return preflopAction;
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -245,37 +232,87 @@ export default function SessionViewPage() {
                 No hands recorded yet. Play some hands to see them here!
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-4">
                 {hands.map((hand) => (
-                  <div key={hand.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-                    <div className="flex items-center gap-4">
-                      <span className="font-mono text-sm font-medium w-12">#{hand.handNumber}</span>
-                      <span className="text-sm text-gray-600">
-                        {format(new Date(hand.timestamp), 'h:mm a')}
-                      </span>
-                      <span className="text-xs bg-gray-100 px-2 py-1 rounded">
-                        {hand.heroPosition}
-                      </span>
-                      {hand.holeCards.length > 0 && (
-                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-mono">
-                          {hand.holeCards.join(' ')}
+                  <div key={hand.id} className="border rounded-lg p-4 hover:bg-gray-50">
+                    {/* Hand Header */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-4">
+                        <span className="font-mono text-lg font-bold">Hand #{hand.handNumber}</span>
+                        <span className="text-sm text-gray-600">
+                          {format(new Date(hand.timestamp), 'h:mm a')}
                         </span>
+                        <span className="text-xs bg-gray-100 px-2 py-1 rounded">
+                          {hand.heroPosition}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-sm font-medium px-2 py-1 rounded ${
+                          hand.result === 'won' ? 'bg-green-100 text-green-800' : 
+                          hand.result === 'lost' ? 'bg-red-100 text-red-800' : 
+                          hand.result === 'folded' ? 'bg-gray-100 text-gray-800' :
+                          'bg-orange-100 text-orange-800'
+                        }`}>
+                          {hand.result === 'won' && hand.amountWon ? `Won +$${hand.amountWon}` : 
+                           hand.result === 'lost' ? `Lost -$${hand.potSize}` : 
+                           hand.result === 'folded' ? 'Folded' : 
+                           hand.result}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {/* Cards and Board */}
+                    <div className="flex items-center gap-4 mb-3">
+                      {hand.holeCards.length > 0 && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500">Hole Cards:</span>
+                          <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded font-mono font-bold">
+                            {hand.holeCards.join(' ')}
+                          </span>
+                        </div>
+                      )}
+                      
+                      {/* Board Cards */}
+                      {(hand.board.flop || hand.board.turn || hand.board.river) && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500">Board:</span>
+                          <div className="flex gap-1">
+                            {hand.board.flop && hand.board.flop.map((card, i) => (
+                              <span key={i} className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded font-mono">
+                                {card}
+                              </span>
+                            ))}
+                            {hand.board.turn && (
+                              <span className="text-sm bg-orange-100 text-orange-800 px-2 py-1 rounded font-mono">
+                                {hand.board.turn}
+                              </span>
+                            )}
+                            {hand.board.river && (
+                              <span className="text-sm bg-purple-100 text-purple-800 px-2 py-1 rounded font-mono">
+                                {hand.board.river}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       )}
                     </div>
-                    <div className="flex items-center gap-4">
-                      <span className="text-sm text-gray-600 capitalize">
-                        {formatHandAction(hand)}
-                      </span>
-                      <span className={`text-sm font-medium ${
-                        hand.result === 'won' ? 'text-green-600' : 
-                        hand.result === 'lost' ? 'text-red-600' : 
-                        'text-gray-600'
-                      }`}>
-                        {hand.result === 'won' && hand.amountWon ? `+$${hand.amountWon}` : 
-                         hand.result === 'lost' ? `-$${hand.potSize}` : 
-                         hand.result === 'folded' ? 'folded' : 
-                         hand.result}
-                      </span>
+                    
+                    {/* Action Summary */}
+                    <div className="text-sm text-gray-600 space-y-1">
+                      <div className="flex flex-wrap gap-4">
+                        <span><strong>Preflop:</strong> {hand.heroActions.preflop}</span>
+                        {hand.heroActions.flop && <span><strong>Flop:</strong> {hand.heroActions.flop}</span>}
+                        {hand.heroActions.turn && <span><strong>Turn:</strong> {hand.heroActions.turn}</span>}
+                        {hand.heroActions.river && <span><strong>River:</strong> {hand.heroActions.river}</span>}
+                      </div>
+                      
+                      <div className="flex justify-between items-center pt-2 border-t">
+                        <span>Pot Size: <strong>${hand.potSize}</strong></span>
+                        <span>Reached: {Object.entries(hand.stagesReached)
+                          .filter(([, reached]) => reached)
+                          .map(([stage]) => stage.charAt(0).toUpperCase() + stage.slice(1))
+                          .join(' → ')}</span>
+                      </div>
                     </div>
                   </div>
                 ))}

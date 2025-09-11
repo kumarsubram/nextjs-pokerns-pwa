@@ -3,20 +3,18 @@
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { OnlineStatusIndicator } from '@/components/OnlineStatusIndicator';
-import { Plus, Calendar, History, User, ArrowLeft, Home } from 'lucide-react';
+import { Calendar, History, User, ArrowLeft, Home } from 'lucide-react';
 
 interface AppHeaderProps {
   title?: string;
   showBackButton?: boolean;
   showNavigation?: boolean;
-  showNewSession?: boolean;
 }
 
 export function AppHeader({ 
   title = "Poker Notes", 
   showBackButton = false, 
-  showNavigation = true,
-  showNewSession = true 
+  showNavigation = true
 }: AppHeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -90,16 +88,6 @@ export function AppHeader({
           <div className="block sm:hidden">
             <OnlineStatusIndicator />
           </div>
-          {showNewSession && (
-            <Button 
-              size="sm" 
-              className="bg-green-600 hover:bg-green-700"
-              onClick={() => router.push('/create-session')}
-            >
-              <Plus className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">New Session</span>
-            </Button>
-          )}
         </div>
       </div>
     </header>

@@ -132,78 +132,83 @@ export function OpponentCardSelector({
       </div>
 
       {[0, 1].map((cardIndex) => (
-        <div key={cardIndex} className="flex items-center gap-3 justify-center">
-          <span className="text-sm font-medium text-gray-700 w-12">
-            {cardIndex === 0 ? 'Card 1' : 'Card 2'}
-          </span>
-          
-          {/* Suit Selection */}
-          <div className="flex gap-1">
-            {suits.map((suit) => {
-              const rank = selectedRanks[cardIndex];
-              const isUnavailable = rank && !isCardAvailable(cardIndex, rank, suit.symbol);
-              
-              return (
-                <Button
-                  key={suit.name}
-                  variant={selectedSuits[cardIndex] === suit.symbol ? "default" : "outline"}
-                  size="sm"
-                  disabled={isUnavailable || undefined}
-                  className={`w-8 h-8 p-0 ${suit.color} ${
-                    selectedSuits[cardIndex] === suit.symbol 
-                      ? 'bg-blue-100 border-blue-500' 
-                      : isUnavailable
-                      ? 'opacity-30 cursor-not-allowed bg-gray-100'
-                      : 'hover:bg-gray-50'
-                  }`}
-                  aria-label={`Select ${suit.name} suit for seat ${seatNumber} card ${cardIndex + 1}`}
-                  onClick={() => handleSuitSelect(cardIndex, suit.symbol)}
-                >
-                  <span className={`text-sm ${isUnavailable ? 'text-gray-400' : suit.color}`}>
-                    {suit.symbol}
-                  </span>
-                </Button>
-              );
-            })}
+        <div key={cardIndex} className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+          {/* Card Display Row */}
+          <div className="text-center">
+            <span className="text-base font-semibold text-gray-800">
+              S{seatNumber}{cardIndex + 1}: 
+              <span className={`ml-2 text-lg font-bold ${
+                opponentCards[cardIndex]
+                  ? (opponentCards[cardIndex]?.includes('♥') || opponentCards[cardIndex]?.includes('♦') 
+                     ? 'text-red-600' : 'text-black')
+                  : 'text-gray-400'
+              }`}>
+                {opponentCards[cardIndex] || '?'}
+              </span>
+            </span>
           </div>
           
-          {/* Rank Selection */}
-          <Select 
-            value={selectedRanks[cardIndex] || ""} 
-            onValueChange={(value) => handleRankSelect(cardIndex, value)}
-          >
-            <SelectTrigger className="w-16 h-8" aria-label={`Select rank for seat ${seatNumber} card ${cardIndex + 1}`}>
-              <SelectValue placeholder="?" />
-            </SelectTrigger>
-            <SelectContent>
-              {ranks.map((rank) => {
-                const suit = selectedSuits[cardIndex];
-                const isUnavailable = suit && !isCardAvailable(cardIndex, rank, suit);
+          {/* Controls Row */}
+          <div className="flex items-center justify-center gap-2">
+            {/* Suit Selection */}
+            <div className="flex gap-2">
+              {suits.map((suit) => {
+                const rank = selectedRanks[cardIndex];
+                const isUnavailable = rank && !isCardAvailable(cardIndex, rank, suit.symbol);
                 
                 return (
-                  <SelectItem 
-                    key={rank} 
-                    value={rank}
+                  <Button
+                    key={suit.name}
+                    variant={selectedSuits[cardIndex] === suit.symbol ? "default" : "outline"}
                     disabled={isUnavailable || undefined}
-                    className={isUnavailable ? 'opacity-50 cursor-not-allowed' : ''}
+                    className={`w-12 h-12 sm:w-10 sm:h-10 p-0 ${suit.color} ${
+                      selectedSuits[cardIndex] === suit.symbol 
+                        ? 'bg-blue-100 border-blue-500' 
+                        : isUnavailable
+                        ? 'opacity-30 cursor-not-allowed bg-gray-100'
+                        : !selectedSuits[cardIndex]
+                        ? 'hover:bg-gray-50 border-2 animate-pulse border-gray-400'
+                        : 'hover:bg-gray-50'
+                    }`}
+                    aria-label={`Select ${suit.name} suit for seat ${seatNumber} card ${cardIndex + 1}`}
+                    onClick={() => handleSuitSelect(cardIndex, suit.symbol)}
                   >
-                    {rank}
-                    {isUnavailable && <span className="text-xs text-gray-400 ml-1">(used)</span>}
-                  </SelectItem>
+                    <span className={`text-lg sm:text-base ${isUnavailable ? 'text-gray-400' : suit.color}`}>
+                      {suit.symbol}
+                    </span>
+                  </Button>
                 );
               })}
-            </SelectContent>
-          </Select>
-          
-          {/* Show selected card */}
-          {opponentCards[cardIndex] && (
-            <div className={`text-sm font-bold ml-2 ${
-              opponentCards[cardIndex]?.includes('♥') || opponentCards[cardIndex]?.includes('♦')
-                ? 'text-red-600' : 'text-black'
-            }`}>
-              {opponentCards[cardIndex]}
             </div>
-          )}
+            
+            {/* Rank Selection */}
+            <Select 
+              value={selectedRanks[cardIndex] || ""} 
+              onValueChange={(value) => handleRankSelect(cardIndex, value)}
+            >
+              <SelectTrigger className="min-w-[4.5rem] w-18 min-h-[3rem] h-12 sm:w-12 sm:h-10 text-lg sm:text-base font-bold border border-gray-300 bg-white hover:bg-gray-50 focus:border-gray-500 focus:ring-2 focus:ring-gray-200 flex items-center justify-center p-0 rounded-md shadow-sm" aria-label={`Select rank for seat ${seatNumber} card ${cardIndex + 1}`}>
+                <SelectValue placeholder="?" />
+              </SelectTrigger>
+              <SelectContent className="min-w-[3rem] w-auto">
+                {ranks.map((rank) => {
+                  const suit = selectedSuits[cardIndex];
+                  const isUnavailable = suit && !isCardAvailable(cardIndex, rank, suit);
+                  
+                  return (
+                    <SelectItem 
+                      key={rank} 
+                      value={rank}
+                      disabled={isUnavailable || undefined}
+                      className={isUnavailable ? 'opacity-50 cursor-not-allowed' : ''}
+                    >
+                      {rank}
+                      {isUnavailable && <span className="text-xs text-gray-400 ml-1">(used)</span>}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       ))}
     </div>

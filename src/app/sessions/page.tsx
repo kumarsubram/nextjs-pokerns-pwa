@@ -245,8 +245,8 @@ export default function SessionsPage() {
                     )}
                   </div>
 
-                  {/* Action Button */}
-                  <div className="pt-2">
+                  {/* Action Buttons */}
+                  <div className="pt-2 space-y-2">
                     {session.endTime ? (
                       <Button 
                         variant="outline" 
@@ -267,6 +267,17 @@ export default function SessionsPage() {
                         Continue Session
                       </Button>
                     )}
+                    
+                    {/* Delete Button */}
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 hover:border-red-300"
+                      onClick={() => handleDeleteSession(session)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Session
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

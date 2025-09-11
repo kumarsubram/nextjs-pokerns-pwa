@@ -61,7 +61,7 @@ export default function Home() {
           {/* Conditional grid layout based on active sessions */}
           <div className={`${
             activeSessions.length > 0 
-              ? 'grid gap-3 mb-6 sm:grid-cols-1 lg:grid-cols-3' // 3 buttons when active sessions exist
+              ? 'grid gap-3 mb-6 sm:grid-cols-1 lg:grid-cols-2 lg:max-w-2xl lg:mx-auto' // 2 centered buttons when active sessions exist
               : 'flex justify-center mb-6' // Single centered button for first-time users
           }`}>
             {/* Start New Session */}

@@ -206,6 +206,200 @@ const handlePlayerAction = (action: 'fold' | 'call' | 'raise' | 'check' | 'all-i
 - **Files Modified**: `src/app/session/[id]/page.tsx` lines 400-450
 - **Key Learning**: React state updates are asynchronous - pass updated values directly instead of relying on state
 
+### Immediate Win Detection & State Timing Issues (Major Bug Fix)
+#### Problem Symptoms
+- **Hand Result Bug**: When hero went all-in and all opponents folded, hand would show "Folded" instead of "Won"
+- **Balance Not Updating**: Session profit wouldn't increase after winning the pot
+- **Timing Issue**: Immediate win detection worked but `handResult` and `handWinAmount` values weren't persisting
+
+#### Root Cause Analysis
+Using enhanced debugging logs, discovered that:
+1. **Immediate Win Logic Worked**: `🏆 HANDLE_PLAYER_ACTION: Only one player remains after action - hand ends immediately!`
+2. **Winner Calculation Correct**: `{winner: 5, heroPosition: 5, isHeroWinner: true, finalPot: 108}`  
+3. **State Timing Failure**: `📝 COMPLETE_HAND: {handResult: null, handWinAmount: 0, finalResult: 'folded'}`
+
+**Issue**: `setHandResult('won')` and `setHandWinAmount(finalPot)` were called but React state didn't update before `completeHand()` was invoked, causing the hand to be saved with default `null` values that became "folded".
+
+#### Technical Solution Implemented
+Modified `completeHand` function to accept direct value overrides:
+```typescript
+// BEFORE (buggy)
+setHandResult('won');
+setHandWinAmount(finalPot);
+setTimeout(() => {
+  completeHand(); // Uses stale state values!
+}, 100);
+
+// AFTER (fixed)
+setHandResult('won');  
+setHandWinAmount(finalPot);
+setTimeout(() => {
+  completeHand('won', finalPot); // Pass values directly!
+}, 100);
+```
+
+**Function Signature Update**:
+```typescript
+const completeHand = async (
+  overrideResult?: 'won' | 'lost' | 'folded' | 'chopped', 
+  overrideWinAmount?: number
+) => {
+  const effectiveResult = overrideResult || handResult || 'folded';
+  const effectiveWinAmount = overrideWinAmount !== undefined ? overrideWinAmount : handWinAmount;
+  
+  // Use effective values for hand saving and profit calculation
+  const hand: Hand = {
+    result: effectiveResult,
+    amountWon: effectiveResult === 'won' ? effectiveWinAmount : undefined,
+    // ...
+  };
+  
+  // Profit calculation now uses effective values
+  if (effectiveResult === 'won' && effectiveWinAmount > 0) {
+    const heroContribution = playerBetsThisRound.get(session.heroPosition || 1) || 0;
+    profitChange = effectiveWinAmount - heroContribution;
+  }
+}
+```
+
+#### Files Modified
+- `src/app/session/[id]/page.tsx` lines 460-503 (handlePlayerAction immediate win)
+- `src/app/session/[id]/page.tsx` lines 733-743 (moveToNextPlayer immediate win)  
+- `src/app/session/[id]/page.tsx` lines 918-1008 (completeHand function signature and logic)
+
+#### Key Learning
+**React State Anti-Pattern**: Never rely on React state updates to complete before subsequent function calls. Always pass critical values directly when timing matters.
+
+#### Verification Results
+- ✅ **Hand Result**: Now correctly shows "Won +$108" instead of "Folded"
+- ✅ **Balance Updates**: Session profit increases by net amount (e.g., +$8 for $108 pot - $100 contribution)  
+- ✅ **HandTracker Display**: Shows completed hands with correct win amounts and results
+- ✅ **Dual Path Support**: Both `handlePlayerAction` and `moveToNextPlayer` immediate win paths work correctly
+
+### HandTracker Component & History Persistence
+#### Problem
+- **HandTracker Reset**: After completing a hand, the HandTracker would disappear instead of showing history
+- **Duplicate Display**: Current hand and completed hand with same number showing simultaneously
+- **No Historical View**: Users couldn't see progression of completed hands
+
+#### Solution Implemented
+1. **Persistent History Display**: 
+   ```typescript
+   // Show both current hand AND completed hands history
+   {(handInProgress || completedHands.length > 0) && (
+     <div className="space-y-3">
+       {/* Current Hand */}
+       {handInProgress && <HandTracker ... />}
+       
+       {/* Completed Hands History */}
+       {completedHands
+         .filter(hand => !handInProgress || hand.handNumber !== currentHandNumber)
+         .sort((a, b) => b.handNumber - a.handNumber)
+         .map(hand => <HandTracker key={hand.id} ... />)}
+     </div>
+   )}
+   ```
+
+2. **State Management**: Added `completedHands` state with proper loading and updating
+3. **Duplicate Prevention**: Filter prevents showing current hand in completed history
+4. **Auto-Reload**: `completeHand()` reloads hands from database after saving
+
+#### Files Modified
+- `src/app/session/[id]/page.tsx` lines 35, 91-104 (state and loading)
+- `src/app/session/[id]/page.tsx` lines 956-962, 982-990 (reload logic)
+- `src/app/session/[id]/page.tsx` lines 1667-1682 (display logic)
+- `src/components/poker/HandTracker.tsx` lines 21, 25-32 (optional currentBettingRound)
+
+### Enhanced All-In & Immediate Win Logic
+#### Minimum Raise Rules Implementation
+```typescript
+// All-in scenarios with minimum raise validation
+if (action === 'all-in') {
+  const totalBet = playerCurrentBet + actualAmount;
+  const raiseAmount = totalBet - currentBet;
+  const minRaise = Math.max(currentBet, (lastRaiserSeat !== null ? minRaise : session.bigBlind));
+  
+  if (totalBet > currentBet && raiseAmount >= minRaise) {
+    // All-in RAISE: Updates current bet, allows re-raises
+    setCurrentBet(totalBet);
+  } else if (totalBet > currentBet) {
+    // All-in CALL: Less than min raise, counts as call only  
+  }
+}
+```
+
+#### Immediate Win Detection (Two Paths)
+1. **handlePlayerAction Path**: Immediately after player folds/acts
+2. **moveToNextPlayer Path**: During round progression logic
+
+Both paths now correctly:
+- Detect when only one player remains (`activePlayerSeats.length === 1`)
+- Calculate final pot including all contributions
+- Set correct winner and amounts
+- Pass values directly to `completeHand()` to avoid timing issues
+
+### Hero Fold Logic & Hand Completion (Critical Fix)
+#### Problem
+When hero folded during a hand, several issues occurred:
+- **Hand didn't end immediately**: Play would continue to community cards instead of ending
+- **Incorrect result tracking**: Hero fold marked as "lost" instead of "folded"
+- **Wrong profit calculation**: Hero would lose entire pot instead of just their contribution
+
+#### Solution Implemented
+Added comprehensive hero fold detection in both immediate win detection paths:
+
+```typescript
+// In both handlePlayerAction and moveToNextPlayer
+const heroFolded = session.heroPosition !== undefined && playerFolded.has(session.heroPosition);
+if (heroFolded) {
+  // Check if hero contributed any money this hand
+  const heroContribution = (playerBetsThisRound.get(session.heroPosition!) || 0);
+  const amountLost = heroContribution; // Only lose what was contributed
+  
+  console.log('💸 Hero folded', {
+    heroPosition: session.heroPosition,
+    contribution: heroContribution,
+    amountLost
+  });
+  
+  setHandResult('folded');
+  completeHand('folded', -amountLost); // Negative to indicate loss
+}
+```
+
+#### Key Logic Rules
+1. **Immediate Hand End**: When hero folds, hand ends immediately regardless of position
+2. **Correct Result Tracking**: Hero fold marked as "folded" (not "lost")
+3. **Accurate Loss Calculation**: Hero loses only actual contribution (blinds + any bets/raises)
+4. **Contribution Tracking**: Uses `playerBetsThisRound.get(session.heroPosition!)` for precise amounts
+
+#### Files Modified
+- `src/app/session/[id]/page.tsx` lines 501-522 (handlePlayerAction hero fold detection)
+- `src/app/session/[id]/page.tsx` lines 753-773 (moveToNextPlayer hero fold detection)
+
+#### TypeScript Fixes
+- Added null checks: `session.heroPosition !== undefined` before accessing position
+- Fixed variable references: Used `playerBetsThisRound` instead of non-existent `playerBets`
+- Fixed onClick handlers: Changed `onClick={completeHand}` to `onClick={() => completeHand()}`
+
+#### Verification Results
+- ✅ **Immediate End**: Hero fold ends hand immediately, no community card selection
+- ✅ **Correct Result**: Shows "Folded" instead of "Lost" in hand tracker
+- ✅ **Accurate Loss**: Hero loses only contributed amount (e.g., $5 SB, not entire pot)
+- ✅ **Build Success**: No TypeScript errors, clean production build
+
+### Build & TypeScript Issues Resolution
+#### JSX Syntax Error Fix  
+- **Problem**: Parsing error around header closing tag due to malformed whitespace
+- **Solution**: Fixed JSX structure and proper div closing hierarchy
+- **Result**: Clean production build with no syntax errors
+
+#### TypeScript & ESLint Compliance
+- **HandTracker Component**: Fixed `any` type usage, added proper `Session` type import
+- **Unused Variables**: Fixed `_currentBettingRound` parameter warnings
+- **Optional Parameters**: Made `currentBettingRound` optional for completed hands
+- **Result**: Clean build with no TypeScript or ESLint errors
+
 ### Advanced Card Selection System
 #### Enhanced Community Card Selection (`src/components/poker/CommunityCardSelector.tsx`)
 - **Duplicate Prevention**: Cannot select cards already used in hole cards or other community cards

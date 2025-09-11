@@ -127,17 +127,17 @@ export function CommunityCardSelector({
       </div>
 
       {getCardsToShow().map((cardIndex) => (
-        <div key={cardIndex} className="flex items-center gap-3 justify-center">
-          <span className="text-sm font-medium text-gray-700 w-8">
+        <div key={cardIndex} className="flex items-center gap-2 justify-center">
+          <span className="text-base font-semibold text-gray-800 w-12">
             {cardIndex === 0 ? 'CC1' :
              cardIndex === 1 ? 'CC2' :
              cardIndex === 2 ? 'CC3' :
              cardIndex === 3 ? 'Turn' :
-             cardIndex === 4 ? 'River' : `CC${cardIndex + 1}`}
+             cardIndex === 4 ? 'River' : `CC${cardIndex + 1}`}:
           </span>
           
           {/* Suit Selection */}
-          <div className="flex gap-1">
+          <div className="flex gap-2">
             {suits.map((suit) => {
               const rank = selectedRanks[cardIndex];
               const isUnavailable = rank && !isCardAvailable(cardIndex, rank, suit.symbol);
@@ -146,19 +146,20 @@ export function CommunityCardSelector({
                 <Button
                   key={suit.name}
                   variant={selectedSuits[cardIndex] === suit.symbol ? "default" : "outline"}
-                  size="sm"
                   disabled={isUnavailable || undefined}
-                  className={`w-8 h-8 p-0 ${suit.color} ${
+                  className={`w-12 h-12 sm:w-10 sm:h-10 p-0 ${suit.color} ${
                     selectedSuits[cardIndex] === suit.symbol 
                       ? 'bg-blue-100 border-blue-500' 
                       : isUnavailable
                       ? 'opacity-30 cursor-not-allowed bg-gray-100'
+                      : !selectedSuits[cardIndex]
+                      ? 'hover:bg-gray-50 border-2 animate-pulse border-orange-300'
                       : 'hover:bg-gray-50'
                   }`}
                   aria-label={`Select ${suit.name} suit for community card ${cardIndex + 1}`}
                   onClick={() => handleSuitSelect(cardIndex, suit.symbol)}
                 >
-                  <span className={`text-sm ${isUnavailable ? 'text-gray-400' : suit.color}`}>
+                  <span className={`text-lg sm:text-base ${isUnavailable ? 'text-gray-400' : suit.color}`}>
                     {suit.symbol}
                   </span>
                 </Button>
@@ -171,10 +172,14 @@ export function CommunityCardSelector({
             value={selectedRanks[cardIndex] || ""} 
             onValueChange={(value) => handleRankSelect(cardIndex, value)}
           >
-            <SelectTrigger className="w-16 h-8" aria-label={`Select rank for community card ${cardIndex + 1}`}>
+            <SelectTrigger className={`min-w-[4.5rem] w-18 min-h-[3rem] h-12 sm:w-12 sm:h-10 text-lg sm:text-base font-bold border bg-white hover:bg-gray-50 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 flex items-center justify-center p-0 rounded-md shadow-sm ${
+              !selectedRanks[cardIndex] 
+                ? 'border-2 animate-pulse border-orange-300' 
+                : 'border-gray-300'
+            }`} aria-label={`Select rank for community card ${cardIndex + 1}`}>
               <SelectValue placeholder="?" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="min-w-[3rem] w-auto">
               {ranks.map((rank) => {
                 const suit = selectedSuits[cardIndex];
                 const isUnavailable = suit && !isCardAvailable(cardIndex, rank, suit);
@@ -193,16 +198,6 @@ export function CommunityCardSelector({
               })}
             </SelectContent>
           </Select>
-          
-          {/* Show selected card */}
-          {communityCards[cardIndex] && (
-            <div className={`text-sm font-bold ml-2 ${
-              communityCards[cardIndex]?.includes('♥') || communityCards[cardIndex]?.includes('♦')
-                ? 'text-red-600' : 'text-black'
-            }`}>
-              {communityCards[cardIndex]}
-            </div>
-          )}
         </div>
       ))}
 

@@ -433,10 +433,199 @@ if (heroFolded) {
 - **Timestamp Tracking**: All actions logged with precise timestamps for future replay functionality
 - **Sequential Tracking**: Actions maintain proper order within betting rounds for accurate replay
 
+### Hero Stack Management & Blind Deduction (Critical Fix)
+#### Problem
+When starting a new hand, hero's stack was initialized to the full buy-in amount but wasn't being reduced when posting blinds. This caused incorrect call button amounts.
+
+**Example Bug**: Hero with $144 stack posts SB $1, but call button showed "Call $200" instead of "All-in $143" when they couldn't afford the full call.
+
+#### Solution Implemented (`src/app/session/[id]/page.tsx` lines 176-183)
+Added automatic blind deduction in `startNewHand()` function:
+```typescript
+// Deduct blind amounts from hero's stack if hero is in blind position
+if (session.heroPosition === session.smallBlindPosition) {
+  setHeroStack(prev => prev - (session.smallBlind || 0));
+} else if (session.heroPosition === session.bigBlindPosition) {
+  setHeroStack(prev => prev - (session.bigBlind || 0));
+}
+```
+
+#### Call Button Logic Verification
+The call button logic was already correct but now works properly with accurate stack tracking:
+```typescript
+const callAmount = Math.min(amountNeeded, heroStack);
+return heroStack < amountNeeded 
+  ? `All-In $${callAmount.toFixed(2)}` 
+  : `Call $${callAmount.toFixed(2)}`;
+```
+
+**Result**: Hero stack correctly reflects available chips after posting blinds, and call buttons show accurate amounts.
+
+### Enhanced HandTracker Component (Major UX Improvement)
+#### Problem
+The previous HandTracker used a confusing table format that was hard to read and didn't show community cards or emphasize hero actions clearly.
+
+#### Solution Implemented (`src/components/poker/HandTracker.tsx`)
+**1. Sequential Action Display**
+- Reverted from table format back to chronological action sequence
+- Clear betting round separation (Preflop, Flop, Turn, River)
+- Community cards displayed between betting rounds with proper suit colors
+
+**2. Hero Action Highlighting**
+```typescript
+const formatted = formatActionText(action);
+return (
+  <div className={cn(
+    formatted.isHero && "text-blue-800 font-semibold", // Hero actions in dark blue
+    !formatted.isHero && action.action === 'fold' && "text-gray-500",
+    // ... other color coding
+  )}>
+    {formatted.text}
+  </div>
+);
+```
+
+**3. Enhanced Card Display**
+- **Hole Cards**: Displayed with proper suit colors in bordered containers
+- **Community Cards**: Show between rounds (Flop: 3 cards, Turn: +1, River: +1)
+- **Card Colors**: Red for hearts/diamonds, black for spades/clubs
+- **Format**: Consistent with hole card selector styling
+
+**4. Prominent Share Buttons**
+```typescript
+<Button
+  variant="outline"
+  size="sm"
+  className="h-8 px-2 text-xs font-medium border-blue-200 text-blue-700 hover:bg-blue-50"
+  onClick={handleShareText}
+>
+  <MessageSquare className="h-3.5 w-3.5 mr-1" />
+  Text
+</Button>
+```
+
+**5. Community Cards Integration**
+- Added `communityCards?: (string | null)[]` prop to HandTracker interface
+- Community cards saved to Hand type when completing hands: `communityCards: communityCards`
+- Both current and completed hands display community cards properly
+
+#### Files Modified
+- `src/components/poker/HandTracker.tsx` - Complete redesign of display format
+- `src/types/poker.ts` - Added `communityCards` field to Hand interface
+- `src/app/session/[id]/page.tsx` - Pass community cards to HandTracker components
+
+#### Visual Improvements
+- **Action Colors**: Hero (dark blue), Folds (gray), All-ins (purple), Raises (orange)
+- **Share Buttons**: Visible outlined buttons instead of hidden ghost icons
+- **Card Display**: Professional bordered cards matching hole card selector style
+- **Layout**: Clean sequential narrative of hand progression
+
+### Post-Flop Betting Order Fix (Critical Bug Fix)
+#### Problem
+After flop/turn/river community cards were dealt, the action was incorrectly starting with the button position instead of the first active player after the button (typically small blind).
+
+#### Root Cause
+The `handleCommunityCardComplete()` function was using incorrect seat calculation logic that included a phantom "dealer seat 0" instead of properly cycling through seats 1-N.
+
+#### Solution Implemented (`src/app/session/[id]/page.tsx` lines 957-982)
+**Fixed Post-Flop Action Start**:
+```typescript
+// Post-flop betting starts from first active player after the button
+const buttonPosition = session?.buttonPosition || 0;
+let firstSeat = buttonPosition;
+
+// Start from the player immediately after the button and find first active player
+const totalSeats = session?.seats || 9;
+let attempts = 0;
+
+do {
+  firstSeat = (firstSeat % totalSeats) + 1; // Move to next seat (1-based)
+  attempts++;
+  
+  // Check if this player is active (not folded and not all-in)
+  if (!playerFolded.has(firstSeat) && !allInPlayers.has(firstSeat)) {
+    console.log(`Post-flop action starts with Seat ${firstSeat}`);
+    break;
+  }
+} while (attempts < totalSeats);
+```
+
+**Fixed moveToNextPlayer Logic** (lines 812-837):
+```typescript
+// Find next active player (seats are numbered 1 to session.seats)
+let nextSeat = currentActionSeat;
+const totalSeats = session.seats;
+
+let attempts = 0;
+do {
+  // Move to next seat, wrapping from session.seats to 1
+  nextSeat = (nextSeat % totalSeats) + 1;
+  attempts++;
+  
+  // If this player is not folded, they can act
+  if (!effectivePlayerFolded.has(nextSeat)) {
+    break;
+  }
+  
+  // Safety check to prevent infinite loop
+  if (attempts > totalSeats) {
+    console.error('Unable to find next active player');
+    break;
+  }
+} while (nextSeat !== currentActionSeat);
+```
+
+#### Key Changes
+- Removed phantom "seat 0" dealer position logic
+- Proper 1-based seat numbering (seats 1 through session.seats)
+- Correct post-flop action order: first active player clockwise from button
+- Button acts last in post-flop betting rounds (Texas Hold'em rule)
+
+#### Files Modified
+- `src/app/session/[id]/page.tsx` lines 939-982 (handleCommunityCardComplete)
+- `src/app/session/[id]/page.tsx` lines 812-837 (moveToNextPlayer)
+
+### All-In Raise Logic Fix (Critical Betting Bug)
+#### Problem Discovered
+When a player went all-in after another player checked, the betting round was ending immediately instead of giving other players the option to call, fold, or re-raise the all-in amount.
+
+**Example Bug**: Turn betting - Seat 4 checks, Seat 5 goes all-in for $67, but Seat 4 never gets the option to respond to the all-in.
+
+#### Root Cause Analysis
+The `playersActedThisRound` tracking wasn't being reset when a new bet/raise occurred. The logic was checking if "everyone has acted" but wasn't accounting for the fact that previous actions were on a DIFFERENT bet amount.
+
+#### Technical Solution (`src/app/session/[id]/page.tsx` lines 538-552)
+When any raise occurs (including all-in raises), reset `playersActedThisRound` to only include the raiser:
+
+```typescript
+// Move to next player - pass updated values if we raised or went all-in for more than current bet
+let updatedCurrentBet = undefined;
+let updatedPlayersActed = newPlayersActedThisRound;
+
+if (actualAction === 'raise') {
+  updatedCurrentBet = amount || currentBet;
+  // When raising, reset who has acted (only the raiser has acted on new bet)
+  updatedPlayersActed = new Set([currentActionSeat]);
+} else if (action === 'all-in') {
+  const totalBet = playerCurrentBet + actualAmount;
+  if (totalBet > currentBet) {
+    updatedCurrentBet = totalBet;
+    // All-in raise also resets who has acted
+    updatedPlayersActed = new Set([currentActionSeat]);
+  }
+}
+moveToNextPlayer(updatedCurrentBet, newBetsThisRound, updatedPlayersActed, newPlayerFolded);
+```
+
+#### Key Learning
+**Texas Hold'em Rule**: When the betting amount changes (via raise/all-in raise), all players who haven't folded must have the opportunity to act on the new bet amount, regardless of their previous actions in that round.
+
 ### State Management Improvements
 - **Proper State Resets**: `lastRaiserSeat` properly reset in new hands and betting rounds
 - **React State Timing**: Learned to pass updated values directly instead of relying on async state updates
 - **Cross-Component State**: `opponentCards` Map properly managed and reset between hands
+- **Stack Tracking**: Hero stack properly maintained with blind deductions and action costs
+- **Betting Round Logic**: Proper tracking of who needs to act on current bet amounts
 
 ## Development Workflow
 
@@ -455,6 +644,39 @@ npm run start        # Start production server
 - **Build Output**: `.next/` directory
 - **Static Assets**: `public/` directory
 - **Port Conflicts**: Always kill existing processes on port 3000 before starting dev server
+
+### PWA Updates & Deployment
+```bash
+npm run update-pwa   # Updates service worker cache version
+npm run push         # Runs update-pwa, then git add/commit/push
+```
+
+#### PWA Update Process
+The app includes a PWA update mechanism that automatically increments the service worker cache version:
+
+**Manual PWA Update**:
+```bash
+npm run update-pwa
+```
+- Runs `node scripts/update-sw-version.js`
+- Increments cache version (e.g., v55 → v56)
+- Users get update notification within 30 seconds
+- Forces app refresh for PWA users
+
+**Automated Git Workflow**:
+```bash
+npm run push
+```
+- Runs PWA update first
+- Adds all changes to git
+- Creates commit
+- Pushes to remote repository
+
+#### Service Worker Cache Strategy
+- **Cache Version**: Stored in service worker file, auto-incremented
+- **Update Notification**: PWA users see update prompt automatically
+- **Offline Support**: Critical app files cached for offline use
+- **Auto-Refresh**: Service worker forces refresh when new version detected
 
 ## Component Patterns
 

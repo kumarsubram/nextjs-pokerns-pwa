@@ -172,6 +172,15 @@ export default function SessionPage() {
     // Initial pot is just the blinds for now
     setPotSize((session.smallBlind || 0) + (session.bigBlind || 0));
     setCurrentBet(session.bigBlind || 0);
+    
+    // Deduct blind amounts from hero's stack if hero is in blind position
+    if (session.heroPosition === session.smallBlindPosition) {
+      setHeroStack(prev => prev - (session.smallBlind || 0));
+      console.log(`🃏 Hero posted SB $${session.smallBlind}, stack reduced to $${heroStack - (session.smallBlind || 0)}`);
+    } else if (session.heroPosition === session.bigBlindPosition) {
+      setHeroStack(prev => prev - (session.bigBlind || 0));
+      console.log(`🃏 Hero posted BB $${session.bigBlind}, stack reduced to $${heroStack - (session.bigBlind || 0)}`);
+    }
   };
   
   const handleStraddleDecision = (hasStraddle: boolean, seat?: number, amount?: number) => {
@@ -533,15 +542,23 @@ export default function SessionPage() {
     
     // Move to next player - pass updated values if we raised or went all-in for more than current bet
     let updatedCurrentBet = undefined;
+    let updatedPlayersActed = newPlayersActedThisRound;
+    
     if (actualAction === 'raise') {
       updatedCurrentBet = amount || currentBet;
+      // When raising, reset who has acted (only the raiser has acted on new bet)
+      updatedPlayersActed = new Set([currentActionSeat]);
+      console.log('🎯 RAISE: Resetting playersActed to only raiser', { raiser: currentActionSeat });
     } else if (action === 'all-in') {
       const totalBet = playerCurrentBet + actualAmount;
       if (totalBet > currentBet) {
         updatedCurrentBet = totalBet;
+        // All-in raise also resets who has acted
+        updatedPlayersActed = new Set([currentActionSeat]);
+        console.log('🎯 ALL-IN RAISE: Resetting playersActed to only raiser', { raiser: currentActionSeat });
       }
     }
-    moveToNextPlayer(updatedCurrentBet, newBetsThisRound, newPlayersActedThisRound, newPlayerFolded);
+    moveToNextPlayer(updatedCurrentBet, newBetsThisRound, updatedPlayersActed, newPlayerFolded);
   };
 
   const handleAllInConfirm = (amount: number) => {
@@ -801,16 +818,26 @@ export default function SessionPage() {
     }
     
     
-    // Find next active player (not folded, not dealer)
+    // Find next active player (seats are numbered 1 to session.seats)
     let nextSeat = currentActionSeat;
-    const totalSeats = session.seats + 1;
+    const totalSeats = session.seats;
     
-    
+    let attempts = 0;
     do {
-      nextSeat = (nextSeat + 1) % totalSeats;
-      console.log(`Checking seat ${nextSeat}: dealer=${nextSeat === 0}, folded=${effectivePlayerFolded.has(nextSeat)}, acted=${effectivePlayersActed.has(nextSeat)}, bet=${effectivePlayerBets.get(nextSeat) || 0}, currentBet=${effectiveCurrentBet}`);
-      // Skip dealer seat (0) and folded players
-      if (nextSeat !== 0 && !effectivePlayerFolded.has(nextSeat)) {
+      // Move to next seat, wrapping from session.seats to 1
+      nextSeat = (nextSeat % totalSeats) + 1;
+      attempts++;
+      
+      console.log(`Checking seat ${nextSeat}: folded=${effectivePlayerFolded.has(nextSeat)}, acted=${effectivePlayersActed.has(nextSeat)}, bet=${effectivePlayerBets.get(nextSeat) || 0}, currentBet=${effectiveCurrentBet}`);
+      
+      // If this player is not folded, they can act
+      if (!effectivePlayerFolded.has(nextSeat)) {
+        break;
+      }
+      
+      // Safety check to prevent infinite loop
+      if (attempts > totalSeats) {
+        console.error('Unable to find next active player');
         break;
       }
     } while (nextSeat !== currentActionSeat);
@@ -946,21 +973,28 @@ export default function SessionPage() {
       return;
     }
     
-    // Normal betting round - start from small blind or first active player
-    const sbPosition = session?.smallBlindPosition || 1;
-    let firstSeat = sbPosition;
+    // Post-flop betting starts from first active player after the button
+    // The button position is the last to act post-flop
+    const buttonPosition = session?.buttonPosition || 0;
+    let firstSeat = buttonPosition;
     
-    // Find first active non-all-in player
-    const totalSeats = (session?.seats || 0) + 1;
+    // Start from the player immediately after the button and find first active player
+    const totalSeats = session?.seats || 9;
     let attempts = 0;
-    while ((playerFolded.has(firstSeat) || firstSeat === 0 || allInPlayers.has(firstSeat)) && attempts < totalSeats) {
-      firstSeat = (firstSeat + 1) % totalSeats;
+    
+    do {
+      firstSeat = (firstSeat % totalSeats) + 1; // Move to next seat (1-based)
       attempts++;
-    }
+      
+      // Check if this player is active (not folded and not all-in)
+      if (!playerFolded.has(firstSeat) && !allInPlayers.has(firstSeat)) {
+        console.log(`Post-flop action starts with Seat ${firstSeat} (first active after button at Seat ${buttonPosition})`);
+        break;
+      }
+    } while (attempts < totalSeats);
     
     if (attempts < totalSeats) {
       setCurrentActionSeat(firstSeat);
-      // setRoundStartSeat(firstSeat);
     } else {
       // No one can act - proceed to next round
       moveToNextRound();
@@ -989,6 +1023,7 @@ export default function SessionPage() {
           heroPosition: positionMap[heroPos] || 'UTG',
           villainPositions: [],
           holeCards: holeCards.filter(card => card !== null) as string[],
+          communityCards: communityCards,
           board: {
             flop: communityCards.slice(0, 3).filter(card => card !== null) as string[] || undefined,
             turn: communityCards[3] || undefined,
@@ -1741,6 +1776,7 @@ export default function SessionPage() {
                 handActions={handActions}
                 currentBettingRound={currentBettingRound}
                 session={session}
+                communityCards={communityCards}
               />
             )}
             
@@ -1757,6 +1793,7 @@ export default function SessionPage() {
                   handWinAmount={hand.amountWon || 0}
                   handActions={hand.preflop}
                   session={session}
+                  communityCards={hand.communityCards || []}
                 />
               ))}
           </div>

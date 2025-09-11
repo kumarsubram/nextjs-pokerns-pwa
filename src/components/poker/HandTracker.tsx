@@ -2,8 +2,10 @@
 
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, MessageSquare, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Action, Session } from '@/types/poker';
+import { cn } from '@/lib/utils';
 
 // Extended action interface for tracking
 interface TrackedAction extends Action {
@@ -20,6 +22,7 @@ interface HandTrackerProps {
   handActions: TrackedAction[];
   currentBettingRound?: 'preflop' | 'flop' | 'turn' | 'river' | 'showdown'; // Optional for completed hands
   session: Session; // Session object to get blind amounts and positions
+  communityCards?: (string | null)[]; // Community cards if available
 }
 
 export function HandTracker({ 
@@ -28,38 +31,42 @@ export function HandTracker({
   handResult, 
   handWinAmount, 
   handActions, 
-  session 
+  session,
+  communityCards = [] 
 }: HandTrackerProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Format hole cards for display - show both short and long format
+  // Format individual card with colored suits
+  const formatCard = (card: string | null) => {
+    if (!card) return null;
+    const rank = card.charAt(0);
+    const suit = card.charAt(1);
+    const isRed = suit === '♥' || suit === '♦';
+    
+    return (
+      <span className={cn(
+        "font-mono font-semibold text-lg",
+        isRed ? "text-red-600" : "text-gray-900"
+      )}>
+        {rank}{suit}
+      </span>
+    );
+  };
+  
+  // Format hole cards for display
   const formatHoleCards = () => {
     const validCards = holeCards.filter(card => card !== null);
-    if (validCards.length === 0) return { short: null, long: null };
+    if (validCards.length === 0) return null;
     
-    // Short format: A♠ K♥
-    const shortFormat = validCards.join(' ');
-    
-    // Long format: Ace of Spades, King of Hearts
-    const longFormat = validCards.map(card => {
-      if (!card) return '';
-      const rank = card.charAt(0);
-      const suit = card.charAt(1);
-      
-      const rankNames: { [key: string]: string } = {
-        'A': 'Ace', 'K': 'King', 'Q': 'Queen', 'J': 'Jack',
-        'T': 'Ten', '9': 'Nine', '8': 'Eight', '7': 'Seven',
-        '6': 'Six', '5': 'Five', '4': 'Four', '3': 'Three', '2': 'Two'
-      };
-      
-      const suitNames: { [key: string]: string } = {
-        '♠': 'Spades', '♥': 'Hearts', '♦': 'Diamonds', '♣': 'Clubs'
-      };
-      
-      return `${rankNames[rank] || rank} of ${suitNames[suit] || suit}`;
-    }).join(', ');
-    
-    return { short: shortFormat, long: longFormat };
+    return (
+      <div className="flex items-center gap-1">
+        {validCards.map((card, idx) => (
+          <span key={idx} className="bg-white border border-gray-300 rounded px-2 py-1">
+            {formatCard(card)}
+          </span>
+        ))}
+      </div>
+    );
   };
 
   // Get result text with amount
@@ -80,7 +87,7 @@ export function HandTracker({
     }
   };
 
-  // Group actions by betting round for better display
+  // Group actions by betting round
   const groupActionsByRound = () => {
     const rounds: { [key: string]: TrackedAction[] } = {
       preflop: [],
@@ -89,85 +96,77 @@ export function HandTracker({
       river: []
     };
     
-    // Group actions by their betting round
     handActions.forEach(action => {
       const round = action.bettingRound || 'preflop';
-      rounds[round].push(action);
+      if (rounds[round]) {
+        rounds[round].push(action);
+      }
     });
     
     return rounds;
   };
-
-  // Convert seat numbers to positions
-  const getPositionName = (seatNumber: number) => {
-    if (!session) return `Seat ${seatNumber}`;
-    
-    const dealerSeat = session.buttonPosition || 0;
-    const totalSeats = session.seats;
-    
-    // Calculate position from dealer
-    const positionsFromDealer = (seatNumber - dealerSeat + totalSeats) % totalSeats;
-    
-    if (seatNumber === session.smallBlindPosition) return 'SB';
-    if (seatNumber === session.bigBlindPosition) return 'BB';
-    
-    // Position mapping based on table size
-    const positionMap: { [seats: number]: { [pos: number]: string } } = {
-      9: { 1: 'UTG', 2: 'UTG+1', 3: 'MP', 4: 'MP+1', 5: 'CO', 6: 'BTN', 7: 'SB', 8: 'BB' },
-      6: { 1: 'UTG', 2: 'MP', 3: 'CO', 4: 'BTN', 5: 'SB', 0: 'BB' },
-    };
-    
-    return positionMap[totalSeats]?.[positionsFromDealer] || `Seat ${seatNumber}`;
-  };
-
+  
+  // Format action text for display
   const formatActionText = (action: TrackedAction) => {
-    let playerName = '';
-    let actionText = '';
-    
-    // Determine player name
-    if (action.player === 'hero') {
-      playerName = `Seat ${session?.heroPosition} (Me)`;
-    } else if (action.seatNumber !== undefined) {
-      const positionName = getPositionName(action.seatNumber);
-      playerName = `Seat ${action.seatNumber} ${positionName !== `Seat ${action.seatNumber}` ? `(${positionName})` : ''}`;
-    } else {
-      playerName = `${action.player}`;
+    let seatText = '';
+    const isHero = action.seatNumber === session?.heroPosition;
+    if (action.seatNumber) {
+      seatText = `Seat ${action.seatNumber}`;
+      if (isHero) {
+        seatText += ' (You)';
+      }
     }
     
-    // Format the action with amount
+    let actionText = '';
     switch (action.action) {
       case 'fold':
-        actionText = 'folded';
-        break;
-      case 'call':
-        actionText = action.amount ? `called $${action.amount}` : 'called';
-        break;
-      case 'raise':
-        actionText = action.amount ? `raised to $${action.amount}` : 'raised';
-        break;
-      case 're-raise':
-        actionText = action.amount ? `re-raised to $${action.amount}` : 're-raised';
-        break;
-      case 'bet':
-        actionText = action.amount ? `bet $${action.amount}` : 'bet';
+        actionText = 'Fold';
         break;
       case 'check':
-        actionText = 'checked';
+        actionText = 'Check';
+        break;
+      case 'call':
+        actionText = action.amount ? `Call $${action.amount}` : 'Call';
+        break;
+      case 'raise':
+        actionText = action.amount ? `Raise $${action.amount}` : 'Raise';
+        break;
+      case 're-raise':
+        actionText = action.amount ? `Re-raise $${action.amount}` : 'Re-raise';
+        break;
+      case 'bet':
+        actionText = action.amount ? `Bet $${action.amount}` : 'Bet';
         break;
       case 'all-in':
-        actionText = action.amount ? `went all-in for $${action.amount}` : 'went all-in';
-        break;
-      case 'straddle':
-        actionText = action.amount ? `straddled $${action.amount}` : 'straddled';
+        actionText = action.amount ? `All-in $${action.amount}` : 'All-in';
         break;
       default:
         actionText = action.action;
     }
     
-    return `${playerName} ${actionText}`;
+    return { text: `${seatText}: ${actionText}`, isHero };
+  };
+  
+  // Format community cards display
+  const formatCommunityCards = (roundCards: (string | null)[]) => {
+    return roundCards.filter(card => card !== null).map((card, idx) => (
+      <span key={idx} className="bg-white border border-gray-300 rounded px-2 py-1 mx-0.5">
+        {formatCard(card)}
+      </span>
+    ));
+  };
+  
+  // Handle share functionality (placeholder for now)
+  const handleShareText = () => {
+    console.log('Share via text - to be implemented');
+  };
+  
+  const handleShareTwitter = () => {
+    console.log('Share on Twitter - to be implemented');
   };
 
-  const holeCardsFormatted = formatHoleCards();
+
+  const holeCardsDisplay = formatHoleCards();
   const resultText = getResultText();
   const actionGroups = groupActionsByRound();
 
@@ -178,27 +177,49 @@ export function HandTracker({
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap">
             <CardTitle className="text-sm font-medium">
-              Hand {handNumber}
+              Hand #{handNumber}
             </CardTitle>
-            {holeCardsFormatted.short && (
-              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-mono">
-                {holeCardsFormatted.short}
-              </span>
-            )}
+            {holeCardsDisplay}
             {resultText && (
-              <span className={`text-xs px-2 py-1 rounded font-medium ${
-                handResult === 'won' ? 'bg-green-100 text-green-800' :
-                handResult === 'lost' ? 'bg-red-100 text-red-800' :
-                handResult === 'folded' ? 'bg-gray-100 text-gray-800' :
-                'bg-orange-100 text-orange-800'
-              }`}>
+              <span className={cn(
+                "text-xs px-2 py-1 rounded font-medium",
+                handResult === 'won' && 'bg-green-100 text-green-800',
+                handResult === 'lost' && 'bg-red-100 text-red-800',
+                handResult === 'folded' && 'bg-gray-100 text-gray-800',
+                handResult === 'chopped' && 'bg-orange-100 text-orange-800'
+              )}>
                 {resultText}
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 px-2 text-xs font-medium border-blue-200 text-blue-700 hover:bg-blue-50"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleShareText();
+              }}
+              title="Share hand via text"
+            >
+              <MessageSquare className="h-3.5 w-3.5 mr-1" />
+              Text
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 px-2 text-xs font-medium border-gray-200 hover:bg-gray-50"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleShareTwitter();
+              }}
+              title="Share on X"
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
             <span className="text-xs text-gray-500">{handActions.length} actions</span>
             {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </div>
@@ -208,42 +229,125 @@ export function HandTracker({
       {isExpanded && (
         <CardContent className="pt-0">
           <div className="space-y-3">
-            {/* Blinds and Preflop Actions */}
-            <div>
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Preflop</h4>
-              <div className="space-y-1 text-sm">
-                <div className="text-blue-600 font-medium">
-                  Seat {session?.smallBlindPosition} posts SB ${session?.smallBlind}
-                </div>
-                <div className="text-blue-600 font-medium">
-                  Seat {session?.bigBlindPosition} posts BB ${session?.bigBlind}
-                </div>
-                {actionGroups.preflop.map((action, index) => (
-                  <div key={index} className="text-gray-800">
-                    {formatActionText(action)}
-                  </div>
-                ))}
-              </div>
-            </div>
-            
-            {/* Other rounds if they have actions */}
-            {['flop', 'turn', 'river'].map(round => (
-              actionGroups[round].length > 0 && (
-                <div key={round}>
-                  <h4 className="text-sm font-medium text-gray-700 mb-2 capitalize">{round}</h4>
-                  <div className="space-y-1 text-sm">
-                    {actionGroups[round].map((action, index) => (
-                      <div key={index} className="text-gray-800">
-                        {formatActionText(action)}
+            {/* Preflop Actions */}
+            {(actionGroups.preflop.length > 0 || session?.smallBlindPosition || session?.bigBlindPosition) && (
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">Preflop</h4>
+                <div className="space-y-1 text-sm">
+                  {session?.smallBlindPosition && (
+                    <div className="text-blue-600">
+                      Seat {session.smallBlindPosition}: Small blind $${session.smallBlind}
+                    </div>
+                  )}
+                  {session?.bigBlindPosition && (
+                    <div className="text-blue-600">
+                      Seat {session.bigBlindPosition}: Big blind $${session.bigBlind}
+                    </div>
+                  )}
+                  {actionGroups.preflop.map((action, idx) => {
+                    const formatted = formatActionText(action);
+                    return (
+                      <div key={idx} className={cn(
+                        formatted.isHero && "text-blue-800 font-semibold",
+                        !formatted.isHero && action.action === 'fold' && "text-gray-500",
+                        !formatted.isHero && action.action === 'all-in' && "text-purple-700 font-semibold",
+                        !formatted.isHero && (action.action === 'raise' || action.action === 're-raise') && "text-orange-700 font-semibold",
+                        !formatted.isHero && !['fold', 'all-in', 'raise', 're-raise'].includes(action.action) && "text-gray-800"
+                      )}>
+                        {formatted.text}
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
-              )
-            ))}
+              </div>
+            )}
             
-            {handActions.length === 0 && (
-              <p className="text-sm text-gray-500 text-center py-2">No actions yet</p>
+            {/* Flop Actions */}
+            {actionGroups.flop.length > 0 && (
+              <div>
+                {communityCards && communityCards.length >= 3 && (
+                  <div className="mb-2 flex items-center gap-1">
+                    <span className="text-sm font-medium text-gray-600">Flop:</span>
+                    {formatCommunityCards(communityCards.slice(0, 3))}
+                  </div>
+                )}
+                <div className="space-y-1 text-sm">
+                  {actionGroups.flop.map((action, idx) => {
+                    const formatted = formatActionText(action);
+                    return (
+                      <div key={idx} className={cn(
+                        formatted.isHero && "text-blue-800 font-semibold",
+                        !formatted.isHero && action.action === 'fold' && "text-gray-500",
+                        !formatted.isHero && action.action === 'all-in' && "text-purple-700 font-semibold",
+                        !formatted.isHero && (action.action === 'raise' || action.action === 're-raise') && "text-orange-700 font-semibold",
+                        !formatted.isHero && !['fold', 'all-in', 'raise', 're-raise'].includes(action.action) && "text-gray-800"
+                      )}>
+                        {formatted.text}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            
+            {/* Turn Actions */}
+            {actionGroups.turn.length > 0 && (
+              <div>
+                {communityCards && communityCards.length >= 4 && (
+                  <div className="mb-2 flex items-center gap-1">
+                    <span className="text-sm font-medium text-gray-600">Turn:</span>
+                    {formatCommunityCards(communityCards.slice(0, 4))}
+                  </div>
+                )}
+                <div className="space-y-1 text-sm">
+                  {actionGroups.turn.map((action, idx) => {
+                    const formatted = formatActionText(action);
+                    return (
+                      <div key={idx} className={cn(
+                        formatted.isHero && "text-blue-800 font-semibold",
+                        !formatted.isHero && action.action === 'fold' && "text-gray-500",
+                        !formatted.isHero && action.action === 'all-in' && "text-purple-700 font-semibold",
+                        !formatted.isHero && (action.action === 'raise' || action.action === 're-raise') && "text-orange-700 font-semibold",
+                        !formatted.isHero && !['fold', 'all-in', 'raise', 're-raise'].includes(action.action) && "text-gray-800"
+                      )}>
+                        {formatted.text}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            
+            {/* River Actions */}
+            {actionGroups.river.length > 0 && (
+              <div>
+                {communityCards && communityCards.length >= 5 && (
+                  <div className="mb-2 flex items-center gap-1">
+                    <span className="text-sm font-medium text-gray-600">River:</span>
+                    {formatCommunityCards(communityCards.slice(0, 5))}
+                  </div>
+                )}
+                <div className="space-y-1 text-sm">
+                  {actionGroups.river.map((action, idx) => {
+                    const formatted = formatActionText(action);
+                    return (
+                      <div key={idx} className={cn(
+                        formatted.isHero && "text-blue-800 font-semibold",
+                        !formatted.isHero && action.action === 'fold' && "text-gray-500",
+                        !formatted.isHero && action.action === 'all-in' && "text-purple-700 font-semibold",
+                        !formatted.isHero && (action.action === 'raise' || action.action === 're-raise') && "text-orange-700 font-semibold",
+                        !formatted.isHero && !['fold', 'all-in', 'raise', 're-raise'].includes(action.action) && "text-gray-800"
+                      )}>
+                        {formatted.text}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            
+            {handActions.length === 0 && !session?.smallBlindPosition && !session?.bigBlindPosition && (
+              <p className="text-sm text-gray-500 text-center py-2">No actions recorded</p>
             )}
           </div>
         </CardContent>

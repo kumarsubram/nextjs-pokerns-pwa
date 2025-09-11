@@ -66,6 +66,7 @@ export interface Hand {
   
   // Cards
   holeCards: string[]; // e.g., ['As', 'Kh']
+  communityCards?: (string | null)[]; // All community cards in order
   board: {
     flop?: string[];
     turn?: string;

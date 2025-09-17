@@ -3,6 +3,330 @@
 ## Project Overview
 A Progressive Web App for tracking poker sessions, hands, and statistics. Built with Next.js 15, TypeScript, and Tailwind CSS.
 
+## NEW SIMPLIFIED STRATEGY (v2.0) - PENDING IMPLEMENTATION
+
+### Core Philosophy
+Remove complex table rotation and position management in favor of fixed-position tables with simplified betting tracking. Focus on session-based hand history storage for future replay functionality.
+
+### Key Changes from v1.0
+1. **Remove Complex Position Logic**: No more rotating buttons, dealer positions, or blind movements
+2. **Fixed Table Positions**: 6-handed and 9-handed tables with standard position labels
+3. **Session-Based Storage**: All hands stored under session IDs for easy retrieval
+4. **Simplified Betting**: Track actions without complex state machines
+5. **Focus on Data Capture**: Prioritize recording over simulation
+
+### Implementation Roadmap
+
+#### Phase 1: Session Setup Redesign ✅ COMPLETED
+- [x] Update session creation flow with auto-generated names (PS1, PS2, etc.)
+- [x] Implement 6-handed and 9-handed fixed position tables
+- [x] Remove all rotation logic from PokerTable component
+- [x] Add session metadata structure
+
+#### Phase 2: Simplified Card Selection ✅ COMPLETED
+- [x] Keep existing card selectors but remove position dependencies
+- [x] Implement visual card display without complex state tracking
+- [x] Focus on recording selected cards for history
+
+#### Phase 3: Betting Round Tracking 🚧 IN PROGRESS
+- [ ] Simple action recording (fold, check, call, raise, all-in)
+- [ ] Contextual action buttons based on current bet
+- [ ] No complex round completion logic
+- [ ] Focus on capturing user's actions and amounts
+
+#### Phase 4: Hand History Storage 🚧 IN PROGRESS
+- [x] Implement session-based localStorage structure
+- [ ] Save hands under session-specific keys
+- [ ] Update session metadata on each hand
+- [ ] Add hand numbering within sessions
+
+#### Phase 5: Session Management ✅ COMPLETED
+- [x] Active session tracking
+- [x] Session list with summary statistics
+- [x] End session functionality
+- [ ] Data export preparation
+
+### Current Implementation Status
+
+#### ✅ Completed Features
+1. **Session Creation Flow**
+   - Auto-generated session names (PS1, PS2, etc.)
+   - Game type selection (Tournament/Cash Game)
+   - Table size selection (6/9 handed)
+   - Buy-in amount input
+   - Seat position selection with visual table
+
+2. **Fixed Position Tables**
+   - SimplePokerTable component with fixed seats
+   - **6-handed action sequence**: BTN → SB → BB → UTG → LJ → CO (DEALER is visual only, non-clickable)
+   - **9-handed action sequence**: BTN → SB → BB → UTG → UTG+1 → UTG+2 → LJ → HJ → CO (DEALER is visual only, non-clickable)
+   - Visual position labels and user seat highlighting
+   - Action flow follows clockwise order for betting rounds
+   - DEALER position is fixed, black, and never participates in actions
+
+3. **Session Management Service**
+   - SessionService with localStorage integration
+   - Session metadata management
+   - Active session tracking
+   - Session list with statistics
+
+4. **Homepage Integration**
+   - Updated to use new session service
+   - Shows active session "Continue" button
+   - Session statistics display
+   - Recent sessions list
+
+5. **Hole Card Selection**
+   - Visual card selector modal
+   - Suit-organized grid layout
+   - Duplicate prevention (first card can't be selected again)
+   - Card display with proper colors (red hearts/diamonds)
+
+#### 🚧 Next Steps
+1. **Betting Actions** - Add fold, check, call, raise buttons
+2. **Community Cards** - Flop, turn, river selection
+3. **Hand Completion** - Save hands to session storage
+4. **Action History** - Track betting rounds and actions
+
+### New Data Architecture
+
+#### Session Metadata Structure
+```typescript
+interface SessionMetadata {
+  sessionId: string;        // 'ps1_2025_09_09_1545'
+  sessionName: string;      // 'PS1 - 9 Sep 25 3:45pm'
+  sessionNumber: number;    // Auto-incremented
+  gameType: 'Tournament' | 'Cash Game';
+  tableSeats: 6 | 9;
+  buyIn: number;
+  userSeat: string;         // Fixed position label
+  startTime: Date;
+  endTime?: Date;
+  status: 'active' | 'completed';
+  totalHands: number;
+  totalDuration?: string;
+  result?: string;          // '+$350' or '-50 BB'
+}
+```
+
+#### Hand Storage Structure
+```typescript
+interface StoredHand {
+  handNumber: number;
+  timestamp: string;
+  userCards: [string, string];
+  communityCards: {
+    flop: [string, string, string] | null;
+    turn: string | null;
+    river: string | null;
+  };
+  bettingRounds: {
+    preflop?: BettingRound;
+    flop?: BettingRound;
+    turn?: BettingRound;
+    river?: BettingRound;
+  };
+  result: {
+    winner?: string;
+    potWon?: number;
+    stackAfter?: number;
+  };
+}
+
+interface BettingRound {
+  actions: Array<{
+    position: string;
+    action: string;
+    amount?: number;
+  }>;
+  pot: number;
+}
+```
+
+#### localStorage Keys Structure
+```
+'lastSessionNumber': number
+'activeSession': string (session ID)
+'session_{id}_meta': SessionMetadata
+'session_{id}_hands': StoredHand[]
+```
+
+### Fixed Position Tables
+
+#### 9-Handed Positions (clockwise)
+1. BB (Big Blind)
+2. SB (Small Blind)
+3. BTN (Button)
+4. CO (Cutoff)
+5. HJ (Hijack)
+6. LJ (Lojack)
+7. MP (Middle Position)
+8. UTG+1 (Under the Gun + 1)
+9. UTG (Under the Gun)
+
+#### 6-Handed Positions (clockwise)
+1. BB (Big Blind)
+2. SB (Small Blind)
+3. BTN (Button)
+4. CO (Cutoff)
+5. HJ (Hijack)
+6. UTG (Under the Gun)
+
+### Session Flow
+
+#### New Session Creation
+1. User taps "Start Session"
+2. Auto-generate session name: `PS{n} - {date}`
+3. Select game type (Tournament/Cash)
+4. Select table size (6/9 seats)
+5. Enter buy-in amount
+6. Select user's seat position
+7. Create session and start tracking
+
+#### Hand Tracking Flow
+1. Select hole cards (2 cards)
+2. Track preflop actions
+3. Select flop cards (if reached)
+4. Track flop actions
+5. Continue through turn/river as needed
+6. Record result
+7. Save hand to session history
+8. Reset for next hand
+
+#### Session Completion
+1. User taps "End Session"
+2. Calculate session statistics
+3. Mark session as completed
+4. Show session summary
+5. Return to home screen
+
+### Component Simplification
+
+#### PokerTable Component (Simplified)
+- Fixed seat positions (no rotation)
+- Visual seat indicators only
+- No complex state management
+- Pure display component
+
+#### Card Selectors (Retained)
+- HoleCardSelector
+- CommunityCardSelector
+- Keep duplicate prevention
+- Focus on data capture
+
+#### Action Buttons (Simplified)
+- Contextual based on current bet
+- Simple state tracking
+- No complex round logic
+- Record action and amount
+
+### Benefits of Simplified Approach
+1. **Reduced Complexity**: Easier to maintain and debug
+2. **Better Performance**: Less state management overhead
+3. **Clearer Data Model**: Session-based organization
+4. **Future Flexibility**: Easy to add replay and analysis features
+5. **Mobile Optimized**: Simpler UI works better on small screens
+
+### Session Management Functions
+
+#### Core Functions Required
+```typescript
+// Session lifecycle
+createNewSession(config: SessionConfig): SessionMetadata
+getCurrentSession(): SessionMetadata | null
+endCurrentSession(): void
+deleteSession(sessionId: string): void
+
+// Hand management
+saveHandToSession(handData: HandData): void
+getSessionHands(sessionId: string): StoredHand[]
+getCurrentHandNumber(): number
+
+// Session queries
+getSessionList(): SessionMetadata[]
+getSessionStats(sessionId: string): SessionStats
+exportSession(sessionId: string): ExportData
+
+// Storage utilities
+getNextSessionNumber(): number
+setActiveSession(sessionId: string): void
+clearActiveSession(): void
+```
+
+#### Session Name Generation
+```typescript
+function generateSessionName(): string {
+  const sessionNumber = getNextSessionNumber();
+  const now = new Date();
+  const dateStr = format(now, "d MMM yy h:mma").toLowerCase();
+  return `PS${sessionNumber} - ${dateStr}`;
+}
+```
+
+### UI Component Changes
+
+#### Homepage Updates
+- Keep existing "Start Session" button
+- Show "Continue Session" button only if active session exists
+- Display last session summary card
+- No changes to navigation
+
+#### Session Creation Wizard
+1. **Step 1**: Basic Info (name, type, seats, buy-in)
+2. **Step 2**: Seat Selection (fixed position grid)
+3. **Validation**: All fields required
+4. **Auto-progression**: Direct to game screen
+
+#### Game Screen Simplification
+- Fixed table layout (no rotation)
+- Position labels always visible
+- Simplified action buttons
+- Hand counter display
+- Session info header
+
+#### Hand Completion Screen
+- Summary of completed hand
+- "Next Hand" button
+- "End Session" option
+- Quick stats display
+
+### Migration Path from v1.0
+
+#### Phase 1: Data Model Migration
+1. Create new session storage structure
+2. Migrate existing hands to session format
+3. Update type definitions
+4. Test data integrity
+
+#### Phase 2: UI Simplification
+1. Remove PokerTable rotation logic
+2. Implement fixed position tables
+3. Simplify betting round tracking
+4. Update card selectors
+
+#### Phase 3: Session Management
+1. Implement session lifecycle functions
+2. Add session name generation
+3. Update navigation flow
+4. Add session summary views
+
+#### Phase 4: Testing & Refinement
+1. Test all user flows
+2. Verify data persistence
+3. Performance optimization
+4. PWA functionality check
+
+### Technical Debt Removal
+- Remove complex position calculations
+- Eliminate betting state machines
+- Simplify component prop drilling
+- Reduce React state complexity
+- Clean up unused utilities
+
+---
+
+## CURRENT IMPLEMENTATION (v1.0) - TO BE REPLACED
+
 ## Architecture & Structure
 
 ### Tech Stack
@@ -696,16 +1020,21 @@ const handleSubmit = async (data: FormType) => {
 const { sessions, createSession, updateSession, deleteSession } = useSessions();
 ```
 
-### Table Position Logic
+### Table Position Logic (v2.0 - Fixed Positions)
 ```tsx
-// Dealer is always one seat before small blind
-const dealerSeat = (smallBlindSeat - 1 + totalSeats) % totalSeats;
+// Fixed position sequences (DEALER is visual only, never in actions)
+export const POSITION_LABELS_6 = [
+  'DEALER', 'BTN', 'SB', 'BB', 'UTG', 'LJ', 'CO'
+] as const;
 
-// Position calculation from dealer
-const getPositionAbbreviation = (seatIndex: number) => {
-  const positionsFromDealer = (seatIndex - dealerSeat + seats) % seats;
-  // Return UTG, MP, CO, BTN, SB, BB based on table size
-};
+export const POSITION_LABELS_9 = [
+  'DEALER', 'BTN', 'SB', 'BB', 'UTG', 'UTG+1', 'UTG+2', 'LJ', 'HJ', 'CO'
+] as const;
+
+// Action sequences (DEALER excluded):
+// 6-handed: BTN → SB → BB → UTG → LJ → CO
+// 9-handed: BTN → SB → BB → UTG → UTG+1 → UTG+2 → LJ → HJ → CO
+// DEALER is black, non-clickable, visual marker only
 ```
 
 ## Future Development Areas

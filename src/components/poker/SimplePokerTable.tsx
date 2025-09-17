@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { POSITION_LABELS_6, POSITION_LABELS_9, Position, TableSeats } from '@/types/poker-v2';
+import { POSITION_LABELS_6, POSITION_LABELS_9, Position, TableSeats, PlayerState } from '@/types/poker-v2';
 
 interface SimplePokerTableProps {
   seats: TableSeats;
@@ -14,6 +14,24 @@ interface SimplePokerTableProps {
   userCards?: [string, string] | null;
   onCardClick?: (cardIndex: 1 | 2) => void;
   showCardButtons?: boolean;
+  communityCards?: {
+    flop: [string, string, string] | null;
+    turn: string | null;
+    river: string | null;
+  };
+  onCommunityCardClick?: (cardType: 'flop', cardIndex: number) => void;
+  showCommunityCards?: boolean;
+  playerStates?: PlayerState[];
+  nextToAct?: Position;
+  currentBettingRound?: {
+    actions: Array<{
+      position: Position;
+      action: string;
+      amount?: number;
+    }>;
+  };
+  isBettingComplete?: boolean;
+  showFlopSelectionPrompt?: boolean;
 }
 
 export function SimplePokerTable({
@@ -25,9 +43,42 @@ export function SimplePokerTable({
   showBlinkingSeats = false,
   userCards = null,
   onCardClick,
-  showCardButtons = false
+  showCardButtons = false,
+  communityCards,
+  onCommunityCardClick,
+  showCommunityCards = false,
+  playerStates = [],
+  nextToAct,
+  currentBettingRound,
+  isBettingComplete = false,
+  showFlopSelectionPrompt = false
 }: SimplePokerTableProps) {
   const positions = seats === 6 ? POSITION_LABELS_6 : POSITION_LABELS_9;
+
+  // Helper function to get the last action for a position
+  const getLastAction = (position: Position) => {
+    if (!currentBettingRound || position === 'DEALER') return null;
+    const actions = currentBettingRound.actions.filter(a => a.position === position);
+    return actions.length > 0 ? actions[actions.length - 1] : null;
+  };
+
+  // Helper function to format action display
+  const formatActionDisplay = (action: { action: string; amount?: number }) => {
+    switch (action.action) {
+      case 'fold':
+        return ''; // Don't show text for fold, just the red visual indicator
+      case 'check':
+        return 'CHECK';
+      case 'call':
+        return 'CALL';
+      case 'raise':
+        return `RAISE ${action.amount || ''}`;
+      case 'all-in':
+        return 'ALL-IN';
+      default:
+        return action.action.toUpperCase();
+    }
+  };
 
   // Helper function to get card color
   const getCardColor = (card: string) => {
@@ -74,9 +125,71 @@ export function SimplePokerTable({
       <div className="relative w-full h-40 bg-green-800 rounded-[2.5rem] shadow-2xl border-4 border-amber-900">
         <div className="absolute inset-3 bg-green-700 rounded-[2rem] border border-green-600">
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-green-500 font-semibold text-xs opacity-60">
-              {seats === 6 ? '6' : '9'} HANDED
-            </span>
+            {showCommunityCards ? (
+              <div className="flex gap-1">
+                {/* Flop Cards */}
+                {[0, 1, 2].map((index) => {
+                  const hasCard = communityCards?.flop?.[index];
+                  const shouldBlink = isBettingComplete && !hasCard;
+                  return (
+                    <button
+                      key={`flop-${index}`}
+                      onClick={() => onCommunityCardClick?.('flop', index)}
+                      disabled={!isBettingComplete}
+                      className={cn(
+                        "w-6 h-9 rounded border text-xs font-bold flex items-center justify-center",
+                        hasCard
+                          ? `bg-white border-gray-800 ${getCardColor(hasCard)}`
+                          : isBettingComplete
+                          ? "bg-gray-200 border-gray-400 text-gray-600 hover:bg-gray-300 cursor-pointer"
+                          : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-50",
+                        shouldBlink && "animate-pulse"
+                      )}
+                    >
+                      {hasCard || "?"}
+                    </button>
+                  );
+                })}
+                {/* Turn Card */}
+                <button
+                  onClick={() => onCommunityCardClick?.('flop', 3)}
+                  disabled={!isBettingComplete}
+                  className={cn(
+                    "w-6 h-9 rounded border text-xs font-bold flex items-center justify-center ml-1",
+                    communityCards?.turn
+                      ? `bg-white border-gray-800 ${getCardColor(communityCards.turn)}`
+                      : isBettingComplete
+                      ? "bg-gray-200 border-gray-400 text-gray-600 hover:bg-gray-300 cursor-pointer"
+                      : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-50"
+                  )}
+                >
+                  {communityCards?.turn || "?"}
+                </button>
+                {/* River Card */}
+                <button
+                  onClick={() => onCommunityCardClick?.('flop', 4)}
+                  disabled={!isBettingComplete}
+                  className={cn(
+                    "w-6 h-9 rounded border text-xs font-bold flex items-center justify-center",
+                    communityCards?.river
+                      ? `bg-white border-gray-800 ${getCardColor(communityCards.river)}`
+                      : isBettingComplete
+                      ? "bg-gray-200 border-gray-400 text-gray-600 hover:bg-gray-300 cursor-pointer"
+                      : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-50"
+                  )}
+                >
+                  {communityCards?.river || "?"}
+                </button>
+              </div>
+            ) : showFlopSelectionPrompt ? (
+              <span className="text-yellow-400 font-semibold text-xs text-center animate-pulse">
+                Choose community cards<br />to proceed
+              </span>
+            ) : (
+              <span className="text-green-500 font-semibold text-xs opacity-60">
+                {seats === 6 ? '6' : '9'} HANDED
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -87,38 +200,69 @@ export function SimplePokerTable({
         const isUserSeat = position === userSeat;
         const isHighlighted = highlightedPositions.includes(position);
 
+        // Get player state for this position (DEALER never has player state)
+        const playerState = position !== 'DEALER' ? playerStates.find(p => p.position === position) : null;
+        const isFolded = playerState?.status === 'folded';
+        const isNextToAct = position !== 'DEALER' && position === nextToAct;
+        const lastAction = getLastAction(position);
+
         return (
           <div
             key={position}
             className="absolute -translate-x-1/2 -translate-y-1/2"
             style={{ left: x, top: y }}
           >
-            <button
-              onClick={() => position !== 'DEALER' && onSeatClick?.(position)}
-              disabled={!onSeatClick || position === 'DEALER'}
-              className={cn(
-                "relative w-12 h-12 rounded-full border-2 transition-all duration-300",
-                "flex flex-col items-center justify-center text-center",
-                "transform hover:scale-110 shadow-md",
-                position === 'DEALER' && "bg-gray-900 border-gray-700 text-white cursor-default",
-                position !== 'DEALER' && isUserSeat && "bg-blue-600 border-blue-400 text-white shadow-lg ring-2 ring-blue-300",
-                position !== 'DEALER' && !isUserSeat && isHighlighted && "bg-yellow-500 border-yellow-400 text-gray-900",
-                position !== 'DEALER' && !isUserSeat && !isHighlighted && "bg-gray-700 border-gray-600 text-gray-300",
-                position !== 'DEALER' && onSeatClick && !isUserSeat && "hover:bg-gray-600 hover:border-gray-500 cursor-pointer",
-                position !== 'DEALER' && !onSeatClick && "cursor-default",
-                showBlinkingSeats && !isUserSeat && position !== 'DEALER' && "animate-pulse"
+            <div className="flex flex-col items-center">
+              <button
+                onClick={() => position !== 'DEALER' && onSeatClick?.(position)}
+                disabled={!onSeatClick || position === 'DEALER'}
+                className={cn(
+                  "relative w-12 h-12 rounded-full border-2 transition-all duration-300",
+                  "flex flex-col items-center justify-center text-center",
+                  "transform hover:scale-110 shadow-md",
+                  // DEALER styling (never changes)
+                  position === 'DEALER' && "bg-gray-900 border-gray-700 text-white cursor-default",
+                  // Folded player styling
+                  position !== 'DEALER' && isFolded && "bg-red-800 border-red-600 text-red-300 opacity-60",
+                  // Next to act styling (green with pulse)
+                  position !== 'DEALER' && isNextToAct && !isFolded && "bg-green-600 border-green-400 text-white shadow-lg ring-2 ring-green-300 animate-pulse",
+                  // User seat styling (when not folded or next to act)
+                  position !== 'DEALER' && isUserSeat && !isFolded && !isNextToAct && "bg-blue-600 border-blue-400 text-white shadow-lg ring-2 ring-blue-300",
+                  // Other highlighted positions
+                  position !== 'DEALER' && !isUserSeat && !isFolded && !isNextToAct && isHighlighted && "bg-yellow-500 border-yellow-400 text-gray-900",
+                  // Default active player styling
+                  position !== 'DEALER' && !isUserSeat && !isFolded && !isNextToAct && !isHighlighted && "bg-gray-700 border-gray-600 text-gray-300",
+                  // Hover effects
+                  position !== 'DEALER' && onSeatClick && !isUserSeat && "hover:bg-gray-600 hover:border-gray-500 cursor-pointer",
+                  position !== 'DEALER' && !onSeatClick && "cursor-default",
+                  // Blinking for seat selection
+                  showBlinkingSeats && !isUserSeat && position !== 'DEALER' && "animate-pulse"
+                )}
+              >
+                <span className={cn(
+                  "text-[10px] font-bold leading-tight",
+                  position === 'DEALER' && "text-[9px]"
+                )}>
+                  {position}
+                </span>
+                {isUserSeat && position !== 'DEALER' && (
+                  <span className="text-[8px] leading-none">YOU</span>
+                )}
+              </button>
+
+              {/* Action indicator */}
+              {lastAction && position !== 'DEALER' && formatActionDisplay(lastAction) && (
+                <div className={cn(
+                  "mt-1 px-1 py-0.5 rounded text-[8px] font-bold text-center min-w-[36px]",
+                  lastAction.action === 'check' && "bg-gray-600 text-white",
+                  lastAction.action === 'call' && "bg-blue-600 text-white",
+                  lastAction.action === 'raise' && "bg-green-600 text-white",
+                  lastAction.action === 'all-in' && "bg-purple-600 text-white"
+                )}>
+                  {formatActionDisplay(lastAction)}
+                </div>
               )}
-            >
-              <span className={cn(
-                "text-[10px] font-bold leading-tight",
-                position === 'DEALER' && "text-[9px]"
-              )}>
-                {position}
-              </span>
-              {isUserSeat && position !== 'DEALER' && (
-                <span className="text-[8px] leading-none">YOU</span>
-              )}
-            </button>
+            </div>
           </div>
         );
       })}

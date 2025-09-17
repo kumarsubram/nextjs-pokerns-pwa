@@ -133,36 +133,6 @@ export default function Home() {
             </Card>
           </div>
 
-          {/* Recent Sessions */}
-          {completedSessions.length > 0 && (
-            <div className="space-y-4">
-              <h2 className="text-xl font-bold mb-4">Recent Sessions</h2>
-              {completedSessions.slice(0, 5).map((session) => (
-                <Card key={session.sessionId} className="hover:shadow-lg transition-shadow">
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-semibold">{session.sessionName}</h3>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {session.gameType} • {session.tableSeats} Handed • {session.userSeat}
-                        </p>
-                        <p className="text-sm text-gray-500 mt-1">
-                          {session.totalHands} hands • {session.totalDuration}
-                        </p>
-                      </div>
-                      {session.result && (
-                        <div className={`text-lg font-bold ${
-                          session.result.startsWith('+') ? 'text-green-600' : 'text-red-600'
-                        }`}>
-                          {session.result}
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
 
           {/* Empty State */}
           {!loading && sessions.length === 0 && (

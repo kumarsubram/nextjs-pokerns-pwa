@@ -523,6 +523,42 @@ const handlePlayerAction = (action: 'fold' | 'call' | 'raise' | 'check' | 'all-i
 
 ## Recent Improvements Made
 
+### Latest Updates (December 2024) - Visual Action Indicators & Betting Flow
+
+#### Visual Action Indicators Implementation ✅ COMPLETED
+- **Problem**: Players couldn't see what actions opponents had taken in each betting round
+- **Solution**: Added visual action badges below each player seat showing their last action
+- **Features**:
+  - Color-coded action indicators: CALL (blue), CHECK (gray), RAISE (green), ALL-IN (purple)
+  - FOLD actions show red visual indicator on seat without text (cleaner design)
+  - Actions display automatically when players take actions and persist throughout the round
+  - Smart positioning below player seats with proper spacing and styling
+
+#### Enhanced Community Card Selection with Visual Feedback ✅ COMPLETED
+- **Blinking Cards**: When betting round is complete, community cards start blinking to indicate they can be selected
+- **Instruction Text**: Center table displays "Choose community cards to proceed" with yellow pulsing animation
+- **Disabled State**: Community cards are visually disabled (grayed out, reduced opacity) during active betting
+- **Smart Activation**: Cards only become clickable when betting round is properly complete
+
+#### Fixed Big Blind Check Logic ✅ COMPLETED
+- **Problem**: BB couldn't check in preflop when no raises occurred (when current bet equals big blind)
+- **Solution**: Updated check option logic to allow BB to check when:
+  1. Current bet is 0 (no one has bet yet), OR
+  2. BB in preflop when current bet equals big blind amount, OR
+  3. Post-flop rounds when current bet is 0 (everyone can check initially)
+- **Poker Rules**: Follows proper Texas Hold'em rules where BB can check if no raises above the big blind
+
+#### Post-Flop Check/Raise Logic Implementation ✅ COMPLETED
+- **First Player Check**: First person to act in post-flop rounds can check when current bet is 0
+- **Subsequent Checks**: If someone checks, next players can check, fold, raise, or go all-in
+- **Raise Elimination**: Once any player raises (current bet > 0), check option disappears for other players
+- **Proper Flow**: Maintains correct poker betting flow with check propagation until someone raises
+
+#### Files Modified for Visual Indicators
+- `src/components/poker/SimplePokerTable.tsx`: Added action indicator display and helper functions
+- `src/app/session/[id]/page.tsx`: Enhanced check logic and added community card selection controls
+- `src/types/poker-v2.ts`: Updated interfaces for betting round action tracking
+
 ### Critical Betting Logic Bug Fixes
 - **Problem**: Betting rounds not completing when all players matched current bet after BB re-raise scenario
 - **Root Cause**: React state timing issue - `moveToNextPlayer()` was using stale `currentBet` values from async `setCurrentBet()`

@@ -64,9 +64,20 @@ export interface BettingAction {
   timestamp: string;
 }
 
+export interface PlayerState {
+  position: Position;
+  status: 'active' | 'folded' | 'all-in';
+  stack: number;
+  currentBet: number;
+  hasActed: boolean;
+}
+
 export interface BettingRound {
   actions: BettingAction[];
   pot: number;
+  currentBet: number;
+  isComplete: boolean;
+  nextToAct?: Position;
 }
 
 export interface StoredHand {
@@ -101,10 +112,20 @@ export interface CurrentHand {
     river: string | null;
   };
   currentBettingRound: 'preflop' | 'flop' | 'turn' | 'river' | 'showdown';
-  currentBet: number;
+  bettingRounds: {
+    preflop: BettingRound;
+    flop?: BettingRound;
+    turn?: BettingRound;
+    river?: BettingRound;
+  };
+  playerStates: PlayerState[];
   pot: number;
-  actions: BettingAction[];
-  activePlayers: Position[];
+  smallBlind: number;
+  bigBlind: number;
+  nextToAct?: Position;
+  canAdvanceToFlop: boolean;
+  canAdvanceToTurn: boolean;
+  canAdvanceToRiver: boolean;
 }
 
 // Card types

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { ChevronDown, ChevronUp, Share2, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, MessageCircle } from 'lucide-react';
 import { CurrentHand, StoredHand, Position } from '@/types/poker-v2';
 
 interface HandHistoryProps {
@@ -244,26 +244,16 @@ export function HandHistory({
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Share Buttons */}
+            {/* Share Button */}
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 // TODO: Implement text share
               }}
               className="p-1 hover:bg-gray-200 rounded"
-              title="Share as text"
+              title="Share hand"
             >
-              <Share2 className="h-4 w-4 text-gray-600" />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                // TODO: Implement X share
-              }}
-              className="p-1 hover:bg-gray-200 rounded"
-              title="Share on X"
-            >
-              <X className="h-4 w-4 text-gray-600" />
+              <MessageCircle className="h-4 w-4 text-gray-600" />
             </button>
 
             {/* Expand/Collapse Icon */}

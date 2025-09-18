@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Users, Calendar, Clock, MapPin, DollarSign } from 'lucide-react';
+import { ArrowLeft, Users, Calendar, Clock, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { HandHistory } from '@/components/poker/HandHistory';
@@ -123,51 +123,47 @@ export default function SessionHistoryPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Session Info Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
               <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">{session.totalHands}</div>
-                <div className="text-sm text-gray-600">Total Hands</div>
+                <div className="text-lg md:text-2xl font-bold text-blue-600">{session.totalHands}</div>
+                <div className="text-xs md:text-sm text-gray-600">Total Hands</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">${session.buyIn}</div>
-                <div className="text-sm text-gray-600">Buy-in</div>
+                <div className="text-lg md:text-2xl font-bold text-green-600">${session.buyIn}</div>
+                <div className="text-xs md:text-sm text-gray-600">Buy-in</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-purple-600">{formatDuration(session.totalDuration)}</div>
-                <div className="text-sm text-gray-600">Duration</div>
+                <div className="text-lg md:text-2xl font-bold text-purple-600">{formatDuration(session.totalDuration)}</div>
+                <div className="text-xs md:text-sm text-gray-600">Duration</div>
               </div>
               <div className="text-center">
-                <div className={`text-2xl font-bold ${
+                <div className={`text-lg md:text-2xl font-bold ${
                   session.result?.startsWith('+') ? 'text-green-600' :
                   session.result?.startsWith('-') ? 'text-red-600' :
                   'text-gray-600'
                 }`}>
                   {session.result || '$0'}
                 </div>
-                <div className="text-sm text-gray-600">Net Result</div>
+                <div className="text-xs md:text-sm text-gray-600">Net Result</div>
               </div>
             </div>
 
             {/* Session Details */}
-            <div className="border-t pt-4 space-y-2">
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <Calendar className="h-4 w-4" />
+            <div className="border-t pt-3 space-y-2">
+              <div className="flex items-center gap-2 text-xs md:text-sm text-gray-600">
+                <Calendar className="h-3 w-3 md:h-4 md:w-4" />
                 <span>{formatDate(session.startTime)} at {formatTime(session.startTime)}</span>
               </div>
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <Users className="h-4 w-4" />
+              <div className="flex items-center gap-2 text-xs md:text-sm text-gray-600">
+                <Users className="h-3 w-3 md:h-4 md:w-4" />
                 <span>{session.tableSeats} handed {session.gameType.toLowerCase()}</span>
               </div>
               {session.location && (
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <MapPin className="h-4 w-4" />
+                <div className="flex items-center gap-2 text-xs md:text-sm text-gray-600">
+                  <MapPin className="h-3 w-3 md:h-4 md:w-4" />
                   <span>{session.location}</span>
                 </div>
               )}
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <DollarSign className="h-4 w-4" />
-                <span>Playing from {session.userSeat} position</span>
-              </div>
             </div>
           </CardContent>
         </Card>

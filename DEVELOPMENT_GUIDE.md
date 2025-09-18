@@ -797,10 +797,98 @@ setShowUnifiedDialog(true);
 - Verify offline behavior with cached content
 - Test service worker update flow
 
-#### 2. Performance Considerations
+#### 2. Data Migration and User Data Management
+
+The app includes a controlled data migration system to manage user data across updates.
+
+##### Normal PWA Updates (Preserve User Data)
+For regular app updates that should **NOT** clear user data:
+
+```bash
+npm run update-pwa   # Updates PWA cache version only
+npm run build        # Build the updated app
+npm run push         # Or manual git commit/push
+```
+
+**Result**: Users get new features but keep all their existing sessions and data.
+
+##### Global Data Clearing (Force Reset for All Users)
+When you need to clear all user data globally due to breaking changes:
+
+**Step 1**: Update the data version in `src/services/session.service.ts`:
+```typescript
+// Change this number to force data migration
+const CURRENT_DATA_VERSION = 3; // Increment from current value
+
+// Add comment explaining the reason
+// Example: v3: New session format incompatible with v2
+```
+
+**Step 2**: Deploy the update:
+```bash
+npm run update-pwa   # Updates PWA cache
+npm run build        # Build with new data version
+npm run push         # Deploy changes
+```
+
+**Result**: All users will have their data cleared once when they load the app, then data persists on future updates.
+
+##### Data Version History
+- **v1**: Initial data format
+- **v2**: Shared hand cleanup migration (current)
+- **v3**: (Future) Use when next breaking change is needed
+
+##### Migration Behavior
+- **New users**: Start with current data version, no migration needed
+- **Existing users**: Migrate from their stored version to current version
+- **Same version**: No migration, data preserved
+- **Lower version**: Data cleared and version updated
+- **Missing version**: Treated as v0, data cleared
+
+#### 3. Performance Considerations
 - Minimize localStorage operations
 - Batch state updates where possible
 - Use React.memo for expensive components
 - Implement proper cleanup in useEffect hooks
 
-This development guide ensures consistent, high-quality implementation that maintains poker integrity while providing excellent mobile UX.
+#### 4. Deployment Workflow
+
+##### Standard Update (Keep User Data)
+```bash
+# Make your code changes
+git add .
+git commit -m "Description of changes"
+
+# Update PWA and deploy
+npm run update-pwa
+npm run build
+git add .
+git commit -m "Update PWA cache version"
+git push
+```
+
+##### Breaking Change Update (Clear User Data)
+```bash
+# Make your code changes
+git add .
+git commit -m "Description of changes"
+
+# Update data version in session.service.ts
+# Edit CURRENT_DATA_VERSION = X (increment number)
+# Add comment explaining why data clearing is needed
+
+# Update PWA and deploy
+npm run update-pwa
+npm run build
+git add .
+git commit -m "Breaking change: clear user data for compatibility"
+git push
+```
+
+##### Emergency Data Clear
+If you need to immediately clear all user data:
+1. Increment `CURRENT_DATA_VERSION` in `session.service.ts`
+2. Add comment explaining emergency reason
+3. Deploy using breaking change workflow above
+
+This development guide ensures consistent, high-quality implementation that maintains poker integrity while providing excellent mobile UX and controlled data management.

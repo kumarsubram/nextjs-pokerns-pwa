@@ -249,4 +249,28 @@ export class SessionService {
       JSON.stringify(metadata)
     );
   }
+
+  // Delete all sessions and related data
+  static deleteAllSessions(): void {
+    if (typeof window === 'undefined') return;
+
+    // Get all localStorage keys
+    const keys = Object.keys(localStorage);
+
+    // Filter for session-related keys
+    const sessionKeys = keys.filter(key =>
+      key.startsWith(STORAGE_KEYS.SESSION_META_PREFIX) ||
+      key.startsWith(STORAGE_KEYS.SESSION_HANDS_PREFIX) ||
+      key.startsWith(STORAGE_KEYS.CURRENT_HAND_PREFIX)
+    );
+
+    // Delete all session-related data
+    sessionKeys.forEach(key => localStorage.removeItem(key));
+
+    // Clear active session
+    this.clearActiveSession();
+
+    // Reset session counter
+    localStorage.removeItem(STORAGE_KEYS.LAST_SESSION_NUMBER);
+  }
 }

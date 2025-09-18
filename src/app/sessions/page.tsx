@@ -74,6 +74,25 @@ export default function SessionsPage() {
     }
   };
 
+  const handleDeleteAllSessions = () => {
+    const confirmed = confirm(
+      `Are you sure you want to delete ALL sessions?\n\nThis will permanently remove:\n• ${sessions.length} session${sessions.length !== 1 ? 's' : ''}\n• All hand data\n• All session metadata\n\nThis action cannot be undone.`
+    );
+    if (confirmed) {
+      const doubleConfirm = confirm('This is your final warning. Delete ALL sessions permanently?');
+      if (doubleConfirm) {
+        try {
+          SessionService.deleteAllSessions();
+          setSessions([]);
+          alert('All sessions have been deleted successfully.');
+        } catch (error) {
+          console.error('Failed to delete all sessions:', error);
+          alert('Failed to delete all sessions. Please try again.');
+        }
+      }
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -108,10 +127,22 @@ export default function SessionsPage() {
     <div className="container max-w-7xl mx-auto px-4 py-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Sessions</h1>
-        <Button onClick={() => router.push('/create-session')} className="bg-emerald-500 hover:bg-emerald-600">
-          <Plus className="h-4 w-4 mr-2" />
-          New Session
-        </Button>
+        <div className="flex items-center gap-3">
+          {sessions.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={handleDeleteAllSessions}
+              className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete All
+            </Button>
+          )}
+          <Button onClick={() => router.push('/create-session')} className="bg-emerald-500 hover:bg-emerald-600">
+            <Plus className="h-4 w-4 mr-2" />
+            New Session
+          </Button>
+        </div>
       </div>
 
       {/* Filters and Search */}

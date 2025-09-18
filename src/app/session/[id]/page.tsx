@@ -374,8 +374,9 @@ export default function SessionPage() {
 
     let updatedHand = { ...currentHand };
 
-    // Auto-fold players who have already acted but didn't match the current bet (when user clicks non-next position)
+    // Auto-fold players between current next-to-act and target position (when user skips positions)
     if (currentHand.nextToAct && currentHand.nextToAct !== position) {
+      console.log(`Auto-folding between ${currentHand.nextToAct} and ${position}`);
       updatedHand = autoFoldPlayersBetween(updatedHand, currentHand.nextToAct, position);
     }
 
@@ -622,19 +623,31 @@ export default function SessionPage() {
       if (positionsToFold.length >= actionSequence.length) break;
     }
 
+    console.log(`Positions to fold: ${positionsToFold.join(', ')}`);
+
     // Fold the identified positions
     for (const position of positionsToFold) {
       const playerState = updatedHand.playerStates.find(p => p.position === position);
+      console.log(`Checking ${position}: status=${playerState?.status}, hasActed=${playerState?.hasActed}, currentBet=${playerState?.currentBet}`);
 
-      // Only auto-fold players who have already acted but haven't matched the current bet
-      // This means they effectively folded by not calling/raising
+      // Auto-fold players who:
+      // 1. Have already acted but haven't matched the current bet, OR
+      // 2. Haven't acted yet (when we skip past them)
       const currentRoundData = updatedHand.currentBettingRound !== 'showdown'
         ? updatedHand.bettingRounds[updatedHand.currentBettingRound]
         : null;
-      if (playerState && playerState.status === 'active' && playerState.hasActed &&
-          currentRoundData && playerState.currentBet < currentRoundData.currentBet) {
+
+      const shouldAutoFold = playerState && playerState.status === 'active' && (
+        // Case 1: Already acted but didn't match current bet
+        (playerState.hasActed && currentRoundData && playerState.currentBet < currentRoundData.currentBet) ||
+        // Case 2: Haven't acted yet (we're skipping past them)
+        !playerState.hasActed
+      );
+
+      if (shouldAutoFold) {
+        console.log(`Auto-folding ${position}`);
         playerState.status = 'folded';
-        // hasActed remains true since they already acted
+        playerState.hasActed = true; // Mark as acted since we're folding them
 
         // Add fold action to betting round
         if (updatedHand.currentBettingRound !== 'showdown') {

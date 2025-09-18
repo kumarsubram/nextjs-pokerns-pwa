@@ -29,6 +29,7 @@ interface SimplePokerTableProps {
       action: string;
       amount?: number;
     }>;
+    currentBet?: number;
   };
   isBettingComplete?: boolean;
   showFlopSelectionPrompt?: boolean;
@@ -210,23 +211,32 @@ export function SimplePokerTable({
         if (playerState?.status === 'folded') {
           actionColor = 'bg-red-800 border-red-600 text-red-300 opacity-60';
         } else if (lastAction && position !== 'DEALER') {
-          // Then check last action for other states
-          switch(lastAction.action) {
-            case 'fold':
-              actionColor = 'bg-red-800 border-red-600 text-red-300 opacity-60';
-              break;
-            case 'call':
-              actionColor = 'bg-blue-700 border-blue-500 text-blue-100';
-              break;
-            case 'check':
-              actionColor = 'bg-blue-600 border-blue-500 text-blue-200';
-              break;
-            case 'raise':
-              actionColor = 'bg-green-700 border-green-500 text-green-100';
-              break;
-            case 'all-in':
-              actionColor = 'bg-purple-700 border-purple-500 text-purple-100';
-              break;
+          // Check if player needs to act again (due to raise) - if so, don't show previous action color
+          const currentBet = currentBettingRound?.currentBet || 0;
+          const needsToActAgain = playerState && (
+            !playerState.hasActed ||
+            (currentBet > 0 && playerState.currentBet < currentBet)
+          );
+
+          // Only show action color if player doesn't need to act again
+          if (!needsToActAgain) {
+            switch(lastAction.action) {
+              case 'fold':
+                actionColor = 'bg-red-800 border-red-600 text-red-300 opacity-60';
+                break;
+              case 'call':
+                actionColor = 'bg-blue-700 border-blue-500 text-blue-100';
+                break;
+              case 'check':
+                actionColor = 'bg-blue-600 border-blue-500 text-blue-200';
+                break;
+              case 'raise':
+                actionColor = 'bg-green-700 border-green-500 text-green-100';
+                break;
+              case 'all-in':
+                actionColor = 'bg-purple-700 border-purple-500 text-purple-100';
+                break;
+            }
           }
         }
 

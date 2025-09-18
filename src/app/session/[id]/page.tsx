@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useViewportHeight } from '@/hooks/useViewportHeight';
 import { SimplePokerTable } from '@/components/poker/SimplePokerTable';
 import { CardSelector } from '@/components/poker/CardSelector';
 import { SeatSelector } from '@/components/poker/SeatSelector';
@@ -54,12 +55,36 @@ export default function SessionPage() {
   // Showdown outcome
   const [showOutcomeSelection, setShowOutcomeSelection] = useState(false);
   // Opponent cards logging
-  const [showOpponentCardsDialog, setShowOpponentCardsDialog] = useState(false);
   const [opponentCards, setOpponentCards] = useState<{[position: string]: [string, string] | null}>({});
+  // Inline card selection state
+  const [inlineCardSelection, setInlineCardSelection] = useState<{
+    show: boolean;
+    position: Position | null;
+    cardIndex: 1 | 2;
+    title: string;
+  }>({
+    show: false,
+    position: null,
+    cardIndex: 1,
+    title: ''
+  });
   // Seat selection for new hands
   const [showSeatSelection, setShowSeatSelection] = useState(false);
   const [handCount, setHandCount] = useState(0);
   const [completedHands, setCompletedHands] = useState<StoredHand[]>([]);
+
+  // Viewport height detection for mobile keyboard
+  const { isKeyboardOpen } = useViewportHeight();
+
+  // Helper function to get dialog classes for mobile keyboard handling
+  const getDialogClasses = (baseClasses: string) => {
+    if (isKeyboardOpen) {
+      console.log('🔥 Mobile keyboard detected - applying dialog position fix');
+    }
+    return isKeyboardOpen
+      ? `${baseClasses} dialog-mobile-keyboard-open`
+      : baseClasses;
+  };
 
   useEffect(() => {
     // Load session and restore current hand if exists
@@ -285,6 +310,50 @@ export default function SessionPage() {
     }
   }, [ante, currentHand, session, smallBlind, bigBlind]);
 
+  // Inline card selection handler
+  const handleInlineCardSelect = (card: string) => {
+    const { position, cardIndex } = inlineCardSelection;
+
+    // Check if we're selecting opponent cards
+    if (position && position !== session?.userSeat) {
+      // Opponent card selection
+      const currentOpponentCards = opponentCards[position] || [null, null];
+      const newOpponentCards = [...currentOpponentCards] as [string | null, string | null];
+      newOpponentCards[cardIndex - 1] = card;
+
+      setOpponentCards(prev => ({
+        ...prev,
+        [position]: newOpponentCards as [string, string] | null
+      }));
+
+      setInlineCardSelection({ show: false, position: null, cardIndex: 1, title: '' });
+      return;
+    }
+
+    // Hero card selection
+    if (cardIndex === 1) {
+      setSelectedCard1(card);
+      // Update current hand immediately for card 1
+      if (currentHand) {
+        setCurrentHand({
+          ...currentHand,
+          userCards: [card, selectedCard2] as [string, string] | null
+        });
+      }
+    } else {
+      setSelectedCard2(card);
+      // Update current hand with both cards
+      if (currentHand) {
+        setCurrentHand({
+          ...currentHand,
+          userCards: [selectedCard1!, card] as [string, string]
+        });
+      }
+    }
+
+    setInlineCardSelection({ show: false, position: null, cardIndex: 1, title: '' });
+  };
+
   const handleUserCardSelect = (card: string) => {
     // Check if we're selecting opponent cards
     if (selectedPosition && selectedPosition !== session?.userSeat) {
@@ -432,16 +501,36 @@ export default function SessionPage() {
       const currentRound = updatedHand.bettingRounds[updatedHand.currentBettingRound];
       if (currentRound) {
         // Manual nextToAct calculation to handle auto-folded players correctly
-        const actionSequence = updatedHand.currentBettingRound === 'preflop'
+        const fullActionSequence = updatedHand.currentBettingRound === 'preflop'
           ? getPreflopActionSequence(session.tableSeats)
           : getPostflopActionSequence(session.tableSeats);
 
         const activePlayers = updatedHand.playerStates.filter(p => p.status === 'active');
+        const activePositions = activePlayers.map(p => p.position);
+        const actionSequence = fullActionSequence.filter(pos => activePositions.includes(pos));
         const currentBet = currentRound.currentBet;
 
         // Find the next active player who needs to act
         let nextPlayer: Position | null = null;
-        for (const pos of actionSequence) {
+
+        // For new betting rounds (flop/turn/river), start from beginning of sequence
+        // For continued rounds (raises), start from position after current actor
+        const isNewRound = currentBet === 0 && activePlayers.every(p => !p.hasActed || p.currentBet === 0);
+
+        let searchSequence: Position[];
+        if (isNewRound) {
+          // New betting round: start from the beginning of active action sequence
+          searchSequence = actionSequence;
+        } else {
+          // Continued round: start from position after current actor
+          const currentActorIndex = actionSequence.indexOf(position);
+          searchSequence = [
+            ...actionSequence.slice(currentActorIndex + 1),
+            ...actionSequence.slice(0, currentActorIndex + 1)
+          ];
+        }
+
+        for (const pos of searchSequence) {
           const player = activePlayers.find(p => p.position === pos);
           if (player && (!player.hasActed || player.currentBet < currentBet)) {
             nextPlayer = pos;
@@ -452,10 +541,18 @@ export default function SessionPage() {
         updatedHand.nextToAct = nextPlayer || undefined;
         console.log(`After action: nextToAct = ${nextPlayer}, activePlayers = ${activePlayers.map(p => `${p.position}(acted:${p.hasActed},bet:${p.currentBet})`).join(', ')}, currentBet = ${currentBet}`);
 
-        // Check if round is complete after setting nextToAct
-        const allActivePlayersHaveActedAndMatched = activePlayers.every(player =>
-          player.hasActed && (player.currentBet === currentBet || player.status === 'all-in')
-        );
+        // Check if round is complete: all active players have acted AND matched current bet (or are all-in)
+        const allActivePlayersHaveActedAndMatched = activePlayers.every(player => {
+          // Player must have acted in this round
+          const hasActedThisRound = player.hasActed;
+          // Player must match current bet or be all-in
+          const matchesBetOrAllIn = player.currentBet === currentBet || player.status === 'all-in';
+
+          console.log(`Player ${player.position}: hasActed=${hasActedThisRound}, currentBet=${player.currentBet}, targetBet=${currentBet}, matchesBet=${matchesBetOrAllIn}`);
+          return hasActedThisRound && matchesBetOrAllIn;
+        });
+
+        console.log(`Round completion check: allMatched=${allActivePlayersHaveActedAndMatched}, activePlayers=${activePlayers.length}`);
 
         if (allActivePlayersHaveActedAndMatched || activePlayers.length <= 1) {
           console.log('Marking round as complete');
@@ -480,6 +577,10 @@ export default function SessionPage() {
     }
   };
 
+  // Add state for validation error dialog
+  const [showValidationError, setShowValidationError] = useState(false);
+  const [validationErrorMessage, setValidationErrorMessage] = useState('');
+
   // Validate required values before hand completion
   const validateHandRequirements = (): { isValid: boolean; error?: string } => {
     if (stack <= 0) {
@@ -498,7 +599,7 @@ export default function SessionPage() {
     // Only require Hero cards if Hero invested money
     if (heroMoneyInvested > 0) {
       if (!currentHand?.userCards || !currentHand.userCards[0] || !currentHand.userCards[1]) {
-        return { isValid: false, error: 'Hero cards must be selected when money is invested' };
+        return { isValid: false, error: 'Please select your hole cards before completing the hand since you invested money.' };
       }
     }
 
@@ -512,7 +613,8 @@ export default function SessionPage() {
     // Validate requirements before completing hand
     const validation = validateHandRequirements();
     if (!validation.isValid) {
-      alert(validation.error);
+      setValidationErrorMessage(validation.error || 'Validation error');
+      setShowValidationError(true);
       return;
     }
 
@@ -565,16 +667,16 @@ export default function SessionPage() {
       // Clear current hand from storage since it's not being tracked
       SessionService.clearCurrentHand(session.sessionId);
 
-      // Reset and prepare for next hand
-      const newHandCount = handCount + 1;
-      setHandCount(newHandCount);
-
-      // Always show seat selection for every hand
+      // Reset states properly
       setCurrentHand(null);
-      setShowSeatSelection(true);
-
+      setHeroMoneyInvested(0);
+      setSelectedPosition(null);
+      setShowPositionActions(false);
       setShowFoldConfirmation(false);
       setFoldPosition(null);
+
+      // Always show seat selection for next hand
+      setShowSeatSelection(true);
       return;
     }
 
@@ -603,17 +705,9 @@ export default function SessionPage() {
 
     setCurrentHand(updatedHand);
 
-    // Check if there are remaining active players who might show cards
-    const activePlayers = updatedHand.playerStates.filter(p => p.status === 'active' && p.position !== session.userSeat);
-
-    if (activePlayers.length > 0) {
-      // Ask if opponents showed cards before completing the hand
-      setShowOpponentCardsDialog(true);
-    } else {
-      // No active players left, complete hand immediately
-      const outcome = heroMoneyInvested > 0 ? 'lost' : 'folded';
-      completeHand(outcome, 0);
-    }
+    // Hero folded - complete hand immediately with loss
+    const outcome = heroMoneyInvested > 0 ? 'lost' : 'folded';
+    completeHand(outcome, 0);
 
     setShowFoldConfirmation(false);
     setFoldPosition(null);
@@ -630,9 +724,14 @@ export default function SessionPage() {
   // 4. Protection: Never auto-fold the target position (the player who's actually acting)
   const autoFoldPlayersBetween = (hand: CurrentHand, nextToAct: Position, targetPosition: Position): CurrentHand => {
     const updatedHand = { ...hand };
-    const actionSequence = hand.currentBettingRound === 'preflop'
+    const fullActionSequence = hand.currentBettingRound === 'preflop'
       ? getPreflopActionSequence(session?.tableSeats || 9)
       : getPostflopActionSequence(session?.tableSeats || 9);
+
+    // Filter to only include active players
+    const activePlayers = updatedHand.playerStates.filter(p => p.status === 'active');
+    const activePositions = activePlayers.map(p => p.position);
+    const actionSequence = fullActionSequence.filter(pos => activePositions.includes(pos));
 
     const nextIndex = actionSequence.indexOf(nextToAct);
     const targetIndex = actionSequence.indexOf(targetPosition);
@@ -666,16 +765,27 @@ export default function SessionPage() {
         : null;
       console.log(`Checking ${position}: status=${playerState?.status}, hasActed=${playerState?.hasActed}, currentBet=${playerState?.currentBet}, roundCurrentBet=${currentRoundData?.currentBet}`);
 
-      // Auto-fold players who we're skipping past
-      // This includes players who haven't acted yet OR haven't matched the current bet
+      // Auto-fold/check players who we're skipping past
+      const currentBet = currentRoundData?.currentBet || 0;
+      const isPostFlop = updatedHand.currentBettingRound !== 'preflop';
+
+      // In post-flop with no betting (currentBet = 0), auto-check instead of auto-fold
+      const shouldAutoCheck = playerState &&
+        playerState.status === 'active' &&
+        currentRoundData &&
+        position !== targetPosition &&
+        isPostFlop &&
+        currentBet === 0 &&
+        !playerState.hasActed;
+
+      // Auto-fold players who haven't matched a bet > 0
       const shouldAutoFold = playerState &&
         playerState.status === 'active' &&
         currentRoundData &&
-        position !== targetPosition && // Never auto-fold the target position (the player who's acting)
+        position !== targetPosition &&
         (
-          // Player hasn't matched the current bet (regardless of hasActed flag)
-          // This covers both: players who haven't acted, and players who acted but didn't match a subsequent raise
-          playerState.currentBet < currentRoundData.currentBet
+          // Player hasn't matched the current bet when there is a bet to match
+          (currentBet > 0 && playerState.currentBet < currentBet)
         );
 
       if (shouldAutoFold) {
@@ -694,6 +804,21 @@ export default function SessionPage() {
             });
           }
         }
+      } else if (shouldAutoCheck) {
+        console.log(`Auto-checking ${position}`);
+        playerState.hasActed = true; // Mark as acted since we're checking for them
+
+        // Add check action to betting round
+        if (updatedHand.currentBettingRound !== 'showdown') {
+          const currentRound = updatedHand.bettingRounds[updatedHand.currentBettingRound];
+          if (currentRound) {
+            currentRound.actions.push({
+              position,
+              action: 'check',
+              timestamp: new Date().toISOString()
+            });
+          }
+        }
       }
     }
 
@@ -704,17 +829,29 @@ export default function SessionPage() {
   const handleAdvanceToNextRound = () => {
     if (!currentHand || !session) return;
 
-    // Check if we're going to showdown
+    // Check if we're going to showdown (river betting complete)
     if (currentHand.currentBettingRound === 'river') {
-      // Validate Hero cards are selected for showdown
-      if (!currentHand.userCards || !currentHand.userCards[0] || !currentHand.userCards[1]) {
-        alert('Hero cards must be selected before showdown');
+      // Count active players (including hero if still active)
+      const activePlayers = currentHand.playerStates.filter(p => p.status === 'active');
+      const heroStillActive = activePlayers.some(p => p.position === session.userSeat);
+
+      // True showdown: 2+ players reach the end
+      if (activePlayers.length >= 2) {
+        // Show outcome selection for true showdown (dialog will handle hero card validation)
+        setShowOutcomeSelection(true);
+        return;
+      } else {
+        // Not a showdown - only 1 player left, hand ends automatically
+        // If hero is the last player, they win. Otherwise they folded and lost.
+        if (heroStillActive) {
+          // Hero wins by everyone else folding
+          completeHand('won', currentHand.pot || 0);
+        } else {
+          // Hero folded earlier and someone else won
+          completeHand('lost', 0);
+        }
         return;
       }
-
-      // Show outcome selection for showdown
-      setShowOutcomeSelection(true);
-      return;
     }
 
     const updatedHand = advanceToNextRound(currentHand);
@@ -762,6 +899,7 @@ export default function SessionPage() {
     const alreadyBet = playerState.currentBet || 0;
     const callAmount = currentBet - alreadyBet;
 
+    console.log(`getCallAmount for ${position}: currentBet=${currentBet}, alreadyBet=${alreadyBet}, callAmount=${callAmount}`);
     return Math.max(0, callAmount);
   };
 
@@ -812,10 +950,10 @@ export default function SessionPage() {
     });
   }
 
-  // Show flop selection prompt when preflop betting is complete and no flop cards are selected
+  // Show flop selection prompt when preflop betting is complete and not all flop cards are selected
   const showFlopSelectionPrompt = isBettingComplete &&
     currentHand?.currentBettingRound === 'preflop' &&
-    (!currentHand?.communityCards.flop || currentHand.communityCards.flop.every(card => !card));
+    (!currentHand?.communityCards.flop || currentHand.communityCards.flop.length < 3 || currentHand.communityCards.flop.some(card => !card));
 
   // Show turn selection prompt when flop betting is complete and no turn card is selected
   const showTurnSelectionPrompt = isBettingComplete &&
@@ -951,8 +1089,9 @@ export default function SessionPage() {
         )}
 
         {/* Table Display */}
-        <div className="bg-white rounded-lg p-4 shadow-sm mb-4">
-          <SimplePokerTable
+        {!showSeatSelection && (
+          <div className="bg-white rounded-lg p-4 shadow-sm mb-4">
+            <SimplePokerTable
             seats={session.tableSeats}
             userSeat={session.userSeat}
             userCards={currentHand?.userCards || null}
@@ -980,6 +1119,7 @@ export default function SessionPage() {
             potSize={currentHand?.pot || 0}
           />
         </div>
+        )}
 
         {/* User Card Selector */}
         {showCardSelector && (
@@ -1026,9 +1166,9 @@ export default function SessionPage() {
             <h3 className="text-md font-semibold mb-3 text-center">
               {selectedPosition} Action
             </h3>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-wrap gap-2">
               <Button
-                className="bg-red-600 hover:bg-red-700 text-white"
+                className="bg-red-600 hover:bg-red-700 text-white flex-1 min-w-[80px]"
                 onClick={() => {
                   handleBettingAction(selectedPosition, 'fold');
                   setShowPositionActions(false);
@@ -1041,7 +1181,7 @@ export default function SessionPage() {
                 const callAmount = getCallAmount(selectedPosition);
                 return callAmount > 0 ? (
                   <Button
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    className="bg-blue-600 hover:bg-blue-700 text-white flex-1 min-w-[80px]"
                     onClick={() => {
                       handleBettingAction(selectedPosition, 'call', currentBettingRound?.currentBet);
                       setShowPositionActions(false);
@@ -1111,7 +1251,7 @@ export default function SessionPage() {
               // Show advance button when betting round is complete
               (() => {
                 const needsCommunityCards =
-                  (currentHand.currentBettingRound === 'preflop' && (!currentHand.communityCards.flop || currentHand.communityCards.flop.every(card => !card))) ||
+                  (currentHand.currentBettingRound === 'preflop' && (!currentHand.communityCards.flop || currentHand.communityCards.flop.length < 3 || currentHand.communityCards.flop.some(card => !card))) ||
                   (currentHand.currentBettingRound === 'flop' && !currentHand.communityCards.turn) ||
                   (currentHand.currentBettingRound === 'turn' && !currentHand.communityCards.river);
 
@@ -1156,9 +1296,9 @@ export default function SessionPage() {
                         ? `${selectedPosition} Actions`
                         : `Hero Actions (${session.userSeat})`}
                     </h3>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-wrap gap-2">
                   <Button
-                    className="bg-red-600 hover:bg-red-700 text-white"
+                    className="bg-red-600 hover:bg-red-700 text-white flex-1 min-w-[80px]"
                     onClick={() => {
                       const targetPosition = showPositionActions && selectedPosition ? selectedPosition : session.userSeat;
                       if (targetPosition === session.userSeat) {
@@ -1245,7 +1385,7 @@ export default function SessionPage() {
 
         {/* Amount Input Modal for Raise/All-In */}
         <Dialog open={showAmountModal} onOpenChange={setShowAmountModal}>
-          <DialogContent className="sm:max-w-[425px] max-w-[350px]">
+          <DialogContent className={getDialogClasses("sm:max-w-[425px] max-w-[350px]")}>
             <DialogHeader>
               <DialogTitle>
                 {amountModalAction === 'raise' ? 'Raise Amount' : 'All-In Amount'}
@@ -1326,9 +1466,9 @@ export default function SessionPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Fold Confirmation Dialog */}
+        {/* Unified Fold Confirmation and Card Selection Dialog */}
         <Dialog open={showFoldConfirmation} onOpenChange={setShowFoldConfirmation}>
-          <DialogContent className="sm:max-w-[425px] max-w-[350px]">
+          <DialogContent className={getDialogClasses("sm:max-w-[500px] max-w-[95vw] w-full")}>
             <DialogHeader>
               <DialogTitle>Confirm Fold</DialogTitle>
               <DialogDescription>
@@ -1338,6 +1478,130 @@ export default function SessionPage() {
                 }
               </DialogDescription>
             </DialogHeader>
+
+            {/* Card Selection Section - Only show if user invested money */}
+            {heroMoneyInvested > 0 && (
+              <div className="mt-4 border-t pt-4">
+                <div className="grid gap-4 max-h-60 overflow-y-auto">
+                  {/* Hero Cards Section - Only show if not already selected */}
+                  {(!currentHand?.userCards || !currentHand.userCards[0] || !currentHand.userCards[1]) && (
+                    <div className="border-2 border-blue-200 rounded-lg p-3 bg-blue-50">
+                      <div className="font-medium mb-2 text-sm text-blue-800">Your Hole Cards (Required)</div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setInlineCardSelection({
+                              show: true,
+                              position: session?.userSeat || null,
+                              cardIndex: 1,
+                              title: 'Select Card 1'
+                            });
+                          }}
+                          className="text-xs border-blue-300 hover:bg-blue-100"
+                        >
+                          {currentHand?.userCards?.[0] || 'Card 1'}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setInlineCardSelection({
+                              show: true,
+                              position: session?.userSeat || null,
+                              cardIndex: 2,
+                              title: 'Select Card 2'
+                            });
+                          }}
+                          className="text-xs border-blue-300 hover:bg-blue-100"
+                        >
+                          {currentHand?.userCards?.[1] || 'Card 2'}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Optional Cards Section Header */}
+                  {currentHand?.userCards?.[0] && currentHand?.userCards?.[1] && (
+                    <div className="text-sm font-medium text-gray-700 mb-2">
+                      Optional: Add any cards revealed
+                    </div>
+                  )}
+
+                  {/* Opponent Cards Section */}
+                  {currentHand?.playerStates &&
+                    currentHand.playerStates.filter(p => p.status === 'active' && p.position !== session?.userSeat)
+                    .length > 0 && (
+                    <div className="border rounded-lg p-3">
+                      <div className="font-medium mb-2 text-sm text-gray-700">Opponent Cards</div>
+                      <div className="grid gap-2">
+                        {currentHand?.playerStates &&
+                          currentHand.playerStates.filter(p => p.status === 'active' && p.position !== session?.userSeat)
+                          .map(player => (
+                            <div key={player.position} className="border rounded p-2 bg-gray-50">
+                              <div className="font-medium mb-1 text-xs">{player.position}</div>
+                              <div className="grid grid-cols-2 gap-1">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setInlineCardSelection({
+                                      show: true,
+                                      position: player.position,
+                                      cardIndex: 1,
+                                      title: `Select ${player.position} Card 1`
+                                    });
+                                  }}
+                                  className="text-xs h-8"
+                                >
+                                  {opponentCards[player.position]?.[0] || 'Card 1'}
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setInlineCardSelection({
+                                      show: true,
+                                      position: player.position,
+                                      cardIndex: 2,
+                                      title: `Select ${player.position} Card 2`
+                                    });
+                                  }}
+                                  className="text-xs h-8"
+                                >
+                                  {opponentCards[player.position]?.[1] || 'Card 2'}
+                                </Button>
+                              </div>
+                            </div>
+                          ))
+                        }
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Inline Card Selector */}
+            {inlineCardSelection.show && (
+              <div className="mt-4 border-t pt-4">
+                <CardSelector
+                  title={inlineCardSelection.title}
+                  selectedCards={[
+                    selectedCard1,
+                    selectedCard2,
+                    ...(currentHand?.communityCards.flop || []),
+                    currentHand?.communityCards.turn,
+                    currentHand?.communityCards.river,
+                    ...Object.values(opponentCards).flat()
+                  ].filter(Boolean) as string[]}
+                  onCardSelect={handleInlineCardSelect}
+                  onCancel={() => setInlineCardSelection({ show: false, position: null, cardIndex: 1, title: '' })}
+                />
+              </div>
+            )}
+
             <div className="flex gap-2 mt-4">
               <Button
                 className="flex-1"
@@ -1352,6 +1616,7 @@ export default function SessionPage() {
               <Button
                 className="flex-1 bg-red-600 hover:bg-red-700 text-white"
                 onClick={handleConfirmedHeroFold}
+                disabled={heroMoneyInvested > 0 && (!currentHand?.userCards || !currentHand.userCards[0] || !currentHand.userCards[1])}
               >
                 Confirm Fold
               </Button>
@@ -1359,34 +1624,144 @@ export default function SessionPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Showdown Outcome Selection */}
+        {/* Unified Showdown Dialog */}
         <Dialog open={showOutcomeSelection} onOpenChange={setShowOutcomeSelection}>
-          <DialogContent className="sm:max-w-[425px] max-w-[350px]">
+          <DialogContent className={getDialogClasses("sm:max-w-[500px] max-w-[95vw] w-full")}>
             <DialogHeader>
-              <DialogTitle>Showdown Result</DialogTitle>
+              <DialogTitle>Showdown</DialogTitle>
               <DialogDescription>
-                Did you win or lose at showdown? (You can add opponent cards after)
+                Add any cards that were revealed at showdown, then select the outcome
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-2 mt-4">
-              <div className="text-center text-sm text-gray-600 mb-2">
+
+            <div className="grid gap-4 mt-4 max-h-80 overflow-y-auto">
+              <div className="text-center text-sm font-medium text-gray-700 mb-2">
                 Pot Size: {currentHand?.pot || 0}
               </div>
+
+              {/* Hero Cards Section - Only show if not already selected */}
+              {(!currentHand?.userCards || !currentHand.userCards[0] || !currentHand.userCards[1]) && (
+                <div className="border-2 border-blue-200 rounded-lg p-4 bg-blue-50">
+                  <div className="font-medium mb-3 text-blue-800">
+                    Your Hole Cards (Required for showdown)
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setInlineCardSelection({
+                          show: true,
+                          position: session?.userSeat || null,
+                          cardIndex: 1,
+                          title: 'Select Your Card 1'
+                        });
+                      }}
+                      className="text-xs border-blue-300 hover:bg-blue-100"
+                    >
+                      {currentHand?.userCards?.[0] || 'Card 1'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setInlineCardSelection({
+                          show: true,
+                          position: session?.userSeat || null,
+                          cardIndex: 2,
+                          title: 'Select Your Card 2'
+                        });
+                      }}
+                      className="text-xs border-blue-300 hover:bg-blue-100"
+                    >
+                      {currentHand?.userCards?.[1] || 'Card 2'}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Opponent Cards Section - Show all active opponents */}
+              {currentHand?.playerStates &&
+                currentHand.playerStates.filter(p => p.status === 'active' && p.position !== session?.userSeat)
+                .length > 0 && (
+                <div className="border rounded-lg p-4">
+                  <div className="font-medium mb-3 text-gray-700">
+                    Opponent Cards (Optional - add any cards that were shown)
+                  </div>
+                  <div className="grid gap-3">
+                    {currentHand?.playerStates &&
+                      currentHand.playerStates.filter(p => p.status === 'active' && p.position !== session?.userSeat)
+                      .map(player => (
+                        <div key={player.position} className="border rounded p-3 bg-gray-50">
+                          <div className="font-medium mb-2 text-sm">{player.position}</div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setInlineCardSelection({
+                                  show: true,
+                                  position: player.position,
+                                  cardIndex: 1,
+                                  title: `Select ${player.position} Card 1`
+                                });
+                              }}
+                              className="text-xs"
+                            >
+                              {opponentCards[player.position]?.[0] || 'Card 1'}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setInlineCardSelection({
+                                  show: true,
+                                  position: player.position,
+                                  cardIndex: 2,
+                                  title: `Select ${player.position} Card 2`
+                                });
+                              }}
+                              className="text-xs"
+                            >
+                              {opponentCards[player.position]?.[1] || 'Card 2'}
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    }
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Inline Card Selector for Showdown Dialog */}
+            {inlineCardSelection.show && (
+              <div className="mt-4 border-t pt-4">
+                <CardSelector
+                  title={inlineCardSelection.title}
+                  selectedCards={[
+                    selectedCard1,
+                    selectedCard2,
+                    ...(currentHand?.communityCards.flop || []),
+                    currentHand?.communityCards.turn,
+                    currentHand?.communityCards.river,
+                    ...Object.values(opponentCards).flat()
+                  ].filter(Boolean) as string[]}
+                  onCardSelect={handleInlineCardSelect}
+                  onCancel={() => setInlineCardSelection({ show: false, position: null, cardIndex: 1, title: '' })}
+                />
+              </div>
+            )}
+
+            {/* Outcome Selection */}
+            <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t">
               <Button
                 className="bg-green-600 hover:bg-green-700 text-white"
                 onClick={() => {
                   setShowOutcomeSelection(false);
-                  // Show opponent cards dialog for showdown
-                  const activePlayers = currentHand?.playerStates.filter(p => p.status === 'active' && p.position !== session?.userSeat);
-                  if (activePlayers && activePlayers.length > 0) {
-                    setShowOpponentCardsDialog(true);
-                    // Pre-set the outcome so we can complete later
-                    setAmountModalValue(currentHand?.pot || 0);
-                    setAmountModalAction('raise'); // Using as a flag for 'won'
-                  } else {
-                    completeHand('won', currentHand?.pot || 0);
-                  }
+                  completeHand('won', currentHand?.pot || 0);
                 }}
+                disabled={!currentHand?.userCards || !currentHand.userCards[0] || !currentHand.userCards[1]}
               >
                 I Won
               </Button>
@@ -1394,17 +1769,9 @@ export default function SessionPage() {
                 className="bg-red-600 hover:bg-red-700 text-white"
                 onClick={() => {
                   setShowOutcomeSelection(false);
-                  // Show opponent cards dialog for showdown
-                  const activePlayers = currentHand?.playerStates.filter(p => p.status === 'active' && p.position !== session?.userSeat);
-                  if (activePlayers && activePlayers.length > 0) {
-                    setShowOpponentCardsDialog(true);
-                    // Pre-set the outcome so we can complete later
-                    setAmountModalValue(0);
-                    setAmountModalAction('all-in'); // Using as a flag for 'lost'
-                  } else {
-                    completeHand('lost', 0);
-                  }
+                  completeHand('lost', 0);
                 }}
+                disabled={!currentHand?.userCards || !currentHand.userCards[0] || !currentHand.userCards[1]}
               >
                 I Lost
               </Button>
@@ -1412,82 +1779,22 @@ export default function SessionPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Opponent Cards Dialog */}
-        <Dialog open={showOpponentCardsDialog} onOpenChange={setShowOpponentCardsDialog}>
-          <DialogContent className="sm:max-w-[500px] max-w-[450px]">
+
+        {/* Validation Error Dialog */}
+        <Dialog open={showValidationError} onOpenChange={setShowValidationError}>
+          <DialogContent className={getDialogClasses("sm:max-w-[425px] max-w-[350px]")}>
             <DialogHeader>
-              <DialogTitle>Opponent Cards</DialogTitle>
+              <DialogTitle>Action Required</DialogTitle>
               <DialogDescription>
-                Did any opponents show their cards? (Optional - you can skip this)
+                {validationErrorMessage}
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 mt-4 max-h-60 overflow-y-auto">
-              {currentHand?.playerStates
-                .filter(p => p.status === 'active' && p.position !== session?.userSeat)
-                .map(player => (
-                  <div key={player.position} className="border rounded p-3">
-                    <div className="font-medium mb-2">{player.position}</div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedPosition(player.position);
-                          setSelectingCard(1);
-                          setShowCardSelector(true);
-                        }}
-                        className="text-xs"
-                      >
-                        {opponentCards[player.position]?.[0] || 'Card 1'}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedPosition(player.position);
-                          setSelectingCard(2);
-                          setShowCardSelector(true);
-                        }}
-                        className="text-xs"
-                      >
-                        {opponentCards[player.position]?.[1] || 'Card 2'}
-                      </Button>
-                    </div>
-                  </div>
-                ))
-              }
-            </div>
-            <div className="flex gap-2 mt-4">
+            <div className="flex justify-end mt-4">
               <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => {
-                  // Complete hand without opponent cards
-                  if (amountModalAction === 'raise') {
-                    completeHand('won', amountModalValue);
-                  } else {
-                    completeHand('lost', 0);
-                  }
-                  setShowOpponentCardsDialog(false);
-                  setOpponentCards({});
-                }}
+                onClick={() => setShowValidationError(false)}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
               >
-                Skip
-              </Button>
-              <Button
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                onClick={() => {
-                  // Complete hand with opponent cards
-                  if (amountModalAction === 'raise') {
-                    completeHand('won', amountModalValue);
-                  } else {
-                    completeHand('lost', 0);
-                  }
-                  setShowOpponentCardsDialog(false);
-                  setOpponentCards({});
-                }}
-              >
-                Done
+                OK
               </Button>
             </div>
           </DialogContent>

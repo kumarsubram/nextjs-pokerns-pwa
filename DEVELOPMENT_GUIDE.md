@@ -3,6 +3,28 @@
 ## Project Overview
 A Progressive Web App for tracking poker sessions, hands, and statistics. Built with Next.js 15, TypeScript, and Tailwind CSS.
 
+## RECENT UPDATES (v2.1) ✅
+
+### Dialog System Improvements - COMPLETED
+✅ **Enhanced Fold Confirmation Dialog**
+- Improved text structure and labeling
+- Hero cards marked as "Required" when not both selected
+- "Optional: Add any cards revealed" text for opponent cards
+- Removed unnecessary explanatory text
+- Disabled "Confirm Fold" button until both hero cards selected when money invested
+
+✅ **Enhanced Showdown Dialog**
+- Replaced ugly browser alert with proper dialog interface
+- Hero card selection integrated directly in showdown dialog
+- "Required for showdown" labeling when hero cards missing
+- Disabled outcome buttons ("I Won"/"I Lost") until hero cards selected
+- Consistent user experience with fold confirmation dialog
+
+✅ **Technical Fixes**
+- Made `SessionService.getSessionMetadata()` public to fix TypeScript build errors
+- Updated PWA service worker to v115 for cache invalidation
+- Build process now passes without TypeScript errors
+
 ## CURRENT IMPLEMENTATION STATUS (v2.0) ✅ COMPLETED
 
 ### Core Philosophy - IMPLEMENTED
@@ -199,6 +221,162 @@ interface StoredHand {
 
 ### Technical Implementation Details
 
+#### Advanced Betting Logic System
+```typescript
+// Auto-fold players between next-to-act and caller
+function autoFoldPlayersBetween(
+  nextToAct: Position,
+  callerPosition: Position,
+  currentRound: BettingRound,
+  playerStates: PlayerState[],
+  seats: TableSeats
+): BettingRound {
+  // Get action sequence for table size
+  const actionSequence = getActionSequence(seats);
+
+  // Filter to only active players
+  const activePlayers = playerStates.filter(p => p.status === 'active');
+  const activePositions = activePlayers.map(p => p.position);
+  const activeActionSequence = actionSequence.filter(pos => activePositions.includes(pos));
+
+  // Find positions between nextToAct and caller
+  const positionsBetween = getPositionsBetween(nextToAct, callerPosition, activeActionSequence);
+
+  // Auto-fold those positions
+  positionsBetween.forEach(position => {
+    currentRound.actions.push({
+      position,
+      action: 'fold',
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  return currentRound;
+}
+
+// Circular next-to-act calculation
+function getNextToAct(
+  bettingRound: string,
+  playerStates: PlayerState[],
+  currentRound: BettingRound,
+  seats: TableSeats
+): Position | null {
+  const actionSequence = getActionSequence(seats, bettingRound as any);
+  const activePlayers = playerStates.filter(p => p.status === 'active');
+
+  // Find next player who needs to act
+  for (let i = 0; i < actionSequence.length; i++) {
+    const position = actionSequence[i];
+    const player = activePlayers.find(p => p.position === position);
+
+    if (player && needsToAct(player, currentRound.currentBet || 0)) {
+      return position;
+    }
+  }
+
+  return null; // Betting round complete
+}
+```
+
+#### Mobile Keyboard Detection System
+```typescript
+// Custom hook for viewport height changes
+export function useViewportHeight() {
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const [initialHeight, setInitialHeight] = useState(0);
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+
+  useEffect(() => {
+    const handleViewportChange = () => {
+      const currentHeight = window.visualViewport?.height || window.innerHeight;
+      setViewportHeight(currentHeight);
+
+      // Consider keyboard open if viewport is significantly smaller
+      const heightDifference = initialHeight - currentHeight;
+      setIsKeyboardOpen(heightDifference > 150);
+    };
+
+    // Use visualViewport if available (better for mobile)
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleViewportChange);
+    }
+  }, []);
+
+  return { viewportHeight, initialHeight, isKeyboardOpen, heightDifference };
+}
+
+// Dynamic dialog classes based on keyboard state
+const getDialogClasses = (baseClasses: string) => {
+  return cn(
+    baseClasses,
+    isKeyboardOpen && "dialog-mobile-keyboard-open"
+  );
+};
+```
+
+#### Inline Card Selection Architecture
+```typescript
+// Inline card selection state management
+const [inlineCardSelection, setInlineCardSelection] = useState<{
+  show: boolean;
+  position: Position | null;
+  cardIndex: 1 | 2;
+  title: string;
+}>({
+  show: false,
+  position: null,
+  cardIndex: 1,
+  title: ''
+});
+
+// Embedded CardSelector in dialogs
+{inlineCardSelection.show && (
+  <div className="mt-4 border-t pt-4">
+    <CardSelector
+      title={inlineCardSelection.title}
+      selectedCards={allSelectedCards}
+      onCardSelect={handleInlineCardSelect}
+      onCancel={() => setInlineCardSelection({
+        show: false,
+        position: null,
+        cardIndex: 1,
+        title: ''
+      })}
+    />
+  </div>
+)}
+```
+
+#### Showdown Detection Logic
+```typescript
+// Proper showdown detection in handleAdvanceToNextRound
+if (currentHand.currentBettingRound === 'river') {
+  // Count active players (including hero if still active)
+  const activePlayers = currentHand.playerStates.filter(p => p.status === 'active');
+  const heroStillActive = activePlayers.some(p => p.position === session.userSeat);
+
+  // True showdown: 2+ players reach the end
+  if (activePlayers.length >= 2) {
+    // Validate Hero cards are selected for showdown only if hero is still active
+    if (heroStillActive && (!currentHand.userCards || !currentHand.userCards[0] || !currentHand.userCards[1])) {
+      alert('Hero cards must be selected before showdown');
+      return;
+    }
+    // Show unified showdown dialog
+    setShowOutcomeSelection(true);
+    return;
+  } else {
+    // Not a showdown - only 1 player left, hand ends automatically
+    if (heroStillActive) {
+      completeHand('won', currentHand.pot || 0);
+    } else {
+      completeHand('lost', 0);
+    }
+    return;
+  }
+}
+```
+
 #### Fixed Position Tables
 ```typescript
 // 6-handed positions (excluding DEALER)
@@ -284,6 +462,29 @@ if (position === session.userSeat && amount) {
    - Sequential card blinking: Turn card blinks after flop, River card blinks after turn
    - Consistent yellow blinking styling for all community card selections
    - Check action now shows blue styling instead of gray for better visibility
+9. **Advanced Betting Logic & Auto-Fold System**: Comprehensive poker action flow
+   - **Auto-fold logic**: Players between the next-to-act and a caller are automatically folded (simulation of typical poker action)
+   - **Proper nextToAct calculation**: Circular search logic for both preflop and post-flop betting rounds
+   - **Active player filtering**: All betting logic properly filters out folded players
+   - **Raise handling**: Correct resetting of hasActed flags and action sequences when raises occur
+   - **Betting round completion**: Accurate detection of when betting rounds are complete
+   - **Position-aware logic**: Separate logic for 6-handed vs 9-handed tables throughout all betting functions
+10. **Mobile Keyboard Handling**: Intelligent dialog positioning for mobile devices
+    - **Viewport detection**: Using Visual Viewport API to detect when mobile keyboard is open
+    - **Dynamic dialog positioning**: Dialogs automatically reposition when keyboard appears to prevent overlap
+    - **iPhone optimization**: Specific handling for iOS Safari keyboard behavior
+    - **Responsive dialog classes**: Conditional CSS classes for keyboard-open states
+11. **Unified Card Selection Experience**: Consolidated and streamlined card selection flow
+    - **Inline Card Selection**: CardSelector component embedded directly within dialogs instead of navigation
+    - **Consolidated Fold Dialog**: Single dialog combining fold confirmation with optional card selection
+    - **Smart Card Requirements**: Only shows card selection if user invested money (heroMoneyInvested > 0)
+    - **Unified Showdown Dialog**: All showdown card selection and outcome selection in one comprehensive dialog
+    - **No Navigation Interruption**: Users remain in dialog context without unexpected page redirects
+12. **Proper Showdown Detection**: Accurate logic for when showdowns actually occur
+    - **True Showdown Logic**: Only shows showdown dialog when 2+ players reach the river
+    - **Auto-completion for Non-showdowns**: Hands automatically complete when only 1 player remains
+    - **Fold Logic Cleanup**: Hero folds immediately complete the hand without unnecessary dialogs
+    - **Active Player Counting**: Proper detection of remaining active players at hand end
 
 ### Architecture & File Structure
 
@@ -415,3 +616,113 @@ Mobile browsers (especially iOS Safari) automatically zoom in when users tap on 
 - The layout may remain zoomed and distorted
 
 By enforcing these standards, we ensure a smooth, native-like mobile experience without unwanted zoom behaviors.
+
+## Development Rules & Best Practices
+
+### Code Quality Standards
+
+#### 1. Poker Logic Integrity
+- **Always filter active players**: All betting logic must check `p.status === 'active'` before processing
+- **Position-aware calculations**: Use `getActionSequence(seats)` for table-size-specific logic
+- **Circular action flow**: Handle wrap-around logic for next-to-act calculations
+- **Raise flag resets**: When raises occur, reset `hasActed` flags appropriately
+- **Betting round completion**: Check all active players have acted AND call amounts match
+
+#### 2. Dialog and Modal Management
+- **Unified dialogs preferred**: Combine related functionality into single dialogs instead of chains
+- **Mobile keyboard awareness**: Use `useViewportHeight()` hook and `getDialogClasses()` for responsive positioning
+- **Inline components**: Embed complex components (like CardSelector) within dialogs rather than navigation
+- **State cleanup**: Always reset dialog states on close/cancel actions
+- **Conditional requirements**: Only show mandatory sections when actually required (e.g., hero cards only for showdowns)
+
+#### 3. User Experience Principles
+- **No unexpected navigation**: Keep users in context, avoid navigating away from dialogs
+- **Smart defaults**: Only show options/requirements when they apply to the current scenario
+- **Progressive disclosure**: Show card selection only when user has invested money
+- **Clear visual feedback**: Use color coding, animations, and state indicators consistently
+- **Error prevention**: Validate states before allowing actions (e.g., hero cards for showdown)
+
+#### 4. State Management Rules
+- **Hero money tracking**: Always update `heroMoneyInvested` for blind posts and betting actions
+- **Stack synchronization**: Keep stack amounts in sync with investments and winnings
+- **Hand state consistency**: Update `currentHand` state immediately when cards are selected
+- **Player state accuracy**: Maintain correct active/folded status throughout betting rounds
+- **Clean state transitions**: Reset relevant states when moving between hands
+
+### Technical Debt Prevention
+
+#### 1. Avoid These Patterns
+```typescript
+// ❌ Bad: Hardcoded position sequences
+const positions = ['BTN', 'SB', 'BB', 'UTG', 'LJ', 'CO'];
+
+// ✅ Good: Table-size aware sequences
+const positions = getActionSequence(seats);
+
+// ❌ Bad: Processing all players
+players.forEach(player => processAction(player));
+
+// ✅ Good: Filter active players first
+players.filter(p => p.status === 'active').forEach(player => processAction(player));
+
+// ❌ Bad: Dialog chains
+setShowDialog1(false);
+setShowDialog2(true);
+
+// ✅ Good: Unified dialogs
+setShowUnifiedDialog(true);
+```
+
+#### 2. Required Validations
+- Check active player status before processing any poker logic
+- Validate hero cards exist before showdown dialogs
+- Confirm table size (6/9) before using position sequences
+- Verify current betting round before calculating next-to-act
+- Ensure dialog states are properly cleaned up
+
+#### 3. Mobile Optimization Checklist
+- [ ] All input fields use minimum 16px font size
+- [ ] Dialogs use mobile keyboard detection
+- [ ] Card selection works with touch interfaces
+- [ ] Button spacing accommodates finger taps
+- [ ] Responsive layout for different screen sizes
+- [ ] No zoom on input focus
+
+### Testing Guidelines
+
+#### 1. Poker Logic Testing Scenarios
+- Test auto-fold logic with different position combinations
+- Verify betting round completion with various action sequences
+- Test showdown detection with 1, 2, and 3+ remaining players
+- Validate raise scenarios reset action flags correctly
+- Test both 6-handed and 9-handed table logic
+
+#### 2. UI/UX Testing Scenarios
+- Test dialog behavior with mobile keyboard open/closed
+- Verify card selection works inline within dialogs
+- Test fold logic with/without money invested
+- Validate showdown flow for different player counts
+- Test seat changes between hands
+
+#### 3. Edge Case Testing
+- Hero folds with various investment amounts
+- All players fold except hero
+- Raise scenarios with circular next-to-act logic
+- Community card selection in different betting rounds
+- Mobile keyboard behavior with different dialog types
+
+### PWA Maintenance
+
+#### 1. Service Worker Updates
+- Update cache version (`CACHE_NAME`) for any significant changes
+- Test PWA functionality after major updates
+- Verify offline behavior with cached content
+- Test service worker update flow
+
+#### 2. Performance Considerations
+- Minimize localStorage operations
+- Batch state updates where possible
+- Use React.memo for expensive components
+- Implement proper cleanup in useEffect hooks
+
+This development guide ensures consistent, high-quality implementation that maintains poker integrity while providing excellent mobile UX.

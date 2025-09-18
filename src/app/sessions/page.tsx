@@ -227,7 +227,13 @@ export default function SessionsPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => router.push(`/session/${session.sessionId}`)}>
+                        <DropdownMenuItem onClick={() => {
+                          if (session.status === 'active') {
+                            router.push(`/session/${session.sessionId}`);
+                          } else {
+                            router.push(`/session/${session.sessionId}/history`);
+                          }
+                        }}>
                           <Eye className="h-4 w-4 mr-2" />
                           {session.status === 'active' ? 'Continue Session' : 'View History'}
                         </DropdownMenuItem>
@@ -300,7 +306,13 @@ export default function SessionsPage() {
                         ? 'bg-emerald-500 hover:bg-emerald-600'
                         : 'bg-blue-500 hover:bg-blue-600'
                     }`}
-                    onClick={() => router.push(`/session/${session.sessionId}`)}
+                    onClick={() => {
+                      if (session.status === 'active') {
+                        router.push(`/session/${session.sessionId}`);
+                      } else {
+                        router.push(`/session/${session.sessionId}/history`);
+                      }
+                    }}
                   >
                     {session.status === 'active' ? (
                       <><Play className="h-4 w-4 mr-2" />Continue Session</>

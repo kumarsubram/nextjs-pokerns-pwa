@@ -238,7 +238,7 @@ export class SessionService {
     return `PS${sessionNumber} - ${dateStr}`;
   }
 
-  private static getSessionMetadata(sessionId: string): SessionMetadata | null {
+  static getSessionMetadata(sessionId: string): SessionMetadata | null {
     const metaJson = localStorage.getItem(`${STORAGE_KEYS.SESSION_META_PREFIX}${sessionId}_meta`);
     return metaJson ? JSON.parse(metaJson) : null;
   }

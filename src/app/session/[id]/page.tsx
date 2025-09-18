@@ -51,6 +51,9 @@ export default function SessionPage() {
   const [heroMoneyInvested, setHeroMoneyInvested] = useState<number>(0);
   // Showdown outcome
   const [showOutcomeSelection, setShowOutcomeSelection] = useState(false);
+  // Opponent cards logging
+  const [showOpponentCardsDialog, setShowOpponentCardsDialog] = useState(false);
+  const [opponentCards, setOpponentCards] = useState<{[position: string]: [string, string] | null}>({});
   // Seat selection for new hands
   const [showSeatSelection, setShowSeatSelection] = useState(false);
   const [handCount, setHandCount] = useState(0);
@@ -281,6 +284,24 @@ export default function SessionPage() {
   }, [ante, currentHand, session, smallBlind, bigBlind]);
 
   const handleUserCardSelect = (card: string) => {
+    // Check if we're selecting opponent cards
+    if (selectedPosition && selectedPosition !== session?.userSeat) {
+      // Opponent card selection
+      const currentOpponentCards = opponentCards[selectedPosition] || [null, null];
+      const newOpponentCards = [...currentOpponentCards] as [string | null, string | null];
+      newOpponentCards[selectingCard - 1] = card;
+
+      setOpponentCards(prev => ({
+        ...prev,
+        [selectedPosition]: newOpponentCards as [string, string] | null
+      }));
+
+      setShowCardSelector(false);
+      setSelectedPosition(null);
+      return;
+    }
+
+    // Hero card selection
     if (selectingCard === 1) {
       setSelectedCard1(card);
       // Update current hand immediately for card 1
@@ -353,7 +374,7 @@ export default function SessionPage() {
 
     let updatedHand = { ...currentHand };
 
-    // Only auto-fold players between current next-to-act and selected position (when user clicks non-next position)
+    // Auto-fold players who have already acted but didn't match the current bet (when user clicks non-next position)
     if (currentHand.nextToAct && currentHand.nextToAct !== position) {
       updatedHand = autoFoldPlayersBetween(updatedHand, currentHand.nextToAct, position);
     }
@@ -432,9 +453,41 @@ export default function SessionPage() {
     }
   };
 
+  // Validate required values before hand completion
+  const validateHandRequirements = (): { isValid: boolean; error?: string } => {
+    if (stack <= 0) {
+      return { isValid: false, error: 'Stack must be greater than 0' };
+    }
+    if (smallBlind <= 0) {
+      return { isValid: false, error: 'Small Blind must be greater than 0' };
+    }
+    if (bigBlind <= 0) {
+      return { isValid: false, error: 'Big Blind must be greater than 0' };
+    }
+    if (bigBlind <= smallBlind) {
+      return { isValid: false, error: 'Big Blind must be greater than Small Blind' };
+    }
+
+    // Only require Hero cards if Hero invested money
+    if (heroMoneyInvested > 0) {
+      if (!currentHand?.userCards || !currentHand.userCards[0] || !currentHand.userCards[1]) {
+        return { isValid: false, error: 'Hero cards must be selected when money is invested' };
+      }
+    }
+
+    return { isValid: true };
+  };
+
   // Complete the current hand
   const completeHand = (outcome: 'won' | 'lost' | 'folded', potWon?: number) => {
     if (!currentHand || !session) return;
+
+    // Validate requirements before completing hand
+    const validation = validateHandRequirements();
+    if (!validation.isValid) {
+      alert(validation.error);
+      return;
+    }
 
     // Save hand to storage
     const handData: StoredHand = {
@@ -447,7 +500,8 @@ export default function SessionPage() {
         winner: outcome === 'won' ? session.userSeat : undefined,
         potWon: outcome === 'won' ? potWon : undefined,
         stackAfter: stack + (outcome === 'won' ? (potWon || 0) : 0) - heroMoneyInvested,
-        handOutcome: outcome
+        handOutcome: outcome,
+        opponentCards: Object.keys(opponentCards).length > 0 ? opponentCards : undefined
       }
     };
 
@@ -479,6 +533,24 @@ export default function SessionPage() {
   const handleConfirmedHeroFold = () => {
     if (!currentHand || !session || !foldPosition) return;
 
+    // If Hero hasn't invested any money, don't track the hand - just start a new one
+    if (heroMoneyInvested === 0) {
+      // Clear current hand from storage since it's not being tracked
+      SessionService.clearCurrentHand(session.sessionId);
+
+      // Reset and prepare for next hand
+      const newHandCount = handCount + 1;
+      setHandCount(newHandCount);
+
+      // Always show seat selection for every hand
+      setCurrentHand(null);
+      setShowSeatSelection(true);
+
+      setShowFoldConfirmation(false);
+      setFoldPosition(null);
+      return;
+    }
+
     let updatedHand = { ...currentHand };
 
     const bettingAction: Omit<BettingAction, 'timestamp'> = {
@@ -504,13 +576,22 @@ export default function SessionPage() {
 
     setCurrentHand(updatedHand);
 
-    // Determine outcome based on money invested
-    const outcome = heroMoneyInvested > 0 ? 'lost' : 'folded';
-    completeHand(outcome, 0);
+    // Check if there are remaining active players who might show cards
+    const activePlayers = updatedHand.playerStates.filter(p => p.status === 'active' && p.position !== session.userSeat);
+
+    if (activePlayers.length > 0) {
+      // Ask if opponents showed cards before completing the hand
+      setShowOpponentCardsDialog(true);
+    } else {
+      // No active players left, complete hand immediately
+      const outcome = heroMoneyInvested > 0 ? 'lost' : 'folded';
+      completeHand(outcome, 0);
+    }
 
     setShowFoldConfirmation(false);
     setFoldPosition(null);
   };
+
 
   // Auto-fold players between nextToAct and target position (when user skips positions)
   const autoFoldPlayersBetween = (hand: CurrentHand, nextToAct: Position, targetPosition: Position): CurrentHand => {
@@ -545,9 +626,15 @@ export default function SessionPage() {
     for (const position of positionsToFold) {
       const playerState = updatedHand.playerStates.find(p => p.position === position);
 
-      if (playerState && playerState.status === 'active' && !playerState.hasActed) {
+      // Only auto-fold players who have already acted but haven't matched the current bet
+      // This means they effectively folded by not calling/raising
+      const currentRoundData = updatedHand.currentBettingRound !== 'showdown'
+        ? updatedHand.bettingRounds[updatedHand.currentBettingRound]
+        : null;
+      if (playerState && playerState.status === 'active' && playerState.hasActed &&
+          currentRoundData && playerState.currentBet < currentRoundData.currentBet) {
         playerState.status = 'folded';
-        playerState.hasActed = true;
+        // hasActed remains true since they already acted
 
         // Add fold action to betting round
         if (updatedHand.currentBettingRound !== 'showdown') {
@@ -572,6 +659,12 @@ export default function SessionPage() {
 
     // Check if we're going to showdown
     if (currentHand.currentBettingRound === 'river') {
+      // Validate Hero cards are selected for showdown
+      if (!currentHand.userCards || !currentHand.userCards[0] || !currentHand.userCards[1]) {
+        alert('Hero cards must be selected before showdown');
+        return;
+      }
+
       // Show outcome selection for showdown
       setShowOutcomeSelection(true);
       return;
@@ -772,6 +865,7 @@ export default function SessionPage() {
                   type="number"
                   value={stack}
                   onChange={(e) => setStack(parseInt(e.target.value) || 0)}
+                  onFocus={(e) => e.target.select()}
                   className="w-full px-2 py-1 text-base border rounded text-center"
                 />
               </div>
@@ -781,6 +875,7 @@ export default function SessionPage() {
                   type="number"
                   value={smallBlind}
                   onChange={(e) => setSmallBlind(parseInt(e.target.value) || 0)}
+                  onFocus={(e) => e.target.select()}
                   className="w-full px-2 py-1 text-base border rounded text-center"
                 />
               </div>
@@ -790,6 +885,7 @@ export default function SessionPage() {
                   type="number"
                   value={bigBlind}
                   onChange={(e) => setBigBlind(parseInt(e.target.value) || 0)}
+                  onFocus={(e) => e.target.select()}
                   className="w-full px-2 py-1 text-base border rounded text-center"
                 />
               </div>
@@ -799,6 +895,7 @@ export default function SessionPage() {
                   type="number"
                   value={ante}
                   onChange={(e) => setAnte(parseInt(e.target.value) || 0)}
+                  onFocus={(e) => e.target.select()}
                   className="w-full px-2 py-1 text-base border rounded text-center"
                 />
               </div>
@@ -840,10 +937,22 @@ export default function SessionPage() {
         {/* User Card Selector */}
         {showCardSelector && (
           <CardSelector
-            title={`Select Card ${selectingCard}`}
-            selectedCards={[selectedCard1, selectedCard2].filter(Boolean) as string[]}
+            title={selectedPosition && selectedPosition !== session?.userSeat
+              ? `Select ${selectedPosition} Card ${selectingCard}`
+              : `Select Card ${selectingCard}`}
+            selectedCards={[
+              selectedCard1,
+              selectedCard2,
+              ...(currentHand?.communityCards.flop || []),
+              currentHand?.communityCards.turn,
+              currentHand?.communityCards.river,
+              ...Object.values(opponentCards).flat()
+            ].filter(Boolean) as string[]}
             onCardSelect={handleUserCardSelect}
-            onCancel={() => setShowCardSelector(false)}
+            onCancel={() => {
+              setShowCardSelector(false);
+              setSelectedPosition(null);
+            }}
           />
         )}
 
@@ -1113,6 +1222,7 @@ export default function SessionPage() {
                       setAmountModalValue(value);
                     }
                   }}
+                  onFocus={(e) => e.target.select()}
                   className="w-full px-3 py-2 text-base border rounded-md"
                   min={(currentBettingRound?.currentBet || 0) * 2}
                   max={amountModalAction === 'all-in' ? stack : undefined}
@@ -1208,7 +1318,7 @@ export default function SessionPage() {
             <DialogHeader>
               <DialogTitle>Showdown Result</DialogTitle>
               <DialogDescription>
-                Did you win or lose at showdown?
+                Did you win or lose at showdown? (You can add opponent cards after)
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-2 mt-4">
@@ -1218,8 +1328,17 @@ export default function SessionPage() {
               <Button
                 className="bg-green-600 hover:bg-green-700 text-white"
                 onClick={() => {
-                  completeHand('won', currentHand?.pot || 0);
                   setShowOutcomeSelection(false);
+                  // Show opponent cards dialog for showdown
+                  const activePlayers = currentHand?.playerStates.filter(p => p.status === 'active' && p.position !== session?.userSeat);
+                  if (activePlayers && activePlayers.length > 0) {
+                    setShowOpponentCardsDialog(true);
+                    // Pre-set the outcome so we can complete later
+                    setAmountModalValue(currentHand?.pot || 0);
+                    setAmountModalAction('raise'); // Using as a flag for 'won'
+                  } else {
+                    completeHand('won', currentHand?.pot || 0);
+                  }
                 }}
               >
                 I Won
@@ -1227,11 +1346,101 @@ export default function SessionPage() {
               <Button
                 className="bg-red-600 hover:bg-red-700 text-white"
                 onClick={() => {
-                  completeHand('lost', 0);
                   setShowOutcomeSelection(false);
+                  // Show opponent cards dialog for showdown
+                  const activePlayers = currentHand?.playerStates.filter(p => p.status === 'active' && p.position !== session?.userSeat);
+                  if (activePlayers && activePlayers.length > 0) {
+                    setShowOpponentCardsDialog(true);
+                    // Pre-set the outcome so we can complete later
+                    setAmountModalValue(0);
+                    setAmountModalAction('all-in'); // Using as a flag for 'lost'
+                  } else {
+                    completeHand('lost', 0);
+                  }
                 }}
               >
                 I Lost
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Opponent Cards Dialog */}
+        <Dialog open={showOpponentCardsDialog} onOpenChange={setShowOpponentCardsDialog}>
+          <DialogContent className="sm:max-w-[500px] max-w-[450px]">
+            <DialogHeader>
+              <DialogTitle>Opponent Cards</DialogTitle>
+              <DialogDescription>
+                Did any opponents show their cards? (Optional - you can skip this)
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 mt-4 max-h-60 overflow-y-auto">
+              {currentHand?.playerStates
+                .filter(p => p.status === 'active' && p.position !== session?.userSeat)
+                .map(player => (
+                  <div key={player.position} className="border rounded p-3">
+                    <div className="font-medium mb-2">{player.position}</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedPosition(player.position);
+                          setSelectingCard(1);
+                          setShowCardSelector(true);
+                        }}
+                        className="text-xs"
+                      >
+                        {opponentCards[player.position]?.[0] || 'Card 1'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedPosition(player.position);
+                          setSelectingCard(2);
+                          setShowCardSelector(true);
+                        }}
+                        className="text-xs"
+                      >
+                        {opponentCards[player.position]?.[1] || 'Card 2'}
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              }
+            </div>
+            <div className="flex gap-2 mt-4">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  // Complete hand without opponent cards
+                  if (amountModalAction === 'raise') {
+                    completeHand('won', amountModalValue);
+                  } else {
+                    completeHand('lost', 0);
+                  }
+                  setShowOpponentCardsDialog(false);
+                  setOpponentCards({});
+                }}
+              >
+                Skip
+              </Button>
+              <Button
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => {
+                  // Complete hand with opponent cards
+                  if (amountModalAction === 'raise') {
+                    completeHand('won', amountModalValue);
+                  } else {
+                    completeHand('lost', 0);
+                  }
+                  setShowOpponentCardsDialog(false);
+                  setOpponentCards({});
+                }}
+              >
+                Done
               </Button>
             </div>
           </DialogContent>

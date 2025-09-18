@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { ChevronDown, ChevronUp, Share2, Twitter } from 'lucide-react';
+import { ChevronDown, ChevronUp, Share2, X } from 'lucide-react';
 import { CurrentHand, StoredHand, Position } from '@/types/poker-v2';
 
 interface HandHistoryProps {
@@ -56,6 +56,45 @@ export function HandHistory({
     setExpandedHands(newExpanded);
   };
 
+  // Group actions for better display readability
+  const groupActionsForDisplay = (actions: Array<{ position: Position; action: string; amount?: number }>, userSeat?: Position) => {
+    const groups: Array<Array<{ position: Position; action: string; amount?: number }>> = [];
+    let currentGroup: Array<{ position: Position; action: string; amount?: number }> = [];
+
+    actions.forEach((action, index) => {
+      const isSignificantAction = action.action === 'raise' || action.action === 'all-in' || action.position === userSeat;
+      const isFirstAction = index === 0;
+      const prevAction = index > 0 ? actions[index - 1] : null;
+      const prevWasSignificant = prevAction && (prevAction.action === 'raise' || prevAction.action === 'all-in' || prevAction.position === userSeat);
+
+      // Start a new group if:
+      // 1. This is a significant action (raise, all-in, or hero action)
+      // 2. Previous action was significant (so this starts on a new line)
+      // 3. This is the first action
+      if (isSignificantAction || prevWasSignificant || isFirstAction) {
+        if (currentGroup.length > 0) {
+          groups.push([...currentGroup]);
+          currentGroup = [];
+        }
+      }
+
+      currentGroup.push(action);
+
+      // If this is significant, close the group so next action starts a new line
+      if (isSignificantAction) {
+        groups.push([...currentGroup]);
+        currentGroup = [];
+      }
+    });
+
+    // Add remaining actions to final group
+    if (currentGroup.length > 0) {
+      groups.push(currentGroup);
+    }
+
+    return groups;
+  };
+
   // Render action log for a hand
   const renderActionLog = (hand: CurrentHand | StoredHand) => {
     const actions: Array<{ round: string; position: Position; action: string; amount?: number }> = [];
@@ -81,35 +120,44 @@ export function HandHistory({
 
     return (
       <div className="space-y-2 p-3 bg-gray-50 rounded-md mt-2">
-        {Object.entries(roundGroups).map(([round, roundActions]) => (
-          <div key={round}>
-            <div className="text-xs font-semibold text-gray-600 mb-1">{round}:</div>
-            <div className="flex flex-wrap gap-2">
-              {roundActions.map((action, idx) => (
-                <span key={idx} className="text-xs">
-                  <span className={cn(
-                    "font-medium",
-                    action.position === userSeat ? "text-blue-600" : "text-gray-700"
-                  )}>
-                    {formatPosition(action.position)}
-                  </span>
-                  <span className={cn(
-                    "ml-1",
-                    action.action === 'fold' ? 'text-red-600' :
-                    action.action === 'check' ? 'text-gray-600' :
-                    action.action === 'call' ? 'text-blue-600' :
-                    action.action === 'raise' ? 'text-green-600' :
-                    action.action === 'all-in' ? 'text-purple-600' :
-                    'text-gray-600'
-                  )}>
-                    {formatActionConcise(action.action, action.amount)}
-                  </span>
-                  {idx < roundActions.length - 1 && <span className="text-gray-400 ml-1">•</span>}
-                </span>
-              ))}
+        {Object.entries(roundGroups).map(([round, roundActions]) => {
+          // Group actions intelligently for better readability
+          const actionGroups = groupActionsForDisplay(roundActions, userSeat);
+
+          return (
+            <div key={round}>
+              <div className="text-xs font-semibold text-gray-600 mb-1">{round}:</div>
+              <div className="space-y-1">
+                {actionGroups.map((group, groupIdx) => (
+                  <div key={groupIdx} className="flex flex-wrap gap-2">
+                    {group.map((action, idx) => (
+                      <span key={idx} className="text-xs">
+                        <span className={cn(
+                          "font-medium",
+                          action.position === userSeat ? "text-blue-600" : "text-gray-700"
+                        )}>
+                          {formatPosition(action.position)}
+                        </span>
+                        <span className={cn(
+                          "ml-1",
+                          action.action === 'fold' ? 'text-red-600' :
+                          action.action === 'check' ? 'text-gray-600' :
+                          action.action === 'call' ? 'text-blue-600' :
+                          action.action === 'raise' ? 'text-green-600' :
+                          action.action === 'all-in' ? 'text-purple-600' :
+                          'text-gray-600'
+                        )}>
+                          {formatActionConcise(action.action, action.amount)}
+                        </span>
+                        {idx < group.length - 1 && <span className="text-gray-400 ml-1">•</span>}
+                      </span>
+                    ))}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {/* Community Cards if available */}
         {(hand.communityCards?.flop?.[0] || hand.communityCards?.turn || hand.communityCards?.river) && (
@@ -210,12 +258,12 @@ export function HandHistory({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                // TODO: Implement Twitter share
+                // TODO: Implement X share
               }}
               className="p-1 hover:bg-gray-200 rounded"
               title="Share on X"
             >
-              <Twitter className="h-4 w-4 text-gray-600" />
+              <X className="h-4 w-4 text-gray-600" />
             </button>
 
             {/* Expand/Collapse Icon */}

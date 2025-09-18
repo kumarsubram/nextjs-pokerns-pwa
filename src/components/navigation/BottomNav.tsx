@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, usePathname } from 'next/navigation';
-import { Home, Calendar, User, History } from 'lucide-react';
+import { Home, Calendar, User, Trophy } from 'lucide-react';
 
 export function BottomNav() {
   const router = useRouter();
@@ -21,8 +21,8 @@ export function BottomNav() {
       active: pathname === '/sessions',
     },
     {
-      icon: History,
-      label: 'History',
+      icon: Trophy,
+      label: 'Leaderboards',
       path: '/history',
       active: pathname === '/history',
     },

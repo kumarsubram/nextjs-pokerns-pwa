@@ -102,6 +102,7 @@ export interface StoredHand {
     potWon?: number;
     stackAfter?: number;
     handOutcome?: 'won' | 'lost' | 'folded' | 'chopped';
+    opponentCards?: {[position: string]: [string, string] | null};
   };
 }
 

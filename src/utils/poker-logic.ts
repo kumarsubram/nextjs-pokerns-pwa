@@ -59,7 +59,7 @@ export function initializePlayerStates(
     status: 'active' as const,
     stack: 1000, // Default stack - should come from session
     currentBet: position === 'SB' ? smallBlind : position === 'BB' ? bigBlind : 0,
-    hasActed: position === 'SB' || position === 'BB' // Blinds are considered "acted"
+    hasActed: false // All players need to act in preflop, even blinds
   }));
 }
 

@@ -32,6 +32,8 @@ interface SimplePokerTableProps {
   };
   isBettingComplete?: boolean;
   showFlopSelectionPrompt?: boolean;
+  showTurnSelectionPrompt?: boolean;
+  showRiverSelectionPrompt?: boolean;
   potSize?: number;
 }
 
@@ -53,6 +55,8 @@ export function SimplePokerTable({
   currentBettingRound,
   isBettingComplete = false,
   showFlopSelectionPrompt = false,
+  showTurnSelectionPrompt = false,
+  showRiverSelectionPrompt = false,
   potSize = 0
 }: SimplePokerTableProps) {
   const positions = seats === 6 ? POSITION_LABELS_6 : POSITION_LABELS_9;
@@ -108,7 +112,7 @@ export function SimplePokerTable({
       {/* Table felt - realistic rounded rectangle poker table */}
       <div className="relative w-full h-40 bg-green-800 rounded-[2.5rem] shadow-2xl border-4 border-amber-900">
         <div className="absolute inset-3 bg-green-700 rounded-[2rem] border border-green-600">
-          <div className="absolute inset-0 flex items-center justify-center">
+          <div className="absolute inset-0 flex items-center justify-center -translate-y-2">
             {showCommunityCards ? (
               <div className="flex gap-1">
                 {/* Flop Cards */}
@@ -145,7 +149,8 @@ export function SimplePokerTable({
                       ? `bg-white border-gray-800 ${getCardColor(communityCards.turn)}`
                       : isBettingComplete
                       ? "bg-gray-200 border-gray-400 text-gray-600 hover:bg-gray-300 cursor-pointer"
-                      : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-50"
+                      : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-50",
+                    showTurnSelectionPrompt && "animate-pulse bg-yellow-200 border-yellow-400"
                   )}
                 >
                   {communityCards?.turn || "?"}
@@ -160,7 +165,8 @@ export function SimplePokerTable({
                       ? `bg-white border-gray-800 ${getCardColor(communityCards.river)}`
                       : isBettingComplete
                       ? "bg-gray-200 border-gray-400 text-gray-600 hover:bg-gray-300 cursor-pointer"
-                      : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-50"
+                      : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-50",
+                    showRiverSelectionPrompt && "animate-pulse bg-yellow-200 border-yellow-400"
                   )}
                 >
                   {communityCards?.river || "?"}
@@ -176,9 +182,9 @@ export function SimplePokerTable({
               </span>
             )}
           </div>
-          {/* Pot Size Display - positioned directly below community cards */}
+          {/* Pot Size Display - positioned right below community cards */}
           {potSize > 0 && (
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 translate-y-6">
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 translate-y-5">
               <div className="bg-black/50 text-white px-2 py-0.5 rounded text-xs font-bold">
                 POT SIZE: {Math.floor(potSize)}
               </div>
@@ -213,7 +219,7 @@ export function SimplePokerTable({
               actionColor = 'bg-blue-700 border-blue-500 text-blue-100';
               break;
             case 'check':
-              actionColor = 'bg-gray-600 border-gray-500 text-gray-200';
+              actionColor = 'bg-blue-600 border-blue-500 text-blue-200';
               break;
             case 'raise':
               actionColor = 'bg-green-700 border-green-500 text-green-100';

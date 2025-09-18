@@ -274,6 +274,16 @@ if (position === session.userSeat && amount) {
    - BB shows "Check" instead of "Call" when no raises occur
    - Call amounts account for already posted bets (e.g., SB needs only 10 more to call 20 BB)
    - Added `getCallAmount()` and `canCheck()` helper functions for accurate betting logic
+7. **Preflop Betting Rules**: Correct poker logic for preflop betting
+   - Only BB can check in preflop when no raises occur
+   - All other positions must call/raise/fold in preflop
+   - Call button hidden when call amount is 0 (showing only Check)
+   - Fixed hasActed initialization for proper betting round completion
+8. **Community Card Improvements**: Enhanced visual feedback and positioning
+   - Raised community cards position on table with better spacing from pot size
+   - Sequential card blinking: Turn card blinks after flop, River card blinks after turn
+   - Consistent yellow blinking styling for all community card selections
+   - Check action now shows blue styling instead of gray for better visibility
 
 ### Architecture & File Structure
 

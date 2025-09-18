@@ -289,13 +289,31 @@ export default function SessionPage() {
       if (currentRound) {
         currentRound.isComplete = true;
         updatedHand.canAdvanceToFlop = true;
+        // Clear nextToAct since round is complete
+        updatedHand.nextToAct = undefined;
+
+        // Auto-fold any remaining active players who haven't acted (like SB)
+        updatedHand.playerStates.forEach(playerState => {
+          if (playerState.status === 'active' && !playerState.hasActed && playerState.position !== 'BB') {
+            console.log(`Auto-folding ${playerState.position} since BB checked in preflop`);
+            playerState.status = 'folded';
+            playerState.hasActed = true;
+
+            // Add fold action to betting round
+            currentRound.actions.push({
+              position: playerState.position,
+              action: 'fold',
+              timestamp: new Date().toISOString()
+            });
+          }
+        });
       }
     }
 
-    // Update nextToAct based on current betting round and player states
+    // Update nextToAct based on current betting round and player states (only if round is not complete)
     if (updatedHand.currentBettingRound !== 'showdown') {
       const currentRound = updatedHand.bettingRounds[updatedHand.currentBettingRound];
-      if (currentRound) {
+      if (currentRound && !currentRound.isComplete) {
         const nextPlayer = getNextToAct(
           updatedHand.currentBettingRound,
           session.tableSeats,
@@ -516,18 +534,58 @@ export default function SessionPage() {
 
     const currentBet = currentRound.currentBet || 0;
     const alreadyBet = playerState.currentBet || 0;
+    const bigBlindAmount = currentHand.bigBlind || 0;
 
-    // Can check if already matching the current bet
+    // Special preflop logic
+    if (currentHand.currentBettingRound === 'preflop') {
+      // Only BB can check in preflop, and only if no one raised above the big blind
+      if (position === 'BB') {
+        const canBBCheck = currentBet === bigBlindAmount && alreadyBet === bigBlindAmount;
+        console.log('BB canCheck debug:', {
+          position,
+          currentBet,
+          alreadyBet,
+          bigBlindAmount,
+          canBBCheck
+        });
+        return canBBCheck;
+      } else {
+        // No one else can check in preflop (must call, raise, or fold)
+        return false;
+      }
+    }
+
+    // Post-flop: Can check if already matching the current bet
     return alreadyBet >= currentBet;
   };
 
   const currentBettingRound = getCurrentBettingRound();
-  const isBettingComplete = currentBettingRound ? isBettingRoundComplete(currentHand?.playerStates || [], currentBettingRound) : false;
+  const isBettingComplete = currentBettingRound ? (currentBettingRound.isComplete || isBettingRoundComplete(currentHand?.playerStates || [], currentBettingRound)) : false;
+
+  // Debug logging
+  if (currentBettingRound) {
+    console.log('Betting round status:', {
+      round: currentHand?.currentBettingRound,
+      isComplete: currentBettingRound.isComplete,
+      standardComplete: isBettingRoundComplete(currentHand?.playerStates || [], currentBettingRound),
+      finalIsBettingComplete: isBettingComplete
+    });
+  }
 
   // Show flop selection prompt when preflop betting is complete and no flop cards are selected
   const showFlopSelectionPrompt = isBettingComplete &&
     currentHand?.currentBettingRound === 'preflop' &&
     (!currentHand?.communityCards.flop || currentHand.communityCards.flop.every(card => !card));
+
+  // Show turn selection prompt when flop betting is complete and no turn card is selected
+  const showTurnSelectionPrompt = isBettingComplete &&
+    currentHand?.currentBettingRound === 'flop' &&
+    !currentHand?.communityCards.turn;
+
+  // Show river selection prompt when turn betting is complete and no river card is selected
+  const showRiverSelectionPrompt = isBettingComplete &&
+    currentHand?.currentBettingRound === 'turn' &&
+    !currentHand?.communityCards.river;
 
   const endSession = () => {
     SessionService.endCurrentSession();
@@ -673,6 +731,8 @@ export default function SessionPage() {
             currentBettingRound={currentBettingRound || undefined}
             isBettingComplete={isBettingComplete}
             showFlopSelectionPrompt={showFlopSelectionPrompt}
+            showTurnSelectionPrompt={showTurnSelectionPrompt}
+            showRiverSelectionPrompt={showRiverSelectionPrompt}
             potSize={currentHand?.pot || 0}
           />
         </div>
@@ -721,22 +781,21 @@ export default function SessionPage() {
               >
                 Fold
               </Button>
-              <Button
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-                onClick={() => {
-                  const callAmount = getCallAmount(selectedPosition);
-                  if (callAmount > 0) {
-                    handleBettingAction(selectedPosition, 'call', currentBettingRound?.currentBet);
-                  }
-                  setShowPositionActions(false);
-                  setSelectedPosition(null);
-                }}
-              >
-                Call {(() => {
-                  const callAmount = getCallAmount(selectedPosition);
-                  return callAmount > 0 ? callAmount : '';
-                })()}
-              </Button>
+              {(() => {
+                const callAmount = getCallAmount(selectedPosition);
+                return callAmount > 0 ? (
+                  <Button
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    onClick={() => {
+                      handleBettingAction(selectedPosition, 'call', currentBettingRound?.currentBet);
+                      setShowPositionActions(false);
+                      setSelectedPosition(null);
+                    }}
+                  >
+                    Call {callAmount}
+                  </Button>
+                ) : null;
+              })()}
               <Button
                 className="bg-green-600 hover:bg-green-700 text-white"
                 onClick={() => {
@@ -790,23 +849,35 @@ export default function SessionPage() {
         )}
 
         {/* Action Buttons */}
-        {currentHand && !showCardSelector && !showCommunitySelector && (
+        {currentHand && !showCardSelector && !showCommunitySelector && !showPositionActions && (
           <div className="bg-white rounded-lg p-4 shadow-sm mb-4">
             {isBettingComplete ? (
               // Show advance button when betting round is complete
-              <div className="text-center">
-                <h3 className="text-md font-semibold mb-3">Betting Round Complete</h3>
-                <Button
-                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-2"
-                  onClick={handleAdvanceToNextRound}
-                >
-                  Proceed to {
-                    currentHand.currentBettingRound === 'preflop' ? 'Flop' :
-                    currentHand.currentBettingRound === 'flop' ? 'Turn' :
-                    currentHand.currentBettingRound === 'turn' ? 'River' : 'Showdown'
-                  }
-                </Button>
-              </div>
+              (() => {
+                const needsCommunityCards =
+                  (currentHand.currentBettingRound === 'preflop' && (!currentHand.communityCards.flop || currentHand.communityCards.flop.every(card => !card))) ||
+                  (currentHand.currentBettingRound === 'flop' && !currentHand.communityCards.turn) ||
+                  (currentHand.currentBettingRound === 'turn' && !currentHand.communityCards.river);
+
+
+                return (
+                  <div className="text-center">
+                    <h3 className="text-md font-semibold mb-3">
+                      {needsCommunityCards
+                        ? `Select community cards to continue`
+                        : 'Betting Round Complete'
+                      }
+                    </h3>
+                    <Button
+                      className="bg-green-600 hover:bg-green-700 text-white px-6 py-2"
+                      onClick={handleAdvanceToNextRound}
+                      disabled={needsCommunityCards}
+                    >
+                      Proceed
+                    </Button>
+                  </div>
+                );
+              })()
             ) : (
               // Show betting actions when hero can act
               (() => {
@@ -846,26 +917,24 @@ export default function SessionPage() {
                   >
                     Fold
                   </Button>
-                  <Button
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                    onClick={() => {
-                      const targetPosition = showPositionActions && selectedPosition ? selectedPosition : session.userSeat;
-                      if (targetPosition) {
-                        const callAmount = getCallAmount(targetPosition);
-                        if (callAmount > 0) {
-                          handleBettingAction(targetPosition, 'call', currentBettingRound?.currentBet);
-                        }
-                      }
-                      setShowPositionActions(false);
-                      setSelectedPosition(null);
-                    }}
-                  >
-                    Call {(() => {
-                      const targetPosition = showPositionActions && selectedPosition ? selectedPosition : session.userSeat;
-                      const callAmount = targetPosition ? getCallAmount(targetPosition) : 0;
-                      return callAmount > 0 ? callAmount : '';
-                    })()}
-                  </Button>
+                  {(() => {
+                    const targetPosition = showPositionActions && selectedPosition ? selectedPosition : session.userSeat;
+                    const callAmount = targetPosition ? getCallAmount(targetPosition) : 0;
+                    return callAmount > 0 ? (
+                      <Button
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                        onClick={() => {
+                          if (targetPosition) {
+                            handleBettingAction(targetPosition, 'call', currentBettingRound?.currentBet);
+                          }
+                          setShowPositionActions(false);
+                          setSelectedPosition(null);
+                        }}
+                      >
+                        Call {callAmount}
+                      </Button>
+                    ) : null;
+                  })()}
                   <Button
                     className="bg-green-600 hover:bg-green-700 text-white"
                     onClick={() => {
@@ -940,7 +1009,8 @@ export default function SessionPage() {
                     if (amountModalAction === 'all-in') {
                       setAmountModalValue(Math.min(value, stack));
                     } else {
-                      setAmountModalValue(Math.max(value, (currentBettingRound?.currentBet || 0) * 2));
+                      // Allow any value for raise input, validation will happen on submit
+                      setAmountModalValue(value);
                     }
                   }}
                   className="w-full px-3 py-2 border rounded-md"
@@ -972,10 +1042,19 @@ export default function SessionPage() {
                   className="flex-1 bg-green-600 hover:bg-green-700 text-white"
                   onClick={() => {
                     if (amountModalPosition) {
+                      const minRaise = (currentBettingRound?.currentBet || 0) * 2;
+                      const amount = Math.floor(amountModalValue);
+
+                      // Validate minimum raise amount
+                      if (amountModalAction === 'raise' && amount < minRaise) {
+                        alert(`Minimum raise is ${minRaise}`);
+                        return;
+                      }
+
                       handleBettingAction(
                         amountModalPosition,
                         amountModalAction,
-                        Math.floor(amountModalValue)
+                        amount
                       );
                       setShowAmountModal(false);
                       setAmountModalPosition(null);

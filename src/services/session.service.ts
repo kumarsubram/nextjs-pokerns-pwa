@@ -29,6 +29,7 @@ export class SessionService {
       tableSeats: config.tableSeats,
       buyIn: config.buyIn,
       userSeat: config.userSeat,
+      location: config.location,
       startTime: now.toISOString(),
       status: 'active',
       totalHands: 0,

@@ -121,12 +121,13 @@ export function SimplePokerTable({
                       onClick={() => onCommunityCardClick?.('flop', index)}
                       disabled={!isBettingComplete}
                       className={cn(
-                        "w-6 h-9 rounded border text-xs font-bold flex items-center justify-center",
+                        "w-8 h-12 rounded border text-sm font-bold flex items-center justify-center",
                         hasCard
                           ? `bg-white border-gray-800 ${getCardColor(hasCard)}`
                           : isBettingComplete
                           ? "bg-gray-200 border-gray-400 text-gray-600 hover:bg-gray-300 cursor-pointer"
                           : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-50",
+                        showFlopSelectionPrompt && !hasCard ? "animate-pulse bg-yellow-200 border-yellow-400" : "",
                         shouldBlink && "animate-pulse"
                       )}
                     >
@@ -139,7 +140,7 @@ export function SimplePokerTable({
                   onClick={() => onCommunityCardClick?.('flop', 3)}
                   disabled={!isBettingComplete}
                   className={cn(
-                    "w-6 h-9 rounded border text-xs font-bold flex items-center justify-center ml-1",
+                    "w-8 h-12 rounded border text-sm font-bold flex items-center justify-center ml-1",
                     communityCards?.turn
                       ? `bg-white border-gray-800 ${getCardColor(communityCards.turn)}`
                       : isBettingComplete
@@ -154,7 +155,7 @@ export function SimplePokerTable({
                   onClick={() => onCommunityCardClick?.('flop', 4)}
                   disabled={!isBettingComplete}
                   className={cn(
-                    "w-6 h-9 rounded border text-xs font-bold flex items-center justify-center",
+                    "w-8 h-12 rounded border text-sm font-bold flex items-center justify-center",
                     communityCards?.river
                       ? `bg-white border-gray-800 ${getCardColor(communityCards.river)}`
                       : isBettingComplete
@@ -231,8 +232,8 @@ export function SimplePokerTable({
           >
             <div className="flex flex-col items-center">
               <button
-                onClick={() => position !== 'DEALER' && onSeatClick?.(position)}
-                disabled={!onSeatClick || position === 'DEALER'}
+                onClick={() => position !== 'DEALER' && playerState?.status !== 'folded' && onSeatClick?.(position)}
+                disabled={!onSeatClick || position === 'DEALER' || playerState?.status === 'folded'}
                 className={cn(
                   "relative w-12 h-12 rounded-full border-2 transition-all duration-300",
                   "flex flex-col items-center justify-center text-center",
@@ -249,9 +250,9 @@ export function SimplePokerTable({
                   position !== 'DEALER' && !isUserSeat && !actionColor && !isNextToAct && isHighlighted && "bg-yellow-500 border-yellow-400 text-gray-900",
                   // Default active player styling - only if no action taken
                   position !== 'DEALER' && !isUserSeat && !actionColor && !isNextToAct && !isHighlighted && "bg-gray-700 border-gray-600 text-gray-300",
-                  // Hover effects
-                  position !== 'DEALER' && onSeatClick && !isUserSeat && "hover:bg-gray-600 hover:border-gray-500 cursor-pointer",
-                  position !== 'DEALER' && !onSeatClick && "cursor-default",
+                  // Hover effects - only for active players
+                  position !== 'DEALER' && onSeatClick && !isUserSeat && playerState?.status !== 'folded' && "hover:bg-gray-600 hover:border-gray-500 cursor-pointer",
+                  position !== 'DEALER' && (!onSeatClick || playerState?.status === 'folded') && "cursor-default",
                   // Blinking for seat selection
                   showBlinkingSeats && !isUserSeat && position !== 'DEALER' && "animate-pulse"
                 )}

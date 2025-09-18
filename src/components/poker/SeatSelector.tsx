@@ -23,39 +23,35 @@ export function SeatSelector({
   showKeepCurrentButton = false
 }: SeatSelectorProps) {
   return (
-    <div className="bg-white rounded-lg p-4 shadow-sm">
-      <h2 className="text-lg font-semibold mb-4 text-center">
-        {title}
-      </h2>
+    <div className="min-h-screen flex flex-col items-center px-4 pt-50">
+      <div className="w-full max-w-lg">
+        <h2 className="text-xl font-semibold mb-6 text-center">
+          {title}
+        </h2>
 
-      <div className="mb-4">
-        <SimplePokerTable
-          seats={tableSeats}
-          userSeat={currentSeat}
-          onSeatClick={onSeatSelect}
-          highlightedPositions={[]}
-          showBlinkingSeats={true}
-          className="mb-4"
-        />
-      </div>
-
-      <div className="text-center text-sm text-gray-600 mb-4">
-        {currentSeat
-          ? `✓ Selected: ${currentSeat} - Tap any seat to change`
-          : 'Click on any seat to select your position'
-        }
-      </div>
-
-      {showKeepCurrentButton && currentSeat && onKeepCurrentSeat && (
-        <div className="text-center">
-          <Button
-            variant="outline"
-            onClick={onKeepCurrentSeat}
-          >
-            Keep Current Seat ({currentSeat})
-          </Button>
+        <div className="mb-8 flex justify-center">
+          <SimplePokerTable
+            seats={tableSeats}
+            userSeat={currentSeat}
+            onSeatClick={onSeatSelect}
+            highlightedPositions={[]}
+            showBlinkingSeats={true}
+            className=""
+          />
         </div>
-      )}
+
+
+        {showKeepCurrentButton && currentSeat && onKeepCurrentSeat && (
+          <div className="text-center">
+            <Button
+              variant="outline"
+              onClick={onKeepCurrentSeat}
+            >
+              Keep Current Seat ({currentSeat})
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

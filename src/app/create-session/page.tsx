@@ -12,9 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { SeatSelector } from '@/components/poker/SeatSelector';
 import { SessionService } from '@/services/session.service';
-import { GameType, TableSeats, Position } from '@/types/poker-v2';
+import { GameType, TableSeats } from '@/types/poker-v2';
 
 export default function CreateSessionPage() {
   const router = useRouter();
@@ -24,7 +23,7 @@ export default function CreateSessionPage() {
   const [gameType, setGameType] = useState<GameType>('Tournament');
   const [tableSeats, setTableSeats] = useState<TableSeats>(9);
   const [buyIn, setBuyIn] = useState<number>(100);
-  const [userSeat, setUserSeat] = useState<Position | null>(null);
+  const [location, setLocation] = useState<string>('');
 
   // Generate default session name on mount
   useEffect(() => {
@@ -42,14 +41,14 @@ export default function CreateSessionPage() {
   }, []);
 
   const handleCreateSession = () => {
-    if (!userSeat || !sessionName || buyIn <= 0) return;
+    if (!sessionName || buyIn <= 0) return;
 
     const session = SessionService.createNewSession({
       sessionName,
       gameType,
       tableSeats,
       buyIn,
-      userSeat
+      location
     });
 
     // Navigate to the game screen
@@ -57,26 +56,17 @@ export default function CreateSessionPage() {
   };
 
   const isValid = () => {
-    return sessionName && buyIn > 0 && userSeat !== null;
+    return sessionName && buyIn > 0;
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
 
-      <div className="p-4 max-w-lg mx-auto space-y-6">
-        {/* Table Selection */}
-        <SeatSelector
-          tableSeats={tableSeats}
-          currentSeat={userSeat || undefined}
-          onSeatSelect={(position) => setUserSeat(position)}
-          title={!userSeat ? 'Select your Seat - Tap any position' : `✓ Selected: ${userSeat}`}
-          showKeepCurrentButton={false}
-        />
-
+      <div className="p-4 max-w-lg mx-auto space-y-2 md:space-y-6">
         {/* Session Configuration */}
-        <div className="bg-white rounded-lg p-4 shadow-sm">
+        <div className="bg-white rounded-lg p-3 md:p-4 shadow-sm">
 
-          <div className="space-y-4">
+          <div className="space-y-3 md:space-y-4">
             {/* Session Name */}
             <div>
               <Label htmlFor="session-name" className="text-xs">Session Name</Label>
@@ -91,7 +81,7 @@ export default function CreateSessionPage() {
             </div>
 
             {/* Game Type & Table Size */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2 md:gap-3">
               <div>
                 <Label htmlFor="game-type" className="text-xs">Game Type</Label>
                 <Select
@@ -140,13 +130,26 @@ export default function CreateSessionPage() {
                 className="mt-1 h-9 text-sm"
               />
             </div>
+
+            {/* Location */}
+            <div>
+              <Label htmlFor="location" className="text-xs">Location (Optional)</Label>
+              <Input
+                id="location"
+                type="text"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder="Home, Casino, Online..."
+                className="mt-1 h-9 text-sm"
+              />
+            </div>
           </div>
         </div>
 
 
         {/* Start Session Button */}
         <Button
-          className="w-full"
+          className="w-full h-12 md:h-10"
           size="lg"
           onClick={handleCreateSession}
           disabled={!isValid()}

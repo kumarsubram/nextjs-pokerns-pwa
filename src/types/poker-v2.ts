@@ -39,7 +39,8 @@ export interface SessionMetadata {
   gameType: GameType;
   tableSeats: TableSeats;
   buyIn: number;
-  userSeat: Position;
+  userSeat?: Position;
+  location?: string;
   startTime: string;
   endTime?: string;
   status: SessionStatus;
@@ -54,7 +55,8 @@ export interface SessionConfig {
   gameType: GameType;
   tableSeats: TableSeats;
   buyIn: number;
-  userSeat: Position;
+  userSeat?: Position;
+  location?: string;
 }
 
 export interface BettingAction {

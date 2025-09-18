@@ -269,6 +269,11 @@ if (position === session.userSeat && amount) {
 3. **Seat Selection**: Between every hand after the first
 4. **Stack Management**: Accurate blind deductions and win/loss tracking
 5. **UI Polish**: Pot display, mobile positioning, subtle animations
+6. **Blind Logic Fix**: Proper call amount calculations considering already posted blinds
+   - SB/BB blind amounts are properly deducted from call calculations
+   - BB shows "Check" instead of "Call" when no raises occur
+   - Call amounts account for already posted bets (e.g., SB needs only 10 more to call 20 BB)
+   - Added `getCallAmount()` and `canCheck()` helper functions for accurate betting logic
 
 ### Architecture & File Structure
 

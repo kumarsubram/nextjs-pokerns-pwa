@@ -63,7 +63,7 @@ export default function Home() {
                   <Plus className="h-8 w-8 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg">Start Session</h3>
+                  <h3 className="font-bold text-lg">Create Session</h3>
                 </div>
               </div>
             </div>

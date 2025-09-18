@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { SimplePokerTable } from '@/components/poker/SimplePokerTable';
+import { SeatSelector } from '@/components/poker/SeatSelector';
 import { SessionService } from '@/services/session.service';
 import { GameType, TableSeats, Position } from '@/types/poker-v2';
 
@@ -65,18 +65,13 @@ export default function CreateSessionPage() {
 
       <div className="p-4 max-w-lg mx-auto space-y-6">
         {/* Table Selection */}
-        <div className="bg-white rounded-lg p-4 shadow-sm">
-          <h2 className="text-sm font-semibold mb-8 text-center">
-            {!userSeat ? 'Select your Seat - Tap any position' : `✓ Selected: ${userSeat}`}
-          </h2>
-
-          <SimplePokerTable
-            seats={tableSeats}
-            userSeat={userSeat || undefined}
-            onSeatClick={(position) => setUserSeat(position)}
-            showBlinkingSeats={!userSeat}
-          />
-        </div>
+        <SeatSelector
+          tableSeats={tableSeats}
+          currentSeat={userSeat || undefined}
+          onSeatSelect={(position) => setUserSeat(position)}
+          title={!userSeat ? 'Select your Seat - Tap any position' : `✓ Selected: ${userSeat}`}
+          showKeepCurrentButton={false}
+        />
 
         {/* Session Configuration */}
         <div className="bg-white rounded-lg p-4 shadow-sm">

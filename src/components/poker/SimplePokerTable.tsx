@@ -32,6 +32,7 @@ interface SimplePokerTableProps {
   };
   isBettingComplete?: boolean;
   showFlopSelectionPrompt?: boolean;
+  potSize?: number;
 }
 
 export function SimplePokerTable({
@@ -51,7 +52,8 @@ export function SimplePokerTable({
   nextToAct,
   currentBettingRound,
   isBettingComplete = false,
-  showFlopSelectionPrompt = false
+  showFlopSelectionPrompt = false,
+  potSize = 0
 }: SimplePokerTableProps) {
   const positions = seats === 6 ? POSITION_LABELS_6 : POSITION_LABELS_9;
 
@@ -60,24 +62,6 @@ export function SimplePokerTable({
     if (!currentBettingRound || position === 'DEALER') return null;
     const actions = currentBettingRound.actions.filter(a => a.position === position);
     return actions.length > 0 ? actions[actions.length - 1] : null;
-  };
-
-  // Helper function to format action display
-  const formatActionDisplay = (action: { action: string; amount?: number }) => {
-    switch (action.action) {
-      case 'fold':
-        return ''; // Don't show text for fold, just the red visual indicator
-      case 'check':
-        return 'CHECK';
-      case 'call':
-        return 'CALL';
-      case 'raise':
-        return `RAISE ${action.amount || ''}`;
-      case 'all-in':
-        return 'ALL-IN';
-      default:
-        return action.action.toUpperCase();
-    }
   };
 
   // Helper function to get card color
@@ -191,6 +175,14 @@ export function SimplePokerTable({
               </span>
             )}
           </div>
+          {/* Pot Size Display - positioned directly below community cards */}
+          {potSize > 0 && (
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 translate-y-6">
+              <div className="bg-black/50 text-white px-2 py-0.5 rounded text-xs font-bold">
+                POT SIZE: {Math.floor(potSize)}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -202,9 +194,34 @@ export function SimplePokerTable({
 
         // Get player state for this position (DEALER never has player state)
         const playerState = position !== 'DEALER' ? playerStates.find(p => p.position === position) : null;
-        const isFolded = playerState?.status === 'folded';
         const isNextToAct = position !== 'DEALER' && position === nextToAct;
         const lastAction = getLastAction(position);
+
+        // Determine button color based on last action or player state
+        let actionColor = '';
+        // First check if player is folded from playerState
+        if (playerState?.status === 'folded') {
+          actionColor = 'bg-red-800 border-red-600 text-red-300 opacity-60';
+        } else if (lastAction && position !== 'DEALER') {
+          // Then check last action for other states
+          switch(lastAction.action) {
+            case 'fold':
+              actionColor = 'bg-red-800 border-red-600 text-red-300 opacity-60';
+              break;
+            case 'call':
+              actionColor = 'bg-blue-700 border-blue-500 text-blue-100';
+              break;
+            case 'check':
+              actionColor = 'bg-gray-600 border-gray-500 text-gray-200';
+              break;
+            case 'raise':
+              actionColor = 'bg-green-700 border-green-500 text-green-100';
+              break;
+            case 'all-in':
+              actionColor = 'bg-purple-700 border-purple-500 text-purple-100';
+              break;
+          }
+        }
 
         return (
           <div
@@ -222,16 +239,16 @@ export function SimplePokerTable({
                   "transform hover:scale-110 shadow-md",
                   // DEALER styling (never changes)
                   position === 'DEALER' && "bg-gray-900 border-gray-700 text-white cursor-default",
-                  // Folded player styling
-                  position !== 'DEALER' && isFolded && "bg-red-800 border-red-600 text-red-300 opacity-60",
-                  // Next to act styling (green with pulse)
-                  position !== 'DEALER' && isNextToAct && !isFolded && "bg-green-600 border-green-400 text-white shadow-lg ring-2 ring-green-300 animate-pulse",
-                  // User seat styling (when not folded or next to act)
-                  position !== 'DEALER' && isUserSeat && !isFolded && !isNextToAct && "bg-blue-600 border-blue-400 text-white shadow-lg ring-2 ring-blue-300",
-                  // Other highlighted positions
-                  position !== 'DEALER' && !isUserSeat && !isFolded && !isNextToAct && isHighlighted && "bg-yellow-500 border-yellow-400 text-gray-900",
-                  // Default active player styling
-                  position !== 'DEALER' && !isUserSeat && !isFolded && !isNextToAct && !isHighlighted && "bg-gray-700 border-gray-600 text-gray-300",
+                  // Action-based styling takes priority
+                  position !== 'DEALER' && actionColor && actionColor,
+                  // Next to act styling (subtle blinking animation) - only if no action taken
+                  position !== 'DEALER' && isNextToAct && !actionColor && "bg-green-600 border-green-400 text-white shadow-lg ring-2 ring-green-300 animate-[pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite]",
+                  // User seat styling - only if no action taken
+                  position !== 'DEALER' && isUserSeat && !actionColor && !isNextToAct && "bg-blue-600 border-blue-400 text-white shadow-lg ring-2 ring-blue-300",
+                  // Other highlighted positions - only if no action taken
+                  position !== 'DEALER' && !isUserSeat && !actionColor && !isNextToAct && isHighlighted && "bg-yellow-500 border-yellow-400 text-gray-900",
+                  // Default active player styling - only if no action taken
+                  position !== 'DEALER' && !isUserSeat && !actionColor && !isNextToAct && !isHighlighted && "bg-gray-700 border-gray-600 text-gray-300",
                   // Hover effects
                   position !== 'DEALER' && onSeatClick && !isUserSeat && "hover:bg-gray-600 hover:border-gray-500 cursor-pointer",
                   position !== 'DEALER' && !onSeatClick && "cursor-default",
@@ -249,33 +266,32 @@ export function SimplePokerTable({
                   <span className="text-[8px] leading-none">YOU</span>
                 )}
               </button>
-
-              {/* Action indicator */}
-              {lastAction && position !== 'DEALER' && formatActionDisplay(lastAction) && (
-                <div className={cn(
-                  "mt-1 px-1 py-0.5 rounded text-[8px] font-bold text-center min-w-[36px]",
-                  lastAction.action === 'check' && "bg-gray-600 text-white",
-                  lastAction.action === 'call' && "bg-blue-600 text-white",
-                  lastAction.action === 'raise' && "bg-green-600 text-white",
-                  lastAction.action === 'all-in' && "bg-purple-600 text-white"
-                )}>
-                  {formatActionDisplay(lastAction)}
-                </div>
-              )}
             </div>
           </div>
         );
       })}
 
-      {/* User Cards - Show above user seat */}
+      {/* User Cards - Position adjusted based on seat */}
       {showCardButtons && userSeat && userSeat !== 'DEALER' && (
         (() => {
           const userIndex = positions.findIndex(pos => pos === userSeat);
           if (userIndex === -1) return null;
           const { x, y } = getSeatPosition(userIndex);
+
+          // Adjust card position based on user seat for mobile visibility
+          let cardOffsetX = '-translate-x-1/2';
+          if (userSeat === 'SB' || userSeat === 'BB') {
+            // Move cards left for right-side seats on mobile
+            cardOffsetX = '-translate-x-[70%]';
+          } else if ((seats === 9 && (userSeat === 'HJ' || userSeat === 'LJ')) ||
+                     (seats === 6 && userSeat === 'CO')) {
+            // Move cards right for left-side seats on mobile
+            cardOffsetX = '-translate-x-[30%]';
+          }
+
           return (
             <div
-              className="absolute -translate-x-1/2"
+              className={cn("absolute", cardOffsetX)}
               style={{ left: x, top: `${parseInt(y as string) - 15}%` }}
             >
               <div className="flex gap-1">

@@ -201,6 +201,10 @@ export class SessionService {
     return !!localStorage.getItem(STORAGE_KEYS.ACTIVE_SESSION);
   }
 
+  static updateSessionMetadata(metadata: SessionMetadata): void {
+    this.saveSessionMetadata(metadata);
+  }
+
   // Private helpers
   private static generateSessionName(sessionNumber: number): string {
     const now = new Date();

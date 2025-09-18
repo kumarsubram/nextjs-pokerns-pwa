@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { SimplePokerTable } from '@/components/poker/SimplePokerTable';
 import { CardSelector } from '@/components/poker/CardSelector';
 import { SeatSelector } from '@/components/poker/SeatSelector';
-import { ActionLog } from '@/components/poker/ActionLog';
+import { HandHistory } from '@/components/poker/HandHistory';
 import { SessionService } from '@/services/session.service';
 import { SessionMetadata, CurrentHand, Position, BettingAction, StoredHand } from '@/types/poker-v2';
 import {
@@ -54,9 +54,10 @@ export default function SessionPage() {
   // Seat selection for new hands
   const [showSeatSelection, setShowSeatSelection] = useState(false);
   const [handCount, setHandCount] = useState(0);
+  const [completedHands, setCompletedHands] = useState<StoredHand[]>([]);
 
   useEffect(() => {
-    // Load session
+    // Load session and restore current hand if exists
     const loadSession = () => {
       const metadata = SessionService.getCurrentSession();
       if (!metadata || metadata.sessionId !== sessionId) {
@@ -69,16 +70,101 @@ export default function SessionPage() {
           if (found.status === 'active') {
             SessionService.setActiveSession(found.sessionId);
           }
+          // Load completed hands
+          const hands = SessionService.getSessionHands(found.sessionId);
+          setCompletedHands(hands);
+
+          // Restore current hand state if it exists
+          const savedHand = SessionService.getCurrentHand(found.sessionId);
+          if (savedHand) {
+            setCurrentHand(savedHand);
+            // Restore related state from the saved hand
+            if (savedHand.userCards) {
+              setSelectedCard1(savedHand.userCards[0]);
+              setSelectedCard2(savedHand.userCards[1]);
+            }
+            // Restore stack from session metadata
+            if (found.currentStack) {
+              setStack(found.currentStack);
+            }
+            // Restore blinds from saved hand
+            setSmallBlind(savedHand.smallBlind);
+            setBigBlind(savedHand.bigBlind);
+            setHandCount(savedHand.handNumber);
+
+            // Calculate hero money invested from betting rounds
+            let invested = 0;
+            Object.values(savedHand.bettingRounds).forEach(round => {
+              if (round?.actions) {
+                round.actions.forEach(action => {
+                  if (action.position === found.userSeat && action.amount) {
+                    invested += action.amount;
+                  }
+                });
+              }
+            });
+            setHeroMoneyInvested(invested);
+          }
         } else {
           router.push('/');
         }
       } else {
         setSession(metadata);
+        // Load completed hands
+        const hands = SessionService.getSessionHands(metadata.sessionId);
+        setCompletedHands(hands);
+
+        // Restore current hand state if it exists
+        const savedHand = SessionService.getCurrentHand(metadata.sessionId);
+        if (savedHand) {
+          setCurrentHand(savedHand);
+          // Restore related state from the saved hand
+          if (savedHand.userCards) {
+            setSelectedCard1(savedHand.userCards[0]);
+            setSelectedCard2(savedHand.userCards[1]);
+          }
+          // Restore stack from session metadata
+          if (metadata.currentStack) {
+            setStack(metadata.currentStack);
+          }
+          // Restore blinds from saved hand
+          setSmallBlind(savedHand.smallBlind);
+          setBigBlind(savedHand.bigBlind);
+          setHandCount(savedHand.handNumber);
+
+          // Calculate hero money invested from betting rounds
+          let invested = 0;
+          Object.values(savedHand.bettingRounds).forEach(round => {
+            if (round?.actions) {
+              round.actions.forEach(action => {
+                if (action.position === metadata.userSeat && action.amount) {
+                  invested += action.amount;
+                }
+              });
+            }
+          });
+          setHeroMoneyInvested(invested);
+        }
       }
     };
 
     loadSession();
   }, [sessionId, router]);
+
+  // Save current hand state whenever it changes
+  useEffect(() => {
+    if (session && currentHand) {
+      SessionService.saveCurrentHand(session.sessionId, currentHand);
+    }
+  }, [currentHand, session]);
+
+  // Save stack changes to session metadata
+  useEffect(() => {
+    if (session) {
+      const updatedSession = { ...session, currentStack: stack };
+      SessionService.updateSessionMetadata(updatedSession);
+    }
+  }, [stack, session]);
 
   // Function to start new hand with explicit session data
   const startNewHandWithPosition = useCallback((sessionData: SessionMetadata, userSeat: Position) => {
@@ -155,12 +241,18 @@ export default function SessionPage() {
   // Auto-start Hand 1 when session loads
   useEffect(() => {
     if (session && !currentHand) {
-      // Initialize stack from session
-      setStack(session.currentStack || session.buyIn || 1000);
+      // Check if we have a saved current hand (already handled in load session)
+      const savedHand = SessionService.getCurrentHand(session.sessionId);
+      if (!savedHand) {
+        // Only show seat selection if there's no current hand saved
+        // Initialize stack from session
+        setStack(session.currentStack || session.buyIn || 1000);
 
-      // Always show seat selection for Hand #1
-      setShowSeatSelection(true);
-      setHandCount(0); // Hand #1
+        // Show seat selection for Hand #1
+        setShowSeatSelection(true);
+        const handNumber = SessionService.getCurrentHandNumber();
+        setHandCount(handNumber - 1); // Set to current hand number - 1 since it will be incremented
+      }
     }
   }, [session, currentHand]);
 
@@ -361,6 +453,9 @@ export default function SessionPage() {
 
     SessionService.saveHandToSession(handData);
 
+    // Clear current hand from storage since it's completed
+    SessionService.clearCurrentHand(session.sessionId);
+
     // Update stack
     if (outcome === 'won') {
       setStack(prev => prev + (potWon || 0));
@@ -370,6 +465,10 @@ export default function SessionPage() {
     // Reset and prepare for next hand
     const newHandCount = handCount + 1;
     setHandCount(newHandCount);
+
+    // Load completed hands for history
+    const hands = SessionService.getSessionHands(session.sessionId);
+    setCompletedHands(hands);
 
     // Always show seat selection for every hand
     setCurrentHand(null);
@@ -654,7 +753,7 @@ export default function SessionPage() {
               // Keep current seat and start new hand
               startNewHand();
             }}
-            title={handCount === 0 ? `Hand #1 - Select your Seat to Begin` : `Hand #${handCount + 1} - Select your Seat to Begin`}
+            title={`Hand #${SessionService.getCurrentHandNumber()} - Select your Seat`}
             showKeepCurrentButton={handCount > 0 && session.userSeat !== undefined}
           />
         )}
@@ -673,7 +772,7 @@ export default function SessionPage() {
                   type="number"
                   value={stack}
                   onChange={(e) => setStack(parseInt(e.target.value) || 0)}
-                  className="w-full px-2 py-1 text-sm border rounded text-center"
+                  className="w-full px-2 py-1 text-base border rounded text-center"
                 />
               </div>
               <div>
@@ -682,7 +781,7 @@ export default function SessionPage() {
                   type="number"
                   value={smallBlind}
                   onChange={(e) => setSmallBlind(parseInt(e.target.value) || 0)}
-                  className="w-full px-2 py-1 text-sm border rounded text-center"
+                  className="w-full px-2 py-1 text-base border rounded text-center"
                 />
               </div>
               <div>
@@ -691,7 +790,7 @@ export default function SessionPage() {
                   type="number"
                   value={bigBlind}
                   onChange={(e) => setBigBlind(parseInt(e.target.value) || 0)}
-                  className="w-full px-2 py-1 text-sm border rounded text-center"
+                  className="w-full px-2 py-1 text-base border rounded text-center"
                 />
               </div>
               <div>
@@ -700,7 +799,7 @@ export default function SessionPage() {
                   type="number"
                   value={ante}
                   onChange={(e) => setAnte(parseInt(e.target.value) || 0)}
-                  className="w-full px-2 py-1 text-sm border rounded text-center"
+                  className="w-full px-2 py-1 text-base border rounded text-center"
                 />
               </div>
             </div>
@@ -1014,7 +1113,7 @@ export default function SessionPage() {
                       setAmountModalValue(value);
                     }
                   }}
-                  className="w-full px-3 py-2 border rounded-md"
+                  className="w-full px-3 py-2 text-base border rounded-md"
                   min={(currentBettingRound?.currentBet || 0) * 2}
                   max={amountModalAction === 'all-in' ? stack : undefined}
                   step="1"
@@ -1138,10 +1237,11 @@ export default function SessionPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Action Log */}
-        {currentHand && !showSeatSelection && (
-          <ActionLog
+        {/* Hand History */}
+        {!showSeatSelection && (
+          <HandHistory
             currentHand={currentHand}
+            completedHands={completedHands}
             userSeat={session.userSeat}
             className="mt-4"
           />

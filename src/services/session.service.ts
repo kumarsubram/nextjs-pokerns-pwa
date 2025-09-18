@@ -2,14 +2,16 @@ import { format } from 'date-fns';
 import {
   SessionMetadata,
   SessionConfig,
-  StoredHand
+  StoredHand,
+  CurrentHand
 } from '@/types/poker-v2';
 
 const STORAGE_KEYS = {
   LAST_SESSION_NUMBER: 'lastSessionNumber',
   ACTIVE_SESSION: 'activeSession',
   SESSION_META_PREFIX: 'session_',
-  SESSION_HANDS_PREFIX: 'session_'
+  SESSION_HANDS_PREFIX: 'session_',
+  CURRENT_HAND_PREFIX: 'current_hand_'
 };
 
 export class SessionService {
@@ -81,12 +83,14 @@ export class SessionService {
     }
 
     this.saveSessionMetadata(session);
+    this.clearCurrentHand(session.sessionId); // Clear any saved current hand
     this.clearActiveSession();
   }
 
   static deleteSession(sessionId: string): void {
     localStorage.removeItem(`${STORAGE_KEYS.SESSION_META_PREFIX}${sessionId}_meta`);
     localStorage.removeItem(`${STORAGE_KEYS.SESSION_HANDS_PREFIX}${sessionId}_hands`);
+    this.clearCurrentHand(sessionId); // Clear any saved current hand
 
     // Clear active session if it's the one being deleted
     const activeSession = localStorage.getItem(STORAGE_KEYS.ACTIVE_SESSION);
@@ -204,6 +208,27 @@ export class SessionService {
 
   static updateSessionMetadata(metadata: SessionMetadata): void {
     this.saveSessionMetadata(metadata);
+  }
+
+  // Current hand management
+  static saveCurrentHand(sessionId: string, currentHand: CurrentHand | null): void {
+    if (currentHand) {
+      localStorage.setItem(
+        `${STORAGE_KEYS.CURRENT_HAND_PREFIX}${sessionId}`,
+        JSON.stringify(currentHand)
+      );
+    } else {
+      localStorage.removeItem(`${STORAGE_KEYS.CURRENT_HAND_PREFIX}${sessionId}`);
+    }
+  }
+
+  static getCurrentHand(sessionId: string): CurrentHand | null {
+    const handJson = localStorage.getItem(`${STORAGE_KEYS.CURRENT_HAND_PREFIX}${sessionId}`);
+    return handJson ? JSON.parse(handJson) : null;
+  }
+
+  static clearCurrentHand(sessionId: string): void {
+    localStorage.removeItem(`${STORAGE_KEYS.CURRENT_HAND_PREFIX}${sessionId}`);
   }
 
   // Private helpers

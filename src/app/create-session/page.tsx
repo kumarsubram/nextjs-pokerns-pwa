@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SessionService } from '@/services/session.service';
 import { GameType, TableSeats } from '@/types/poker-v2';
 
@@ -24,6 +25,10 @@ export default function CreateSessionPage() {
   const [tableSeats, setTableSeats] = useState<TableSeats>(9);
   const [buyIn, setBuyIn] = useState<number>(100);
   const [location, setLocation] = useState<string>('');
+
+  // Confirmation dialog state
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [activeSessionName, setActiveSessionName] = useState<string>('');
 
   // Generate default session name on mount
   useEffect(() => {
@@ -42,6 +47,26 @@ export default function CreateSessionPage() {
 
   const handleCreateSession = () => {
     if (!sessionName || buyIn <= 0) return;
+
+    // Check if there's an active session
+    const activeSession = SessionService.getCurrentSession();
+    if (activeSession && activeSession.status === 'active') {
+      // Show confirmation dialog
+      setActiveSessionName(activeSession.sessionName);
+      setShowConfirmDialog(true);
+      return;
+    }
+
+    // Create new session directly if no active session
+    createNewSession();
+  };
+
+  const createNewSession = () => {
+    // End current session if exists
+    const activeSession = SessionService.getCurrentSession();
+    if (activeSession && activeSession.status === 'active') {
+      SessionService.endCurrentSession();
+    }
 
     const session = SessionService.createNewSession({
       sessionName,
@@ -157,6 +182,36 @@ export default function CreateSessionPage() {
           Start Session
         </Button>
       </div>
+
+      {/* Confirmation Dialog */}
+      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <DialogContent className="sm:max-w-[425px] max-w-[350px]">
+          <DialogHeader>
+            <DialogTitle>End Current Session?</DialogTitle>
+            <DialogDescription>
+              You have an active session &quot;{activeSessionName}&quot; running. Creating a new session will automatically end the current one and save its state.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-3 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowConfirmDialog(false)}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                setShowConfirmDialog(false);
+                createNewSession();
+              }}
+              className="flex-1"
+            >
+              End & Create New
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

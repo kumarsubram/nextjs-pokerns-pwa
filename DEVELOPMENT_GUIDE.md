@@ -348,3 +348,70 @@ npm run push         # Runs update-pwa, then git add/commit/push
 4. **Enhanced PWA**: Push notifications, better offline support
 
 This implementation provides a complete, production-ready poker session tracking PWA with a focus on simplicity, accuracy, and mobile usability.
+
+## Mobile Development Standards
+
+### Input Field Requirements
+To prevent unwanted zoom behavior on mobile devices, all input fields MUST follow these standards:
+
+#### 1. Viewport Configuration
+The app metadata must include proper viewport settings:
+```typescript
+viewport: {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+}
+```
+
+#### 2. Font Size Requirements
+- **All input fields** must use a minimum font size of 16px (`text-base` in Tailwind)
+- Never use `text-sm` or smaller sizes for inputs on mobile
+- This applies to:
+  - Text inputs
+  - Number inputs
+  - Select dropdowns
+  - Textareas
+  - All custom input components
+
+#### 3. Global CSS Rules
+The following CSS rules are enforced in `globals.css`:
+```css
+/* Prevent zoom on mobile for all input fields */
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="tel"],
+input[type="password"],
+input[type="search"],
+select,
+textarea {
+  font-size: 16px !important;
+}
+
+/* iOS-specific fixes */
+@media screen and (max-width: 768px) {
+  input[type="text"],
+  input[type="number"],
+  /* ... other input types ... */
+  select,
+  textarea {
+    font-size: 16px !important;
+    -webkit-text-size-adjust: 100%;
+  }
+}
+```
+
+#### 4. Component Standards
+- The base `Input` component uses `text-base` consistently
+- All native HTML inputs must include `text-base` class or inline `font-size: 16px`
+- Modal inputs and inline forms follow the same 16px minimum
+
+### Why This Matters
+Mobile browsers (especially iOS Safari) automatically zoom in when users tap on input fields with font sizes smaller than 16px. This creates a poor user experience where:
+- The viewport zooms in unexpectedly
+- The user must manually zoom out after input
+- The layout may remain zoomed and distorted
+
+By enforcing these standards, we ensure a smooth, native-like mobile experience without unwanted zoom behaviors.

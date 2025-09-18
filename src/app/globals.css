@@ -119,6 +119,33 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Prevent zoom on mobile for all input fields */
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="password"],
+  input[type="search"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* Additional iOS-specific fixes */
+  @media screen and (max-width: 768px) {
+    input[type="text"],
+    input[type="number"],
+    input[type="email"],
+    input[type="tel"],
+    input[type="password"],
+    input[type="search"],
+    select,
+    textarea {
+      font-size: 16px !important;
+      -webkit-text-size-adjust: 100%;
+    }
+  }
 }
 
 /* Card slide-in animation */

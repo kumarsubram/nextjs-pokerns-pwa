@@ -53,17 +53,20 @@ export default function Home() {
           }`}>
             {/* Start New Session */}
             <div
-              className={`bg-gradient-to-r from-emerald-500 to-green-600 rounded-xl p-4 cursor-pointer hover:from-emerald-600 hover:to-green-700 transition-all transform hover:scale-105 shadow-lg ${
-                !activeSession ? 'inline-flex' : ''
+              className={`bg-gradient-to-r from-emerald-500 to-green-600 rounded-lg p-3 cursor-pointer hover:from-emerald-600 hover:to-green-700 transition-all transform hover:scale-105 shadow-lg ${
+                !activeSession ? 'min-w-[200px]' : 'w-full'
               }`}
               onClick={() => router.push('/create-session')}
             >
               <div className="flex items-center text-white">
-                <div className="bg-white/20 rounded-lg p-2 mr-3">
-                  <Plus className="h-8 w-8 text-white" />
+                <div className="bg-white/20 rounded-md p-1.5 mr-2.5 flex-shrink-0">
+                  <Plus className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg">Create Session</h3>
+                  <h3 className="font-semibold text-base">Create Session</h3>
+                  {activeSession && (
+                    <p className="text-xs opacity-90">Start new game</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -71,17 +74,17 @@ export default function Home() {
             {/* Continue Active Session */}
             {activeSession && (
               <div
-                className="bg-gradient-to-r from-orange-500 to-red-600 rounded-xl p-4 cursor-pointer hover:from-orange-600 hover:to-red-700 transition-all transform hover:scale-105 shadow-lg relative"
+                className="bg-gradient-to-r from-orange-500 to-red-600 rounded-lg p-3 cursor-pointer hover:from-orange-600 hover:to-red-700 transition-all transform hover:scale-105 shadow-lg relative w-full"
                 onClick={() => router.push(`/session/${activeSession.sessionId}`)}
               >
                 <div className="flex items-center text-white">
-                  <div className="bg-white/20 rounded-lg p-2 mr-3 relative">
-                    <Play className="h-8 w-8 text-white" />
-                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                  <div className="bg-white/20 rounded-md p-1.5 mr-2.5 relative flex-shrink-0">
+                    <Play className="h-5 w-5 text-white" />
+                    <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-400 rounded-full animate-pulse"></div>
                   </div>
                   <div>
-                    <h3 className="font-bold text-lg">Continue Session</h3>
-                    <p className="text-sm opacity-90">
+                    <h3 className="font-semibold text-base">Continue Session</h3>
+                    <p className="text-xs opacity-90">
                       {activeSession.sessionName}
                     </p>
                   </div>

@@ -5,16 +5,41 @@ import {
   StoredHand,
   CurrentHand
 } from '@/types/poker-v2';
+import { SharedHandService } from './shared-hand.service';
 
 const STORAGE_KEYS = {
   LAST_SESSION_NUMBER: 'lastSessionNumber',
   ACTIVE_SESSION: 'activeSession',
   SESSION_META_PREFIX: 'session_',
   SESSION_HANDS_PREFIX: 'session_',
-  CURRENT_HAND_PREFIX: 'current_hand_'
+  CURRENT_HAND_PREFIX: 'current_hand_',
+  DATA_VERSION: 'dataVersion'
 };
 
+// Current data version - increment to force migration/cleanup
+const CURRENT_DATA_VERSION = 2;
+
 export class SessionService {
+  // Data migration and cleanup
+  static checkAndMigrateData(): void {
+    if (typeof window === 'undefined') return;
+
+    const storedVersion = localStorage.getItem(STORAGE_KEYS.DATA_VERSION);
+    const currentVersion = CURRENT_DATA_VERSION.toString();
+
+    if (storedVersion !== currentVersion) {
+      console.log('Data version mismatch - clearing all data for compatibility');
+
+      // Clear all existing data
+      this.deleteAllSessions();
+
+      // Set new version
+      localStorage.setItem(STORAGE_KEYS.DATA_VERSION, currentVersion);
+
+      console.log(`Data migrated to version ${currentVersion}`);
+    }
+  }
+
   // Session lifecycle
   static createNewSession(config: SessionConfig): SessionMetadata {
     const sessionNumber = this.getNextSessionNumber();
@@ -97,6 +122,9 @@ export class SessionService {
     if (activeSession === sessionId) {
       this.clearActiveSession();
     }
+
+    // Delete any shared hands from this session
+    SharedHandService.deleteHandsBySession(sessionId);
   }
 
   // Hand management
@@ -140,6 +168,9 @@ export class SessionService {
 
   // Session queries
   static getSessionList(): SessionMetadata[] {
+    // Check for data migration on app usage
+    this.checkAndMigrateData();
+
     const sessions: SessionMetadata[] = [];
     const keys = Object.keys(localStorage);
 
@@ -272,5 +303,8 @@ export class SessionService {
 
     // Reset session counter
     localStorage.removeItem(STORAGE_KEYS.LAST_SESSION_NUMBER);
+
+    // Delete all shared hands since all sessions are being deleted
+    SharedHandService.deleteAllSharedHands();
   }
 }

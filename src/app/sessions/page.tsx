@@ -24,6 +24,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 
 export default function SessionsPage() {
   const router = useRouter();
@@ -31,6 +39,12 @@ export default function SessionsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
+  const [deleteAllConfirmOpen, setDeleteAllConfirmOpen] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState<SessionMetadata | null>(null);
 
   useEffect(() => {
     const loadSessions = () => {
@@ -62,34 +76,41 @@ export default function SessionsPage() {
   });
 
   const handleDeleteSession = (session: SessionMetadata) => {
-    const confirmed = confirm(`Are you sure you want to delete "${session.sessionName}"?`);
-    if (confirmed) {
+    setSessionToDelete(session);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteSession = () => {
+    if (sessionToDelete) {
       try {
-        SessionService.deleteSession(session.sessionId);
-        setSessions(prev => prev.filter(s => s.sessionId !== session.sessionId));
+        SessionService.deleteSession(sessionToDelete.sessionId);
+        setSessions(prev => prev.filter(s => s.sessionId !== sessionToDelete.sessionId));
+        setDeleteDialogOpen(false);
+        setSessionToDelete(null);
       } catch (error) {
         console.error('Failed to delete session:', error);
-        alert('Failed to delete session. Please try again.');
+        // Keep dialog open and show error in console for now
       }
     }
   };
 
   const handleDeleteAllSessions = () => {
-    const confirmed = confirm(
-      `Are you sure you want to delete ALL sessions?\n\nThis will permanently remove:\n• ${sessions.length} session${sessions.length !== 1 ? 's' : ''}\n• All hand data\n• All session metadata\n\nThis action cannot be undone.`
-    );
-    if (confirmed) {
-      const doubleConfirm = confirm('This is your final warning. Delete ALL sessions permanently?');
-      if (doubleConfirm) {
-        try {
-          SessionService.deleteAllSessions();
-          setSessions([]);
-          alert('All sessions have been deleted successfully.');
-        } catch (error) {
-          console.error('Failed to delete all sessions:', error);
-          alert('Failed to delete all sessions. Please try again.');
-        }
-      }
+    setDeleteAllDialogOpen(true);
+  };
+
+  const confirmDeleteAllSessions = () => {
+    setDeleteAllDialogOpen(false);
+    setDeleteAllConfirmOpen(true);
+  };
+
+  const finalConfirmDeleteAll = () => {
+    try {
+      SessionService.deleteAllSessions();
+      setSessions([]);
+      setDeleteAllConfirmOpen(false);
+    } catch (error) {
+      console.error('Failed to delete all sessions:', error);
+      // Keep dialog open and show error in console for now
     }
   };
 
@@ -357,6 +378,98 @@ export default function SessionsPage() {
           ))}
         </div>
       )}
+
+      {/* Delete Single Session Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Session</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete &quot;{sessionToDelete?.sessionName}&quot;?
+              <br /><br />
+              This will permanently remove all hand data and session metadata. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setSessionToDelete(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDeleteSession}
+            >
+              Delete Session
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete All Sessions Dialog */}
+      <Dialog open={deleteAllDialogOpen} onOpenChange={setDeleteAllDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete All Sessions</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete ALL sessions?
+              <br /><br />
+              This will permanently remove:
+              <br />• {sessions.length} session{sessions.length !== 1 ? 's' : ''}
+              <br />• All hand data
+              <br />• All session metadata
+              <br /><br />
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteAllDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDeleteAllSessions}
+            >
+              Continue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Final Confirmation Dialog for Delete All */}
+      <Dialog open={deleteAllConfirmOpen} onOpenChange={setDeleteAllConfirmOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Final Warning</DialogTitle>
+            <DialogDescription>
+              This is your final warning. Delete ALL sessions permanently?
+              <br /><br />
+              <strong>This action cannot be undone!</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteAllConfirmOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={finalConfirmDeleteAll}
+            >
+              Delete All Sessions
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

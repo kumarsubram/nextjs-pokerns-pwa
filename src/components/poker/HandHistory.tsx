@@ -233,6 +233,17 @@ export function HandHistory({
       roundGroups[action.round].push(action);
     });
 
+    // If no actions found, show a message
+    if (actions.length === 0) {
+      return (
+        <div className="space-y-3 p-3 bg-gray-50 rounded-md mt-2">
+          <div className="text-xs text-gray-500 italic">
+            No betting actions recorded for this hand
+          </div>
+        </div>
+      );
+    }
+
     // Helper to get community cards for a specific round
     const getCommunityCardsForRound = (round: string) => {
       const cards: string[] = [];

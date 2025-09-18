@@ -14,11 +14,8 @@ function SharePageContent() {
   const router = useRouter();
   const [hand, setHand] = useState<StoredHand | null>(null);
   const [metadata, setMetadata] = useState<{
-    sessionName: string;
-    gameType: 'Tournament' | 'Cash Game';
     tableSeats: 6 | 9;
     userSeat: Position;
-    username: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -110,10 +107,10 @@ function SharePageContent() {
             </Button>
             <div>
               <h1 className="text-lg font-semibold">
-                Shared by {metadata.username || 'Anonymous'}
+                Shared Hand #{hand.handNumber}
               </h1>
               <p className="text-sm text-gray-600">
-                {metadata.sessionName} • Hand #{hand.handNumber}
+                {metadata.tableSeats} handed • Hero: {metadata.userSeat}
               </p>
             </div>
           </div>
@@ -147,9 +144,6 @@ function SharePageContent() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-gray-600">Type:</span> {metadata.gameType}
-              </div>
               <div>
                 <span className="text-gray-600">Table:</span> {metadata.tableSeats} handed
               </div>

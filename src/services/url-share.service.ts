@@ -1,7 +1,7 @@
 import { StoredHand, SessionMetadata, Position } from '@/types/poker-v2';
 
 export class URLShareService {
-  // Compress hand data for URL sharing
+  // Compress hand data for URL sharing - minimal data, full actions
   static compressHandData(hand: StoredHand, sessionMetadata: Partial<SessionMetadata> & { username?: string }): string {
     const shareData = {
       h: hand.handNumber,
@@ -12,14 +12,9 @@ export class URLShareService {
         r: hand.communityCards.river
       },
       b: hand.bettingRounds,
-      rs: hand.result,
-      m: {
-        n: sessionMetadata.sessionName,
-        g: sessionMetadata.gameType,
-        s: sessionMetadata.tableSeats,
-        p: sessionMetadata.userSeat,
-        un: sessionMetadata.username || 'Anonymous'
-      }
+      o: hand.result?.handOutcome, // Just the outcome, not full result
+      s: sessionMetadata.tableSeats, // Just table seats for action sequence
+      p: sessionMetadata.userSeat // Just user position
     };
 
     // Convert to JSON and compress using base64
@@ -34,11 +29,8 @@ export class URLShareService {
   static decompressHandData(compressed: string): {
     hand: StoredHand;
     metadata: {
-      sessionName: string;
-      gameType: 'Tournament' | 'Cash Game';
       tableSeats: 6 | 9;
       userSeat: Position;
-      username: string;
     }
   } | null {
     try {
@@ -55,15 +47,17 @@ export class URLShareService {
           river: shareData.c.r
         },
         bettingRounds: shareData.b,
-        result: shareData.rs
+        result: {
+          handOutcome: shareData.o,
+          winner: shareData.o === 'won' ? shareData.p : undefined,
+          potWon: undefined,
+          stackAfter: undefined
+        }
       };
 
       const metadata = {
-        sessionName: shareData.m.n,
-        gameType: shareData.m.g,
-        tableSeats: shareData.m.s,
-        userSeat: shareData.m.p,
-        username: shareData.m.un
+        tableSeats: shareData.s,
+        userSeat: shareData.p
       };
 
       return { hand, metadata };
@@ -82,19 +76,7 @@ export class URLShareService {
     // Use a special route for URL-shared hands
     const baseUrl = window.location.origin;
 
-    // Limit URL length for compatibility (most browsers support ~2000 chars)
-    if (compressed.length > 1500) {
-      // If too long, create a simpler version without full action history
-      const simplifiedHand = {
-        ...hand,
-        bettingRounds: {
-          preflop: { actions: [], pot: 0, currentBet: 0, isComplete: true }
-        }
-      };
-      const simpleCompressed = this.compressHandData(simplifiedHand, sessionMetadata);
-      return `${baseUrl}/share?h=${simpleCompressed}`;
-    }
-
+    // With minimal metadata, URLs should be much shorter and include all actions
     return `${baseUrl}/share?h=${compressed}`;
   }
 

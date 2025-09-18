@@ -173,4 +173,21 @@ export class SharedHandService {
     const baseUrl = window.location.origin;
     return `${baseUrl}/shared/${handId}`;
   }
+
+  // Delete all shared hands from a specific session
+  static deleteHandsBySession(sessionId: string): void {
+    const hands = this.getAllSharedHands();
+    const filteredHands = hands.filter(hand => hand.sessionId !== sessionId);
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(SHARED_HANDS_KEY, JSON.stringify(filteredHands));
+    }
+  }
+
+  // Delete all shared hands (used when deleting all sessions)
+  static deleteAllSharedHands(): void {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(SHARED_HANDS_KEY);
+    }
+  }
 }

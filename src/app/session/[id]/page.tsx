@@ -46,6 +46,7 @@ export default function SessionPage() {
   const [amountModalAction, setAmountModalAction] = useState<'raise' | 'all-in'>('raise');
   const [amountModalPosition, setAmountModalPosition] = useState<Position | null>(null);
   const [amountModalValue, setAmountModalValue] = useState<number>(0);
+  const [amountModalError, setAmountModalError] = useState<string | null>(null);
   // Hero fold confirmation
   const [showFoldConfirmation, setShowFoldConfirmation] = useState(false);
   const [foldPosition, setFoldPosition] = useState<Position | null>(null);
@@ -1484,6 +1485,7 @@ export default function SessionPage() {
                   value={amountModalValue}
                   onChange={(e) => {
                     const inputValue = e.target.value;
+                    setAmountModalError(null); // Clear error on input change
                     if (inputValue === '') {
                       setAmountModalValue(0);
                     } else {
@@ -1512,6 +1514,11 @@ export default function SessionPage() {
                     <>Max: ${stack}</>
                   )}
                 </div>
+                {amountModalError && (
+                  <div className="text-xs text-red-600 mt-1">
+                    {amountModalError}
+                  </div>
+                )}
               </div>
               <div className="flex gap-3 pt-2">
                 <Button
@@ -1520,6 +1527,7 @@ export default function SessionPage() {
                   onClick={() => {
                     setShowAmountModal(false);
                     setAmountModalPosition(null);
+                    setAmountModalError(null);
                   }}
                 >
                   Cancel
@@ -1533,7 +1541,7 @@ export default function SessionPage() {
 
                       // Validate minimum raise amount
                       if (amountModalAction === 'raise' && amount < minRaise) {
-                        alert(`Minimum raise is ${minRaise}`);
+                        setAmountModalError(`Minimum raise is $${minRaise}`);
                         return;
                       }
 
@@ -1544,6 +1552,7 @@ export default function SessionPage() {
                       );
                       setShowAmountModal(false);
                       setAmountModalPosition(null);
+                      setAmountModalError(null);
                       setSelectedPosition(null);
                     }
                   }}

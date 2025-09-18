@@ -3,7 +3,37 @@
 ## Project Overview
 A Progressive Web App for tracking poker sessions, hands, and statistics. Built with Next.js 15, TypeScript, and Tailwind CSS.
 
-## RECENT UPDATES (v2.3) ✅
+## RECENT UPDATES (v2.4) ✅
+
+### Layout and Betting Logic Fixes - COMPLETED
+✅ **Fixed SeatSelector Layout Issues**
+- Fixed scroll bar appearing when there wasn't enough content to scroll
+- Adjusted height calculation to account for AppHeader (64px), session header, and bottom navigation
+- Changed from `h-full` to `h-[calc(100dvh-12rem)]` for better mobile viewport handling
+- Increased horizontal padding for better button spacing
+- Used dynamic viewport height (`100dvh`) for mobile browser compatibility
+
+✅ **Fixed Betting Action Button Layout**
+- Made all action buttons (Fold, Call, Raise, All-In, Check) equal width
+- Added `flex-1 min-w-[80px]` to all position action buttons and hero action buttons
+- Consistent button sizing across both position action selector and hero action sections
+- Better visual balance and touch targets on mobile
+
+✅ **Fixed All-In and Hand Completion Logic**
+- Fixed bug where all-in actions incorrectly ended hands immediately
+- Updated hand completion logic to include both 'active' and 'all-in' players
+- All-in players now properly remain in the hand until opponents act
+- Only when opponents fold does the hand end with all-in player winning
+- Fixed multiple locations: `handleBettingAction`, `handIsOver` calculation, `advanceToNextRound`
+- Proper poker logic: all-in doesn't end hand, only player folding does
+
+✅ **Enhanced Poker Logic Integrity**
+- All-in players considered active for hand continuation purposes
+- Betting can continue after all-in until other players fold or call
+- Showdown logic properly handles all-in vs active player scenarios
+- Fixed premature hand endings in all-in situations
+
+## PREVIOUS UPDATES (v2.3) ✅
 
 ### Input Handling and Mobile UX Fixes - COMPLETED
 ✅ **Fixed Input Number Handling Issues**

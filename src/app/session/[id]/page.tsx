@@ -544,19 +544,22 @@ export default function SessionPage() {
       }
     }
 
-    setCurrentHand(updatedHand);
-
-    // Check if hand ends (all others folded)
-    const activePlayers = updatedHand.playerStates.filter(p => p.status === 'active');
+    // Check if hand ends (all others folded) BEFORE setting state
+    // Include both 'active' and 'all-in' players as they can still win the hand
+    const activePlayers = updatedHand.playerStates.filter(p => p.status === 'active' || p.status === 'all-in');
     if (activePlayers.length === 1) {
       if (activePlayers[0].position === session.userSeat) {
-        // Hero wins
-        completeHand('won', updatedHand.pot);
+        // Hero wins - complete hand immediately
+        completeHand('won', updatedHand.pot || 0);
+        return; // Exit early, don't set currentHand
       } else {
         // Hero lost (already folded)
         completeHand('lost', 0);
+        return; // Exit early, don't set currentHand
       }
     }
+
+    setCurrentHand(updatedHand);
   };
 
   // Add state for validation error dialog
@@ -870,8 +873,8 @@ export default function SessionPage() {
 
     // Check if we're going to showdown (river betting complete)
     if (currentHand.currentBettingRound === 'river') {
-      // Count active players (including hero if still active)
-      const activePlayers = currentHand.playerStates.filter(p => p.status === 'active');
+      // Count active players (including hero if still active or all-in)
+      const activePlayers = currentHand.playerStates.filter(p => p.status === 'active' || p.status === 'all-in');
       const heroStillActive = activePlayers.some(p => p.position === session.userSeat);
 
       // True showdown: 2+ players reach the end
@@ -994,18 +997,25 @@ export default function SessionPage() {
   const isBettingComplete = currentBettingRound ? (currentBettingRound.isComplete || isBettingRoundComplete(currentHand?.playerStates || [], currentBettingRound)) : false;
 
 
-  // Show flop selection prompt when preflop betting is complete and not all flop cards are selected
+  // Check if hand is already over (only 1 or 0 active+all-in players remain)
+  const activePlayers = currentHand?.playerStates.filter(p => p.status === 'active' || p.status === 'all-in') || [];
+  const handIsOver = activePlayers.length <= 1;
+
+  // Show flop selection prompt when preflop betting is complete, hand is not over, and not all flop cards are selected
   const showFlopSelectionPrompt = isBettingComplete &&
+    !handIsOver &&
     currentHand?.currentBettingRound === 'preflop' &&
     (!currentHand?.communityCards.flop || currentHand.communityCards.flop.length < 3 || currentHand.communityCards.flop.some(card => !card));
 
-  // Show turn selection prompt when flop betting is complete and no turn card is selected
+  // Show turn selection prompt when flop betting is complete, hand is not over, and no turn card is selected
   const showTurnSelectionPrompt = isBettingComplete &&
+    !handIsOver &&
     currentHand?.currentBettingRound === 'flop' &&
     !currentHand?.communityCards.turn;
 
-  // Show river selection prompt when turn betting is complete and no river card is selected
+  // Show river selection prompt when turn betting is complete, hand is not over, and no river card is selected
   const showRiverSelectionPrompt = isBettingComplete &&
+    !handIsOver &&
     currentHand?.currentBettingRound === 'turn' &&
     !currentHand?.communityCards.river;
 
@@ -1275,7 +1285,7 @@ export default function SessionPage() {
                 ) : null;
               })()}
               <Button
-                className="bg-green-600 hover:bg-green-700 text-white"
+                className="bg-green-600 hover:bg-green-700 text-white flex-1 min-w-[80px]"
                 onClick={() => {
                   setAmountModalAction('raise');
                   setAmountModalPosition(selectedPosition);
@@ -1288,7 +1298,7 @@ export default function SessionPage() {
               </Button>
               {canCheck(selectedPosition) && (
                 <Button
-                  className="bg-orange-600 hover:bg-orange-700 text-white"
+                  className="bg-orange-600 hover:bg-orange-700 text-white flex-1 min-w-[80px]"
                   onClick={() => {
                     handleBettingAction(selectedPosition, 'check');
                     setShowPositionActions(false);
@@ -1299,7 +1309,7 @@ export default function SessionPage() {
                 </Button>
               )}
               <Button
-                className="bg-purple-600 hover:bg-purple-700 text-white"
+                className="bg-purple-600 hover:bg-purple-700 text-white flex-1 min-w-[80px]"
                 onClick={() => {
                   setAmountModalAction('all-in');
                   setAmountModalPosition(selectedPosition);
@@ -1401,7 +1411,7 @@ export default function SessionPage() {
                     const callAmount = targetPosition ? getCallAmount(targetPosition) : 0;
                     return callAmount > 0 ? (
                       <Button
-                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                        className="bg-blue-600 hover:bg-blue-700 text-white flex-1 min-w-[80px]"
                         onClick={() => {
                           if (targetPosition) {
                             handleBettingAction(targetPosition, 'call', currentBettingRound?.currentBet);
@@ -1415,7 +1425,7 @@ export default function SessionPage() {
                     ) : null;
                   })()}
                   <Button
-                    className="bg-green-600 hover:bg-green-700 text-white"
+                    className="bg-green-600 hover:bg-green-700 text-white flex-1 min-w-[80px]"
                     onClick={() => {
                       setAmountModalAction('raise');
                       setAmountModalPosition((showPositionActions && selectedPosition) ? selectedPosition : (session.userSeat || null));
@@ -1427,7 +1437,7 @@ export default function SessionPage() {
                     Raise
                   </Button>
                   <Button
-                    className="bg-purple-600 hover:bg-purple-700 text-white"
+                    className="bg-purple-600 hover:bg-purple-700 text-white flex-1 min-w-[80px]"
                     onClick={() => {
                       setAmountModalAction('all-in');
                       setAmountModalPosition((showPositionActions && selectedPosition) ? selectedPosition : (session.userSeat || null));
@@ -1443,7 +1453,7 @@ export default function SessionPage() {
                     return targetPosition && canCheck(targetPosition);
                   })() && (
                     <Button
-                      className="bg-orange-600 hover:bg-orange-700 text-white col-span-2"
+                      className="bg-orange-600 hover:bg-orange-700 text-white flex-1 min-w-[80px]"
                       onClick={() => {
                         const targetPosition = showPositionActions && selectedPosition ? selectedPosition : session.userSeat;
                         if (targetPosition) handleBettingAction(targetPosition, 'check');

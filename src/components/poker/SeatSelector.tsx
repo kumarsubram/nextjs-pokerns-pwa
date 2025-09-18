@@ -23,8 +23,8 @@ export function SeatSelector({
   showKeepCurrentButton = false
 }: SeatSelectorProps) {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-6">
-      <div className="w-full max-w-lg space-y-6">
+    <div className="h-[calc(100dvh-12rem)] flex flex-col items-center justify-center px-6">
+      <div className="w-full max-w-lg space-y-8">
         <h2 className="text-xl font-semibold text-center">
           {title}
         </h2>

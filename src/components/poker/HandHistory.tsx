@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { ChevronDown, ChevronUp, Share2, X, Link, Copy, ExternalLink } from 'lucide-react';
+import { ChevronDown, ChevronUp, Share2, Trash2, Link, Copy, ExternalLink } from 'lucide-react';
 import { CurrentHand, StoredHand, Position } from '@/types/poker-v2';
 import { SharedHandService } from '@/services/shared-hand.service';
 import { SessionService } from '@/services/session.service';
@@ -462,7 +462,7 @@ export function HandHistory({
                     className="p-1 rounded hover:bg-red-100 transition-colors"
                     title="Remove from your shared list"
                   >
-                    <X className="h-3 w-3 text-red-600" />
+                    <Trash2 className="h-4 w-4 text-red-600" />
                   </button>
                 )}
               </div>

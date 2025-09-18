@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { SimplePokerTable } from '@/components/poker/SimplePokerTable';
 import { CardSelector } from '@/components/poker/CardSelector';
 import { SeatSelector } from '@/components/poker/SeatSelector';
+import { ActionLog } from '@/components/poker/ActionLog';
 import { SessionService } from '@/services/session.service';
 import { SessionMetadata, CurrentHand, Position, BettingAction, StoredHand } from '@/types/poker-v2';
 import {
@@ -1136,6 +1137,15 @@ export default function SessionPage() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Action Log */}
+        {currentHand && !showSeatSelection && (
+          <ActionLog
+            currentHand={currentHand}
+            userSeat={session.userSeat}
+            className="mt-4"
+          />
+        )}
       </div>
 
     </div>

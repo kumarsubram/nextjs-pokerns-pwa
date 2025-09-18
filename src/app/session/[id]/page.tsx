@@ -595,6 +595,13 @@ export default function SessionPage() {
 
 
   // Auto-fold players between nextToAct and target position (when user skips positions)
+  //
+  // Scenarios this handles:
+  // 1. Simple call: UTG calls when UTG+1 was next -> auto-fold UTG+1 if they haven't matched current bet
+  // 2. Raise scenario: UTG raises to 40, UTG+1 calls 40, UTG+2 raises to 80, then Hero calls 80
+  //    -> auto-fold anyone between UTG+2 and Hero who hasn't matched the 80 bet
+  // 3. Multiple raises: Similar logic applies, always check against current bet amount
+  // 4. Protection: Never auto-fold the target position (the player who's actually acting)
   const autoFoldPlayersBetween = (hand: CurrentHand, nextToAct: Position, targetPosition: Position): CurrentHand => {
     const updatedHand = { ...hand };
     const actionSequence = hand.currentBettingRound === 'preflop'
@@ -628,21 +635,22 @@ export default function SessionPage() {
     // Fold the identified positions
     for (const position of positionsToFold) {
       const playerState = updatedHand.playerStates.find(p => p.position === position);
-      console.log(`Checking ${position}: status=${playerState?.status}, hasActed=${playerState?.hasActed}, currentBet=${playerState?.currentBet}`);
-
-      // Auto-fold players who:
-      // 1. Have already acted but haven't matched the current bet, OR
-      // 2. Haven't acted yet (when we skip past them)
       const currentRoundData = updatedHand.currentBettingRound !== 'showdown'
         ? updatedHand.bettingRounds[updatedHand.currentBettingRound]
         : null;
+      console.log(`Checking ${position}: status=${playerState?.status}, hasActed=${playerState?.hasActed}, currentBet=${playerState?.currentBet}, roundCurrentBet=${currentRoundData?.currentBet}`);
 
-      const shouldAutoFold = playerState && playerState.status === 'active' && (
-        // Case 1: Already acted but didn't match current bet
-        (playerState.hasActed && currentRoundData && playerState.currentBet < currentRoundData.currentBet) ||
-        // Case 2: Haven't acted yet (we're skipping past them)
-        !playerState.hasActed
-      );
+      // Auto-fold players who we're skipping past
+      // This includes players who haven't acted yet OR haven't matched the current bet
+      const shouldAutoFold = playerState &&
+        playerState.status === 'active' &&
+        currentRoundData &&
+        position !== targetPosition && // Never auto-fold the target position (the player who's acting)
+        (
+          // Player hasn't matched the current bet (regardless of hasActed flag)
+          // This covers both: players who haven't acted, and players who acted but didn't match a subsequent raise
+          playerState.currentBet < currentRoundData.currentBet
+        );
 
       if (shouldAutoFold) {
         console.log(`Auto-folding ${position}`);

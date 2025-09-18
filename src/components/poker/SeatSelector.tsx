@@ -23,9 +23,9 @@ export function SeatSelector({
   showKeepCurrentButton = false
 }: SeatSelectorProps) {
   return (
-    <div className="min-h-screen flex flex-col items-center px-4 pt-45">
+    <div className="min-h-screen flex flex-col items-center px-4 pt-39">
       <div className="w-full max-w-lg">
-        <h2 className="text-xl font-semibold mb-6 text-center">
+        <h2 className="text-xl font-semibold mb-9 text-center">
           {title}
         </h2>
 

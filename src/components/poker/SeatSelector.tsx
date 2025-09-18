@@ -23,13 +23,13 @@ export function SeatSelector({
   showKeepCurrentButton = false
 }: SeatSelectorProps) {
   return (
-    <div className="min-h-screen flex flex-col items-center px-4 pt-39">
-      <div className="w-full max-w-lg">
-        <h2 className="text-xl font-semibold mb-9 text-center">
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-6">
+      <div className="w-full max-w-lg space-y-6">
+        <h2 className="text-xl font-semibold text-center">
           {title}
         </h2>
 
-        <div className="mb-8 flex justify-center">
+        <div className="flex justify-center">
           <SimplePokerTable
             seats={tableSeats}
             userSeat={currentSeat}
@@ -39,7 +39,6 @@ export function SeatSelector({
             className=""
           />
         </div>
-
 
         {showKeepCurrentButton && currentSeat && onKeepCurrentSeat && (
           <div className="text-center">

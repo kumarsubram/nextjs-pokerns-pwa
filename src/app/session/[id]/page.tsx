@@ -39,8 +39,8 @@ export default function SessionPage() {
   const [showPositionActions, setShowPositionActions] = useState(false);
   // Hand settings
   const [stack, setStack] = useState<number>(1000);
-  const [smallBlind, setSmallBlind] = useState<number>(10);
-  const [bigBlind, setBigBlind] = useState<number>(20);
+  const [smallBlind, setSmallBlind] = useState<number>(2);
+  const [bigBlind, setBigBlind] = useState<number>(5);
   const [ante, setAnte] = useState<number>(0);
   // Raise/All-in modal
   const [showAmountModal, setShowAmountModal] = useState(false);
@@ -1099,7 +1099,17 @@ export default function SessionPage() {
                 <input
                   type="number"
                   value={stack}
-                  onChange={(e) => setStack(parseInt(e.target.value) || 0)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '') {
+                      setStack(0);
+                    } else {
+                      const numValue = parseInt(value, 10);
+                      if (!isNaN(numValue) && numValue >= 0) {
+                        setStack(numValue);
+                      }
+                    }
+                  }}
                   onFocus={(e) => e.target.select()}
                   className="w-full px-2 py-1 text-base border rounded text-center"
                 />
@@ -1109,7 +1119,17 @@ export default function SessionPage() {
                 <input
                   type="number"
                   value={smallBlind}
-                  onChange={(e) => setSmallBlind(parseInt(e.target.value) || 0)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '') {
+                      setSmallBlind(0);
+                    } else {
+                      const numValue = parseInt(value, 10);
+                      if (!isNaN(numValue) && numValue >= 0) {
+                        setSmallBlind(numValue);
+                      }
+                    }
+                  }}
                   onFocus={(e) => e.target.select()}
                   className="w-full px-2 py-1 text-base border rounded text-center"
                 />
@@ -1119,7 +1139,17 @@ export default function SessionPage() {
                 <input
                   type="number"
                   value={bigBlind}
-                  onChange={(e) => setBigBlind(parseInt(e.target.value) || 0)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '') {
+                      setBigBlind(0);
+                    } else {
+                      const numValue = parseInt(value, 10);
+                      if (!isNaN(numValue) && numValue >= 0) {
+                        setBigBlind(numValue);
+                      }
+                    }
+                  }}
                   onFocus={(e) => e.target.select()}
                   className="w-full px-2 py-1 text-base border rounded text-center"
                 />
@@ -1129,7 +1159,17 @@ export default function SessionPage() {
                 <input
                   type="number"
                   value={ante}
-                  onChange={(e) => setAnte(parseInt(e.target.value) || 0)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '') {
+                      setAnte(0);
+                    } else {
+                      const numValue = parseInt(value, 10);
+                      if (!isNaN(numValue) && numValue >= 0) {
+                        setAnte(numValue);
+                      }
+                    }
+                  }}
                   onFocus={(e) => e.target.select()}
                   className="w-full px-2 py-1 text-base border rounded text-center"
                 />
@@ -1436,32 +1476,39 @@ export default function SessionPage() {
 
         {/* Amount Input Modal for Raise/All-In */}
         <Dialog open={showAmountModal} onOpenChange={setShowAmountModal}>
-          <DialogContent className={getDialogClasses("sm:max-w-[425px] max-w-[350px]")}>
+          <DialogContent className={getDialogClasses("sm:max-w-[425px] max-w-[95vw] w-full mx-4")}>
             <DialogHeader>
-              <DialogTitle>
+              <DialogTitle className="text-lg">
                 {amountModalAction === 'raise' ? 'Raise Amount' : 'All-In Amount'}
               </DialogTitle>
-              <DialogDescription>
-                Enter the total amount to {amountModalAction === 'raise' ? 'raise to' : 'go all-in with'} (no decimals)
+              <DialogDescription className="text-sm">
+                Enter the total amount to {amountModalAction === 'raise' ? 'raise to' : 'go all-in with'}
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="flex flex-col gap-2">
+            <div className="space-y-4 pt-2">
+              <div className="space-y-2">
                 <label className="text-sm font-medium">Amount</label>
                 <input
                   type="number"
                   value={amountModalValue}
                   onChange={(e) => {
-                    const value = parseInt(e.target.value) || 0;
-                    if (amountModalAction === 'all-in') {
-                      setAmountModalValue(Math.min(value, stack));
+                    const inputValue = e.target.value;
+                    if (inputValue === '') {
+                      setAmountModalValue(0);
                     } else {
-                      // Allow any value for raise input, validation will happen on submit
-                      setAmountModalValue(value);
+                      const numValue = parseInt(inputValue, 10);
+                      if (!isNaN(numValue) && numValue >= 0) {
+                        if (amountModalAction === 'all-in') {
+                          setAmountModalValue(Math.min(numValue, stack));
+                        } else {
+                          // Allow any value for raise input, validation will happen on submit
+                          setAmountModalValue(numValue);
+                        }
+                      }
                     }
                   }}
                   onFocus={(e) => e.target.select()}
-                  className="w-full px-3 py-2 text-base border rounded-md"
+                  className="w-full px-3 py-3 text-base border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   min={(currentBettingRound?.currentBet || 0) * 2}
                   max={amountModalAction === 'all-in' ? stack : undefined}
                   step="1"
@@ -1475,9 +1522,9 @@ export default function SessionPage() {
                   )}
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-3 pt-2">
                 <Button
-                  className="flex-1"
+                  className="flex-1 h-11"
                   variant="outline"
                   onClick={() => {
                     setShowAmountModal(false);
@@ -1487,7 +1534,7 @@ export default function SessionPage() {
                   Cancel
                 </Button>
                 <Button
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                  className="flex-1 h-11 bg-green-600 hover:bg-green-700 text-white"
                   onClick={() => {
                     if (amountModalPosition) {
                       const minRaise = (currentBettingRound?.currentBet || 0) * 2;

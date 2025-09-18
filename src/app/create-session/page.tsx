@@ -23,7 +23,7 @@ export default function CreateSessionPage() {
   const [sessionName, setSessionName] = useState('');
   const [gameType, setGameType] = useState<GameType>('Tournament');
   const [tableSeats, setTableSeats] = useState<TableSeats>(9);
-  const [buyIn, setBuyIn] = useState<number>(100);
+  const [buyIn, setBuyIn] = useState<number>(500);
   const [location, setLocation] = useState<string>('');
 
   // Confirmation dialog state
@@ -149,8 +149,18 @@ export default function CreateSessionPage() {
                 id="buy-in"
                 type="number"
                 value={buyIn}
-                onChange={(e) => setBuyIn(parseInt(e.target.value) || 0)}
-                placeholder="100"
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === '') {
+                    setBuyIn(0);
+                  } else {
+                    const numValue = parseInt(value, 10);
+                    if (!isNaN(numValue) && numValue >= 0) {
+                      setBuyIn(numValue);
+                    }
+                  }
+                }}
+                placeholder="500"
                 min="0"
                 className="mt-1 h-9 text-sm"
               />

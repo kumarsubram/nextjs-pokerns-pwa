@@ -195,17 +195,34 @@
   [data-radix-dialog-content] {
     max-height: 85vh;
     overflow-y: auto;
+    margin: 1rem;
+    width: calc(100vw - 2rem);
   }
 
   /* When keyboard is open, move dialogs higher */
   .dialog-mobile-keyboard-open {
     top: 2vh !important;
     max-height: 45vh !important;
+    width: calc(100vw - 2rem) !important;
+    margin: 1rem !important;
   }
 
   /* Make dialog content scrollable */
   .dialog-mobile-keyboard-open > div {
     max-height: 40vh !important;
     overflow-y: auto !important;
+  }
+
+  /* Specific mobile improvements for amount modal */
+  [data-radix-dialog-content] input[type="number"] {
+    font-size: 16px !important;
+    height: 48px !important;
+    padding: 12px !important;
+  }
+
+  /* Prevent iOS zoom when focusing on inputs */
+  [data-radix-dialog-content] input:focus {
+    font-size: 16px !important;
+    transform: none !important;
   }
 }

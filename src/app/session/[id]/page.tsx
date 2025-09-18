@@ -16,7 +16,9 @@ import {
   processBettingAction,
   advanceToNextRound,
   isBettingRoundComplete,
-  getNextToAct
+  getNextToAct,
+  getPreflopActionSequence,
+  getPostflopActionSequence
 } from '@/utils/poker-logic';
 
 export default function SessionPage() {
@@ -425,17 +427,41 @@ export default function SessionPage() {
       }
     }
 
-    // Update nextToAct based on current betting round and player states (only if round is not complete)
+    // Update nextToAct based on current betting round and player states
     if (updatedHand.currentBettingRound !== 'showdown') {
       const currentRound = updatedHand.bettingRounds[updatedHand.currentBettingRound];
-      if (currentRound && !currentRound.isComplete) {
-        const nextPlayer = getNextToAct(
-          updatedHand.currentBettingRound,
-          session.tableSeats,
-          updatedHand.playerStates,
-          currentRound
-        );
+      if (currentRound) {
+        // Manual nextToAct calculation to handle auto-folded players correctly
+        const actionSequence = updatedHand.currentBettingRound === 'preflop'
+          ? getPreflopActionSequence(session.tableSeats)
+          : getPostflopActionSequence(session.tableSeats);
+
+        const activePlayers = updatedHand.playerStates.filter(p => p.status === 'active');
+        const currentBet = currentRound.currentBet;
+
+        // Find the next active player who needs to act
+        let nextPlayer: Position | null = null;
+        for (const pos of actionSequence) {
+          const player = activePlayers.find(p => p.position === pos);
+          if (player && (!player.hasActed || player.currentBet < currentBet)) {
+            nextPlayer = pos;
+            break;
+          }
+        }
+
         updatedHand.nextToAct = nextPlayer || undefined;
+        console.log(`After action: nextToAct = ${nextPlayer}, activePlayers = ${activePlayers.map(p => `${p.position}(acted:${p.hasActed},bet:${p.currentBet})`).join(', ')}, currentBet = ${currentBet}`);
+
+        // Check if round is complete after setting nextToAct
+        const allActivePlayersHaveActedAndMatched = activePlayers.every(player =>
+          player.hasActed && (player.currentBet === currentBet || player.status === 'all-in')
+        );
+
+        if (allActivePlayersHaveActedAndMatched || activePlayers.length <= 1) {
+          console.log('Marking round as complete');
+          currentRound.isComplete = true;
+          updatedHand.nextToAct = undefined;
+        }
       }
     }
 
@@ -605,8 +631,8 @@ export default function SessionPage() {
   const autoFoldPlayersBetween = (hand: CurrentHand, nextToAct: Position, targetPosition: Position): CurrentHand => {
     const updatedHand = { ...hand };
     const actionSequence = hand.currentBettingRound === 'preflop'
-      ? ['UTG', 'UTG+1', 'UTG+2', 'LJ', 'HJ', 'CO', 'BTN', 'SB', 'BB']
-      : ['SB', 'BB', 'UTG', 'UTG+1', 'UTG+2', 'LJ', 'HJ', 'CO', 'BTN'];
+      ? getPreflopActionSequence(session?.tableSeats || 9)
+      : getPostflopActionSequence(session?.tableSeats || 9);
 
     const nextIndex = actionSequence.indexOf(nextToAct);
     const targetIndex = actionSequence.indexOf(targetPosition);

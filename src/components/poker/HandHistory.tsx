@@ -2,10 +2,11 @@
 
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { ChevronDown, ChevronUp, Share2, Check, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Share2, X, Link } from 'lucide-react';
 import { CurrentHand, StoredHand, Position } from '@/types/poker-v2';
 import { SharedHandService } from '@/services/shared-hand.service';
 import { SessionService } from '@/services/session.service';
+import { URLShareService } from '@/services/url-share.service';
 import { useParams } from 'next/navigation';
 
 interface HandHistoryProps {
@@ -63,7 +64,7 @@ export function HandHistory({
     setExpandedHands(newExpanded);
   };
 
-  // Handle share button click
+  // Handle share button click - now uses URL sharing for universal access
   const handleShare = async (hand: StoredHand, e: React.MouseEvent) => {
     e.stopPropagation();
 
@@ -72,47 +73,55 @@ export function HandHistory({
     const sessionMetadata = SessionService.getSessionMetadata(sessionId);
     if (!sessionMetadata) return;
 
-    // Check if hand is already shared
-    const isShared = SharedHandService.isHandShared(sessionId, hand.handNumber);
+    // Generate URL-based share link (works for everyone, no local storage needed)
+    const username = SharedHandService.getCurrentUsername();
+    const shareUrl = URLShareService.generateShareableURL(hand, {
+      ...sessionMetadata,
+      username
+    });
 
-    if (isShared) {
-      // Unshare the hand
-      const handId = SharedHandService.generateHandId(sessionId, hand.handNumber);
-      if (SharedHandService.unshareHand(handId)) {
-        setSharedHands(prev => {
-          const newShared = new Set(prev);
-          newShared.delete(hand.handNumber);
-          return newShared;
-        });
-        setShareMessage(`Hand #${hand.handNumber} has been unshared`);
-        setTimeout(() => setShareMessage(''), 3000);
-      } else {
-        setShareMessage(`You can only unshare hands you shared`);
-        setTimeout(() => setShareMessage(''), 3000);
-      }
-    } else {
-      // Share the hand
-      const handId = SharedHandService.shareHand(hand, sessionId, sessionMetadata);
-      const shareUrl = SharedHandService.getShareUrl(handId);
+    // Also save locally for the "Shared" list (local only)
+    const isLocallyShared = SharedHandService.isHandShared(sessionId, hand.handNumber);
 
-      // Mark as shared
+    if (!isLocallyShared) {
+      SharedHandService.shareHand(hand, sessionId, sessionMetadata);
       setSharedHands(prev => {
         const newShared = new Set(prev);
         newShared.add(hand.handNumber);
         return newShared;
       });
+    }
 
-      // Copy to clipboard
-      if (navigator.clipboard) {
-        try {
-          await navigator.clipboard.writeText(shareUrl);
-          setShareMessage(`Hand #${hand.handNumber} shared! Link copied to clipboard`);
-          setTimeout(() => setShareMessage(''), 3000);
-        } catch {
-          setShareMessage(`Hand #${hand.handNumber} shared! ${shareUrl}`);
-          setTimeout(() => setShareMessage(''), 5000);
-        }
+    // Copy to clipboard
+    if (navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        setShareMessage(
+          `Hand #${hand.handNumber} shared! Link copied - anyone can view this hand with the link`
+        );
+        setTimeout(() => setShareMessage(''), 4000);
+      } catch {
+        setShareMessage(`Share this link: ${shareUrl}`);
+        setTimeout(() => setShareMessage(''), 10000);
       }
+    }
+  };
+
+  // Handle unshare (local only)
+  const handleUnshare = async (hand: StoredHand, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (!sessionId) return;
+
+    const handId = SharedHandService.generateHandId(sessionId, hand.handNumber);
+    if (SharedHandService.unshareHand(handId)) {
+      setSharedHands(prev => {
+        const newShared = new Set(prev);
+        newShared.delete(hand.handNumber);
+        return newShared;
+      });
+      setShareMessage(`Hand #${hand.handNumber} removed from your shared list`);
+      setTimeout(() => setShareMessage(''), 3000);
     }
   };
 
@@ -354,29 +363,35 @@ export function HandHistory({
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Share Button */}
+            {/* Share Button - Now generates universal URL */}
             {'result' in hand && (
-              <button
-                onClick={(e) => handleShare(hand as StoredHand, e)}
-                className={cn(
-                  "p-1 rounded transition-colors relative group",
-                  sharedHands.has(hand.handNumber) || SharedHandService.isHandShared(sessionId, hand.handNumber)
-                    ? "bg-green-100 hover:bg-red-100"
-                    : "hover:bg-gray-200"
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={(e) => handleShare(hand as StoredHand, e)}
+                  className={cn(
+                    "p-1 rounded transition-colors",
+                    sharedHands.has(hand.handNumber) || SharedHandService.isHandShared(sessionId, hand.handNumber)
+                      ? "bg-green-100 hover:bg-green-200"
+                      : "hover:bg-gray-200"
+                  )}
+                  title="Share hand (generates link anyone can view)"
+                >
+                  {sharedHands.has(hand.handNumber) || SharedHandService.isHandShared(sessionId, hand.handNumber) ? (
+                    <Link className="h-4 w-4 text-green-600" />
+                  ) : (
+                    <Share2 className="h-4 w-4 text-gray-600" />
+                  )}
+                </button>
+                {(sharedHands.has(hand.handNumber) || SharedHandService.isHandShared(sessionId, hand.handNumber)) && (
+                  <button
+                    onClick={(e) => handleUnshare(hand as StoredHand, e)}
+                    className="p-1 rounded hover:bg-red-100 transition-colors"
+                    title="Remove from your shared list"
+                  >
+                    <X className="h-3 w-3 text-red-600" />
+                  </button>
                 )}
-                title={sharedHands.has(hand.handNumber) || SharedHandService.isHandShared(sessionId, hand.handNumber)
-                  ? "Click to unshare"
-                  : "Share hand"}
-              >
-                {sharedHands.has(hand.handNumber) || SharedHandService.isHandShared(sessionId, hand.handNumber) ? (
-                  <>
-                    <Check className="h-4 w-4 text-green-600 group-hover:hidden" />
-                    <X className="h-4 w-4 text-red-600 hidden group-hover:block" />
-                  </>
-                ) : (
-                  <Share2 className="h-4 w-4 text-gray-600" />
-                )}
-              </button>
+              </div>
             )}
 
             {/* Expand/Collapse Icon */}

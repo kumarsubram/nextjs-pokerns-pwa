@@ -16,21 +16,25 @@ const STORAGE_KEYS = {
   DATA_VERSION: 'dataVersion'
 };
 
-// Current data version - increment to force migration/cleanup
+// Data version - only increment when you want to force data cleanup for all users
+// Current: 2 (used for shared hand cleanup migration)
 const CURRENT_DATA_VERSION = 2;
 
 export class SessionService {
-  // Data migration and cleanup
+  // Data migration and cleanup - only runs when data version is explicitly changed
   static checkAndMigrateData(): void {
     if (typeof window === 'undefined') return;
 
     const storedVersion = localStorage.getItem(STORAGE_KEYS.DATA_VERSION);
     const currentVersion = CURRENT_DATA_VERSION.toString();
 
-    if (storedVersion !== currentVersion) {
-      console.log('Data version mismatch - clearing all data for compatibility');
+    // Only migrate if no version is stored (first time) or version is lower than current
+    const storedVersionNum = storedVersion ? parseInt(storedVersion, 10) : 0;
 
-      // Clear all existing data
+    if (storedVersionNum < CURRENT_DATA_VERSION) {
+      console.log(`Data migration required: v${storedVersionNum} → v${CURRENT_DATA_VERSION}`);
+
+      // Clear all existing data for breaking changes
       this.deleteAllSessions();
 
       // Set new version

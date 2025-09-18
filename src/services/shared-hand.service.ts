@@ -19,9 +19,9 @@ export class SharedHandService {
   // Generate unique hand ID
   static generateHandId(sessionId: string, handNumber: number): string {
     const username = this.getCurrentUsername();
-    // Replace spaces and special chars for URL safety
-    const safeUsername = username.replace(/[^a-zA-Z0-9]/g, '_');
-    const safeSessionId = sessionId.replace(/[^a-zA-Z0-9]/g, '_');
+    // Replace spaces and special chars for URL safety, handle null/undefined values
+    const safeUsername = (username || 'anonymous').replace(/[^a-zA-Z0-9]/g, '_');
+    const safeSessionId = (sessionId || 'unknown').replace(/[^a-zA-Z0-9]/g, '_');
     return `${safeUsername}_${safeSessionId}_${handNumber}`;
   }
 

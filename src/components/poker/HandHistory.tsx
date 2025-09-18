@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { ChevronDown, ChevronUp, Share2, X, Link } from 'lucide-react';
+import { ChevronDown, ChevronUp, Share2, X, Link, Copy, ExternalLink } from 'lucide-react';
 import { CurrentHand, StoredHand, Position } from '@/types/poker-v2';
 import { SharedHandService } from '@/services/shared-hand.service';
 import { SessionService } from '@/services/session.service';
@@ -123,6 +123,52 @@ export function HandHistory({
       setShareMessage(`Hand #${hand.handNumber} removed from your shared list`);
       setTimeout(() => setShareMessage(''), 3000);
     }
+  };
+
+  // Handle create link (just copy URL without sharing locally)
+  const handleCreateLink = async (hand: StoredHand, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (!sessionId) return;
+
+    const sessionMetadata = SessionService.getSessionMetadata(sessionId);
+    if (!sessionMetadata) return;
+
+    const username = SharedHandService.getCurrentUsername();
+    const shareUrl = URLShareService.generateShareableURL(hand, {
+      ...sessionMetadata,
+      username
+    });
+
+    // Copy to clipboard
+    if (navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        setShareMessage(`Link copied for Hand #${hand.handNumber}`);
+        setTimeout(() => setShareMessage(''), 3000);
+      } catch {
+        setShareMessage(`Copy this link: ${shareUrl}`);
+        setTimeout(() => setShareMessage(''), 10000);
+      }
+    }
+  };
+
+  // Handle open link in new tab
+  const handleOpenLink = (hand: StoredHand, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (!sessionId) return;
+
+    const sessionMetadata = SessionService.getSessionMetadata(sessionId);
+    if (!sessionMetadata) return;
+
+    const username = SharedHandService.getCurrentUsername();
+    const shareUrl = URLShareService.generateShareableURL(hand, {
+      ...sessionMetadata,
+      username
+    });
+
+    window.open(shareUrl, '_blank');
   };
 
   // Group actions for better display readability
@@ -363,7 +409,7 @@ export function HandHistory({
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Share Button - Now generates universal URL */}
+            {/* Share Buttons */}
             {'result' in hand && (
               <div className="flex items-center gap-1">
                 <button
@@ -374,7 +420,7 @@ export function HandHistory({
                       ? "bg-green-100 hover:bg-green-200"
                       : "hover:bg-gray-200"
                   )}
-                  title="Share hand (generates link anyone can view)"
+                  title="Share hand and add to shared list"
                 >
                   {sharedHands.has(hand.handNumber) || SharedHandService.isHandShared(sessionId, hand.handNumber) ? (
                     <Link className="h-4 w-4 text-green-600" />
@@ -382,6 +428,23 @@ export function HandHistory({
                     <Share2 className="h-4 w-4 text-gray-600" />
                   )}
                 </button>
+
+                <button
+                  onClick={(e) => handleCreateLink(hand as StoredHand, e)}
+                  className="p-1 rounded hover:bg-blue-100 transition-colors"
+                  title="Copy link to hand"
+                >
+                  <Copy className="h-4 w-4 text-blue-600" />
+                </button>
+
+                <button
+                  onClick={(e) => handleOpenLink(hand as StoredHand, e)}
+                  className="p-1 rounded hover:bg-purple-100 transition-colors"
+                  title="Open hand in new tab"
+                >
+                  <ExternalLink className="h-4 w-4 text-purple-600" />
+                </button>
+
                 {(sharedHands.has(hand.handNumber) || SharedHandService.isHandShared(sessionId, hand.handNumber)) && (
                   <button
                     onClick={(e) => handleUnshare(hand as StoredHand, e)}

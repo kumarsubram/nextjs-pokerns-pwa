@@ -5,7 +5,6 @@ import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useViewportHeight } from '@/hooks/useViewportHeight';
 import { SimplePokerTable } from '@/components/poker/SimplePokerTable';
 import { CardSelector } from '@/components/poker/CardSelector';
 import { SeatSelector } from '@/components/poker/SeatSelector';
@@ -73,17 +72,9 @@ export default function SessionPage() {
   const [handCount, setHandCount] = useState(0);
   const [completedHands, setCompletedHands] = useState<StoredHand[]>([]);
 
-  // Viewport height detection for mobile keyboard
-  const { isKeyboardOpen } = useViewportHeight();
-
-  // Helper function to get dialog classes for mobile keyboard handling
+  // Simplified dialog classes - no complex mobile keyboard detection
   const getDialogClasses = (baseClasses: string) => {
-    if (isKeyboardOpen) {
-      console.log('🔥 Mobile keyboard detected - applying dialog position fix');
-    }
-    return isKeyboardOpen
-      ? `${baseClasses} dialog-mobile-keyboard-open`
-      : baseClasses;
+    return baseClasses;
   };
 
   useEffect(() => {

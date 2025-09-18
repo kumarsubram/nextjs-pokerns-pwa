@@ -106,6 +106,29 @@ export interface StoredHand {
   };
 }
 
+export interface SharedHand {
+  id: string; // Unique ID: username_sessionId_handNumber
+  username: string;
+  sessionId: string;
+  handData: StoredHand;
+  sessionMetadata: {
+    sessionName: string;
+    gameType: 'Tournament' | 'Cash Game';
+    tableSeats: 6 | 9;
+    userSeat: Position;
+  };
+  sharedAt: string;
+  views: number;
+  comments: Comment[];
+}
+
+export interface Comment {
+  id: string;
+  username: string;
+  text: string;
+  timestamp: string;
+}
+
 export interface CurrentHand {
   handNumber: number;
   userCards: [string, string] | null;

@@ -2,8 +2,11 @@
 
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { ChevronDown, ChevronUp, MessageCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, Share2, Check } from 'lucide-react';
 import { CurrentHand, StoredHand, Position } from '@/types/poker-v2';
+import { SharedHandService } from '@/services/shared-hand.service';
+import { SessionService } from '@/services/session.service';
+import { useParams } from 'next/navigation';
 
 interface HandHistoryProps {
   currentHand?: CurrentHand | null;
@@ -19,6 +22,10 @@ export function HandHistory({
   className
 }: HandHistoryProps) {
   const [expandedHands, setExpandedHands] = useState<Set<number>>(new Set());
+  const [sharedHands, setSharedHands] = useState<Set<number>>(new Set());
+  const [shareMessage, setShareMessage] = useState<string>('');
+  const params = useParams();
+  const sessionId = params?.id as string;
 
   // Helper function to get card color
   const getCardColor = (card: string) => {
@@ -54,6 +61,38 @@ export function HandHistory({
       newExpanded.add(handNumber);
     }
     setExpandedHands(newExpanded);
+  };
+
+  // Handle share button click
+  const handleShare = async (hand: StoredHand, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (!sessionId) return;
+
+    const sessionMetadata = SessionService.getSessionMetadata(sessionId);
+    if (!sessionMetadata) return;
+
+    const handId = SharedHandService.shareHand(hand, sessionId, sessionMetadata);
+    const shareUrl = SharedHandService.getShareUrl(handId);
+
+    // Mark as shared
+    setSharedHands(prev => {
+      const newShared = new Set(prev);
+      newShared.add(hand.handNumber);
+      return newShared;
+    });
+
+    // Copy to clipboard
+    if (navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        setShareMessage(`Hand #${hand.handNumber} shared! Link copied to clipboard`);
+        setTimeout(() => setShareMessage(''), 3000);
+      } catch {
+        setShareMessage(`Hand #${hand.handNumber} shared! ${shareUrl}`);
+        setTimeout(() => setShareMessage(''), 5000);
+      }
+    }
   };
 
   // Group actions for better display readability
@@ -295,16 +334,24 @@ export function HandHistory({
 
           <div className="flex items-center gap-2">
             {/* Share Button */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                // TODO: Implement text share
-              }}
-              className="p-1 hover:bg-gray-200 rounded"
-              title="Share hand"
-            >
-              <MessageCircle className="h-4 w-4 text-gray-600" />
-            </button>
+            {'result' in hand && (
+              <button
+                onClick={(e) => handleShare(hand as StoredHand, e)}
+                className={cn(
+                  "p-1 rounded transition-colors",
+                  sharedHands.has(hand.handNumber) || SharedHandService.isHandShared(sessionId, hand.handNumber)
+                    ? "bg-green-100 hover:bg-green-200"
+                    : "hover:bg-gray-200"
+                )}
+                title={sharedHands.has(hand.handNumber) || SharedHandService.isHandShared(sessionId, hand.handNumber) ? "Shared" : "Share hand"}
+              >
+                {sharedHands.has(hand.handNumber) || SharedHandService.isHandShared(sessionId, hand.handNumber) ? (
+                  <Check className="h-4 w-4 text-green-600" />
+                ) : (
+                  <Share2 className="h-4 w-4 text-gray-600" />
+                )}
+              </button>
+            )}
 
             {/* Expand/Collapse Icon */}
             {isExpanded ? (
@@ -335,6 +382,13 @@ export function HandHistory({
   return (
     <div className={cn("space-y-2", className)}>
       <h3 className="text-lg font-semibold mb-3">Hand History</h3>
+
+      {/* Share Message */}
+      {shareMessage && (
+        <div className="bg-green-100 border border-green-400 text-green-700 px-3 py-2 rounded text-sm">
+          {shareMessage}
+        </div>
+      )}
 
       {/* Current Hand */}
       {currentHand && renderHand(currentHand, true)}

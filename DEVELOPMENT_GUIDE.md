@@ -3,7 +3,51 @@
 ## Project Overview
 A Progressive Web App for tracking poker sessions, hands, and statistics. Built with Next.js 15, TypeScript, and Tailwind CSS.
 
-## RECENT UPDATES (v2.2) ✅
+## RECENT UPDATES (v2.3) ✅
+
+### Input Handling and Mobile UX Fixes - COMPLETED
+✅ **Fixed Input Number Handling Issues**
+- Fixed buy-in input bug causing "0500" pattern when editing
+- Replaced faulty `parseInt(e.target.value) || 0` with proper validation logic
+- Added explicit empty string handling and NaN checks
+- Applied fix to all number inputs: buy-in, stack, small blind, big blind, ante, amounts
+
+✅ **Updated Default Values**
+- Buy-in default changed from 100 to 500
+- Small Blind default changed from 10 to 2
+- Big Blind default changed from 20 to 5
+- Updated placeholder text to reflect new defaults
+
+✅ **Fixed SeatSelector Mobile Positioning**
+- Removed extreme `pt-39` padding causing cutoff positioning on iPhone
+- Added proper `justify-center` for vertical centering
+- Replaced excessive margins with consistent `space-y-6` spacing
+- Fixed dialog appearing in top-left corner cut off on mobile
+
+✅ **Session Management Enhancements**
+- Added comprehensive "Delete All Sessions" functionality to sessions page
+- Double confirmation dialog to prevent accidental deletion
+- Complete cleanup of all session-related localStorage data
+- Added `deleteAllSessions()` method to SessionService with proper error handling
+- Updated PWA service worker cache version for feature deployment
+
+✅ **Comprehensive Number Input Validation**
+```typescript
+// Improved input handling pattern
+onChange={(e) => {
+  const value = e.target.value;
+  if (value === '') {
+    setValue(0);
+  } else {
+    const numValue = parseInt(value, 10);
+    if (!isNaN(numValue) && numValue >= 0) {
+      setValue(numValue);
+    }
+  }
+}}
+```
+
+## PREVIOUS UPDATES (v2.2) ✅
 
 ### Enhanced Hand History and Side Pot Logic - COMPLETED
 ✅ **Progressive Community Cards Display**

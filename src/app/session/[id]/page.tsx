@@ -198,7 +198,6 @@ export default function SessionPage() {
 
   // Function to start new hand with explicit session data
   const startNewHandWithPosition = useCallback((sessionData: SessionMetadata, userSeat: Position) => {
-    console.log('startNewHandWithPosition called, session:', sessionData.sessionId, 'userSeat:', userSeat);
 
     const handNumber = SessionService.getCurrentHandNumber();
 
@@ -258,9 +257,7 @@ export default function SessionPage() {
   }, [smallBlind, bigBlind, ante]);
 
   const startNewHand = useCallback(() => {
-    console.log('startNewHand called, session:', session?.sessionId, 'userSeat:', session?.userSeat);
     if (!session || !session.userSeat) {
-      console.log('startNewHand: Missing session or userSeat');
       return;
     }
 
@@ -447,7 +444,6 @@ export default function SessionPage() {
 
     // Auto-fold players between current next-to-act and target position (when user skips positions)
     if (currentHand.nextToAct && currentHand.nextToAct !== position) {
-      console.log(`Auto-folding between ${currentHand.nextToAct} and ${position}`);
       updatedHand = autoFoldPlayersBetween(updatedHand, currentHand.nextToAct, position);
     }
 
@@ -470,7 +466,6 @@ export default function SessionPage() {
     if (updatedHand.currentBettingRound === 'preflop' &&
         position === 'BB' &&
         action === 'check') {
-      console.log('BB checked in preflop, marking round as complete');
       const currentRound = updatedHand.bettingRounds.preflop;
       if (currentRound) {
         currentRound.isComplete = true;
@@ -481,7 +476,6 @@ export default function SessionPage() {
         // Auto-fold any remaining active players who haven't acted (like SB)
         updatedHand.playerStates.forEach(playerState => {
           if (playerState.status === 'active' && !playerState.hasActed && playerState.position !== 'BB') {
-            console.log(`Auto-folding ${playerState.position} since BB checked in preflop`);
             playerState.status = 'folded';
             playerState.hasActed = true;
 
@@ -539,7 +533,6 @@ export default function SessionPage() {
         }
 
         updatedHand.nextToAct = nextPlayer || undefined;
-        console.log(`After action: nextToAct = ${nextPlayer}, activePlayers = ${activePlayers.map(p => `${p.position}(acted:${p.hasActed},bet:${p.currentBet})`).join(', ')}, currentBet = ${currentBet}`);
 
         // Check if round is complete: all active players have acted AND matched current bet (or are all-in)
         const allActivePlayersHaveActedAndMatched = activePlayers.every(player => {
@@ -548,14 +541,11 @@ export default function SessionPage() {
           // Player must match current bet or be all-in
           const matchesBetOrAllIn = player.currentBet === currentBet || player.status === 'all-in';
 
-          console.log(`Player ${player.position}: hasActed=${hasActedThisRound}, currentBet=${player.currentBet}, targetBet=${currentBet}, matchesBet=${matchesBetOrAllIn}`);
           return hasActedThisRound && matchesBetOrAllIn;
         });
 
-        console.log(`Round completion check: allMatched=${allActivePlayersHaveActedAndMatched}, activePlayers=${activePlayers.length}`);
 
         if (allActivePlayersHaveActedAndMatched || activePlayers.length <= 1) {
-          console.log('Marking round as complete');
           currentRound.isComplete = true;
           updatedHand.nextToAct = undefined;
         }
@@ -607,6 +597,66 @@ export default function SessionPage() {
   };
 
   // Complete the current hand
+  // Calculate total investment for a specific player across all betting rounds
+  const calculatePlayerTotalInvestment = (position: Position): number => {
+    if (!currentHand) return 0;
+
+    let totalInvestment = 0;
+    const bettingRounds = ['preflop', 'flop', 'turn', 'river'] as const;
+
+    for (const roundName of bettingRounds) {
+      const round = currentHand.bettingRounds[roundName];
+      if (round && round.actions) {
+        // Sum all betting actions for this player in this round
+        for (const action of round.actions) {
+          if (action.position === position && action.amount) {
+            totalInvestment += action.amount;
+          }
+        }
+      }
+    }
+
+    return totalInvestment;
+  };
+
+  // Calculate effective pot winnings based on side pot logic
+  const calculateEffectivePotWinnings = (outcome: 'won' | 'lost' | 'folded', potWon?: number) => {
+    if (outcome !== 'won' || !currentHand || !potWon) {
+      return 0;
+    }
+
+    // Calculate hero's maximum possible winnings based on their investment
+    // In poker, you can only win what you put in from each opponent, plus your own investment back
+    const heroInvestment = heroMoneyInvested;
+
+    // Get all active player states to calculate their investments
+    const activePlayers = currentHand.playerStates.filter(p => p.status === 'active');
+
+    // Calculate total investment from all opponents
+    let totalOpponentInvestment = 0;
+    for (const player of activePlayers) {
+      if (player.position !== session?.userSeat) {
+        // Calculate opponent's total investment across all rounds
+        const opponentInvestment = calculatePlayerTotalInvestment(player.position);
+        // Each opponent contributed at most min(heroInvestment, theirInvestment) to hero's potential winnings
+        const effectiveContribution = Math.min(heroInvestment, opponentInvestment);
+        totalOpponentInvestment += effectiveContribution;
+      }
+    }
+
+    // Hero's maximum winnings = their own investment back + what they can win from opponents
+    const maxPossibleWinnings = heroInvestment + totalOpponentInvestment;
+
+    // Actual winnings is the minimum of stated pot winnings and calculated maximum
+    const effectiveWinnings = Math.min(potWon, maxPossibleWinnings);
+
+    if (effectiveWinnings !== potWon) {
+      console.log(`Side pot applied: Limited winnings from $${potWon} to $${effectiveWinnings} (hero invested $${heroInvestment})`);
+    }
+
+    return effectiveWinnings;
+  };
+
   const completeHand = (outcome: 'won' | 'lost' | 'folded', potWon?: number) => {
     if (!currentHand || !session) return;
 
@@ -618,6 +668,9 @@ export default function SessionPage() {
       return;
     }
 
+    // Calculate effective winnings based on side pot logic
+    const effectivePotWon = calculateEffectivePotWinnings(outcome, potWon);
+
     // Save hand to storage
     const handData: StoredHand = {
       handNumber: currentHand.handNumber,
@@ -627,8 +680,8 @@ export default function SessionPage() {
       bettingRounds: currentHand.bettingRounds,
       result: {
         winner: outcome === 'won' ? session.userSeat : undefined,
-        potWon: outcome === 'won' ? potWon : undefined,
-        stackAfter: stack + (outcome === 'won' ? (potWon || 0) : 0) - heroMoneyInvested,
+        potWon: outcome === 'won' ? effectivePotWon : undefined,
+        stackAfter: stack + (outcome === 'won' ? effectivePotWon : 0) - heroMoneyInvested,
         handOutcome: outcome,
         opponentCards: Object.keys(opponentCards).length > 0 ? opponentCards : undefined
       }
@@ -639,11 +692,9 @@ export default function SessionPage() {
     // Clear current hand from storage since it's completed
     SessionService.clearCurrentHand(session.sessionId);
 
-    // Update stack
-    if (outcome === 'won') {
-      setStack(prev => prev + (potWon || 0));
-    }
-    // Note: Stack is already reduced when betting/posting blinds, so no need to deduct again
+    // Update stack to the calculated stackAfter value
+    const newStackAmount = stack + (outcome === 'won' ? effectivePotWon : 0) - heroMoneyInvested;
+    setStack(newStackAmount);
 
     // Reset and prepare for next hand
     const newHandCount = handCount + 1;
@@ -755,7 +806,6 @@ export default function SessionPage() {
       if (positionsToFold.length >= actionSequence.length) break;
     }
 
-    console.log(`Positions to fold: ${positionsToFold.join(', ')}`);
 
     // Fold the identified positions
     for (const position of positionsToFold) {
@@ -763,7 +813,6 @@ export default function SessionPage() {
       const currentRoundData = updatedHand.currentBettingRound !== 'showdown'
         ? updatedHand.bettingRounds[updatedHand.currentBettingRound]
         : null;
-      console.log(`Checking ${position}: status=${playerState?.status}, hasActed=${playerState?.hasActed}, currentBet=${playerState?.currentBet}, roundCurrentBet=${currentRoundData?.currentBet}`);
 
       // Auto-fold/check players who we're skipping past
       const currentBet = currentRoundData?.currentBet || 0;
@@ -789,7 +838,6 @@ export default function SessionPage() {
         );
 
       if (shouldAutoFold) {
-        console.log(`Auto-folding ${position}`);
         playerState.status = 'folded';
         playerState.hasActed = true; // Mark as acted since we're folding them
 
@@ -805,7 +853,6 @@ export default function SessionPage() {
           }
         }
       } else if (shouldAutoCheck) {
-        console.log(`Auto-checking ${position}`);
         playerState.hasActed = true; // Mark as acted since we're checking for them
 
         // Add check action to betting round
@@ -897,10 +944,31 @@ export default function SessionPage() {
 
     const currentBet = currentRound.currentBet || 0;
     const alreadyBet = playerState.currentBet || 0;
-    const callAmount = currentBet - alreadyBet;
+    const requiredCallAmount = currentBet - alreadyBet;
 
-    console.log(`getCallAmount for ${position}: currentBet=${currentBet}, alreadyBet=${alreadyBet}, callAmount=${callAmount}`);
-    return Math.max(0, callAmount);
+    // For hero position, limit call amount by remaining stack
+    if (position === session?.userSeat) {
+      const remainingStack = stack - heroMoneyInvested;
+      const maxCallAmount = Math.min(requiredCallAmount, remainingStack);
+      return Math.max(0, maxCallAmount);
+    }
+
+    return Math.max(0, requiredCallAmount);
+  };
+
+  // Check if a call would be an all-in for the hero
+  const isCallAllIn = (position: Position) => {
+    if (position !== session?.userSeat || !currentHand) return false;
+    const currentRound = getCurrentBettingRound();
+    if (!currentRound) return false;
+
+    const currentBet = currentRound.currentBet || 0;
+    const playerState = currentHand.playerStates.find(p => p.position === position);
+    const alreadyBet = playerState?.currentBet || 0;
+    const requiredCallAmount = currentBet - alreadyBet;
+    const remainingStack = stack - heroMoneyInvested;
+
+    return requiredCallAmount > 0 && remainingStack <= requiredCallAmount;
   };
 
   // Check if a player can check (already matches current bet)
@@ -919,13 +987,6 @@ export default function SessionPage() {
       // Only BB can check in preflop, and only if no one raised above the big blind
       if (position === 'BB') {
         const canBBCheck = currentBet === bigBlindAmount && alreadyBet === bigBlindAmount;
-        console.log('BB canCheck debug:', {
-          position,
-          currentBet,
-          alreadyBet,
-          bigBlindAmount,
-          canBBCheck
-        });
         return canBBCheck;
       } else {
         // No one else can check in preflop (must call, raise, or fold)
@@ -940,15 +1001,6 @@ export default function SessionPage() {
   const currentBettingRound = getCurrentBettingRound();
   const isBettingComplete = currentBettingRound ? (currentBettingRound.isComplete || isBettingRoundComplete(currentHand?.playerStates || [], currentBettingRound)) : false;
 
-  // Debug logging
-  if (currentBettingRound) {
-    console.log('Betting round status:', {
-      round: currentHand?.currentBettingRound,
-      isComplete: currentBettingRound.isComplete,
-      standardComplete: isBettingRoundComplete(currentHand?.playerStates || [], currentBettingRound),
-      finalIsBettingComplete: isBettingComplete
-    });
-  }
 
   // Show flop selection prompt when preflop betting is complete and not all flop cards are selected
   const showFlopSelectionPrompt = isBettingComplete &&
@@ -1013,9 +1065,7 @@ export default function SessionPage() {
             tableSeats={session.tableSeats}
             currentSeat={session.userSeat}
             onSeatSelect={(position) => {
-              console.log('Seat selected:', position);
               if (position !== 'DEALER') {
-                console.log('Starting new hand with position:', position);
                 setShowSeatSelection(false);
                 // Update session with new seat
                 const updatedSession = { ...session, userSeat: position };
@@ -1188,7 +1238,7 @@ export default function SessionPage() {
                       setSelectedPosition(null);
                     }}
                   >
-                    Call {callAmount}
+                    {selectedPosition && isCallAllIn(selectedPosition) ? `Call All-In ${callAmount}` : `Call ${callAmount}`}
                   </Button>
                 ) : null;
               })()}
@@ -1328,7 +1378,7 @@ export default function SessionPage() {
                           setSelectedPosition(null);
                         }}
                       >
-                        Call {callAmount}
+                        {selectedPosition && isCallAllIn(selectedPosition) ? `Call All-In ${callAmount}` : `Call ${callAmount}`}
                       </Button>
                     ) : null;
                   })()}

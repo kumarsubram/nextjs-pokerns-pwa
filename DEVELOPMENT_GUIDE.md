@@ -3,7 +3,41 @@
 ## Project Overview
 A Progressive Web App for tracking poker sessions, hands, and statistics. Built with Next.js 15, TypeScript, and Tailwind CSS.
 
-## RECENT UPDATES (v2.1) ✅
+## RECENT UPDATES (v2.2) ✅
+
+### Enhanced Hand History and Side Pot Logic - COMPLETED
+✅ **Progressive Community Cards Display**
+- Hand history now shows community cards progressively per betting round
+- Preflop: no cards, Flop: 3 cards, Turn: 4 cards, River: 5 cards
+- Cards displayed inline with each betting round's action log
+
+✅ **Opponent Cards in Showdown History**
+- Opponent cards are now logged and displayed in hand history during showdowns
+- Shows each opponent's hole cards when revealed at showdown
+- Clear labeling of opponent positions and their cards
+
+✅ **Proper Stack Tracking Between Hands**
+- Stack now correctly tracks wins/losses between hands in same session
+- Winning a pot increases stack for next hand's starting amount
+- Losing money decreases stack accordingly
+- Accurate session-to-session stack continuity
+
+✅ **Side Pot Logic Implementation**
+- Proper side pot calculation for all-in scenarios with different stack sizes
+- Hero can only win maximum of their investment from each opponent
+- Effective winnings limited by actual player investments
+- Console logging shows when side pot rules apply
+
+✅ **All-in Call Amount Fixes**
+- Call amounts properly limited by remaining stack size
+- "Call All-In" button text when call uses entire remaining stack
+- Prevents calls for more money than player has
+
+✅ **Code Quality Improvements**
+- Reduced excessive console logging to keep only critical messages
+- Cleaner debug output focusing on important state changes
+
+## PREVIOUS UPDATES (v2.1) ✅
 
 ### Dialog System Improvements - COMPLETED
 ✅ **Enhanced Fold Confirmation Dialog**

@@ -118,15 +118,65 @@ export function HandHistory({
       roundGroups[action.round].push(action);
     });
 
+    // Helper to get community cards for a specific round
+    const getCommunityCardsForRound = (round: string) => {
+      const cards: string[] = [];
+
+      if (round === 'Preflop') {
+        // No community cards for preflop
+        return null;
+      } else if (round === 'Flop') {
+        if (hand.communityCards?.flop) {
+          cards.push(...hand.communityCards.flop.filter(card => card));
+        }
+      } else if (round === 'Turn') {
+        if (hand.communityCards?.flop) {
+          cards.push(...hand.communityCards.flop.filter(card => card));
+        }
+        if (hand.communityCards?.turn) {
+          cards.push(hand.communityCards.turn);
+        }
+      } else if (round === 'River') {
+        if (hand.communityCards?.flop) {
+          cards.push(...hand.communityCards.flop.filter(card => card));
+        }
+        if (hand.communityCards?.turn) {
+          cards.push(hand.communityCards.turn);
+        }
+        if (hand.communityCards?.river) {
+          cards.push(hand.communityCards.river);
+        }
+      }
+
+      return cards.length > 0 ? cards : null;
+    };
+
     return (
-      <div className="space-y-2 p-3 bg-gray-50 rounded-md mt-2">
+      <div className="space-y-3 p-3 bg-gray-50 rounded-md mt-2">
         {Object.entries(roundGroups).map(([round, roundActions]) => {
           // Group actions intelligently for better readability
           const actionGroups = groupActionsForDisplay(roundActions, userSeat);
+          const communityCards = getCommunityCardsForRound(round);
 
           return (
             <div key={round}>
               <div className="text-xs font-semibold text-gray-600 mb-1">{round}:</div>
+
+              {/* Show community cards for this round */}
+              {communityCards && (
+                <div className="mb-2">
+                  <div className="text-xs text-gray-500 mb-1">Board:</div>
+                  <div className="flex gap-1">
+                    {communityCards.map((card, i) => (
+                      <span key={`${round}-${i}`} className={cn("text-xs font-bold", getCardColor(card))}>
+                        {card}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Show actions for this round */}
               <div className="space-y-1">
                 {actionGroups.map((group, groupIdx) => (
                   <div key={groupIdx} className="flex flex-wrap gap-2">
@@ -159,25 +209,25 @@ export function HandHistory({
           );
         })}
 
-        {/* Community Cards if available */}
-        {(hand.communityCards?.flop?.[0] || hand.communityCards?.turn || hand.communityCards?.river) && (
+        {/* Opponent Cards if available (shown at showdown) */}
+        {'result' in hand && hand.result.opponentCards && Object.keys(hand.result.opponentCards).length > 0 && (
           <div className="mt-2 pt-2 border-t border-gray-200">
-            <div className="text-xs font-semibold text-gray-600 mb-1">Board:</div>
-            <div className="flex gap-1">
-              {hand.communityCards.flop?.map((card, i) => card && (
-                <span key={`flop-${i}`} className={cn("text-xs font-bold", getCardColor(card))}>
-                  {card}
-                </span>
-              ))}
-              {hand.communityCards.turn && (
-                <span className={cn("text-xs font-bold ml-1", getCardColor(hand.communityCards.turn))}>
-                  {hand.communityCards.turn}
-                </span>
-              )}
-              {hand.communityCards.river && (
-                <span className={cn("text-xs font-bold ml-1", getCardColor(hand.communityCards.river))}>
-                  {hand.communityCards.river}
-                </span>
+            <div className="text-xs font-semibold text-gray-600 mb-1">Showdown Cards:</div>
+            <div className="space-y-1">
+              {Object.entries(hand.result.opponentCards).map(([position, cards]) =>
+                cards && (
+                  <div key={position} className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-gray-700">{position}:</span>
+                    <div className="flex gap-1">
+                      <span className={cn("text-xs font-bold", getCardColor(cards[0]))}>
+                        {cards[0]}
+                      </span>
+                      <span className={cn("text-xs font-bold", getCardColor(cards[1]))}>
+                        {cards[1]}
+                      </span>
+                    </div>
+                  </div>
+                )
               )}
             </div>
           </div>

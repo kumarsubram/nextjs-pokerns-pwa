@@ -1245,7 +1245,8 @@ export default function SessionPage() {
         )}
 
         {/* Action Buttons */}
-        {currentHand && !showCardSelector && !showCommunitySelector && !showPositionActions && (
+        {currentHand && !showCommunitySelector && !showPositionActions &&
+         !(showCardSelector && selectedPosition && selectedPosition !== session?.userSeat) && (
           <div className="bg-white rounded-lg p-4 shadow-sm mb-4">
             {isBettingComplete ? (
               // Show advance button when betting round is complete

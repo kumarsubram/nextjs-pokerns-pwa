@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { ChevronDown, ChevronUp, Share2, Check } from 'lucide-react';
+import { ChevronDown, ChevronUp, Share2, Check, X } from 'lucide-react';
 import { CurrentHand, StoredHand, Position } from '@/types/poker-v2';
 import { SharedHandService } from '@/services/shared-hand.service';
 import { SessionService } from '@/services/session.service';
@@ -72,25 +72,46 @@ export function HandHistory({
     const sessionMetadata = SessionService.getSessionMetadata(sessionId);
     if (!sessionMetadata) return;
 
-    const handId = SharedHandService.shareHand(hand, sessionId, sessionMetadata);
-    const shareUrl = SharedHandService.getShareUrl(handId);
+    // Check if hand is already shared
+    const isShared = SharedHandService.isHandShared(sessionId, hand.handNumber);
 
-    // Mark as shared
-    setSharedHands(prev => {
-      const newShared = new Set(prev);
-      newShared.add(hand.handNumber);
-      return newShared;
-    });
-
-    // Copy to clipboard
-    if (navigator.clipboard) {
-      try {
-        await navigator.clipboard.writeText(shareUrl);
-        setShareMessage(`Hand #${hand.handNumber} shared! Link copied to clipboard`);
+    if (isShared) {
+      // Unshare the hand
+      const handId = SharedHandService.generateHandId(sessionId, hand.handNumber);
+      if (SharedHandService.unshareHand(handId)) {
+        setSharedHands(prev => {
+          const newShared = new Set(prev);
+          newShared.delete(hand.handNumber);
+          return newShared;
+        });
+        setShareMessage(`Hand #${hand.handNumber} has been unshared`);
         setTimeout(() => setShareMessage(''), 3000);
-      } catch {
-        setShareMessage(`Hand #${hand.handNumber} shared! ${shareUrl}`);
-        setTimeout(() => setShareMessage(''), 5000);
+      } else {
+        setShareMessage(`You can only unshare hands you shared`);
+        setTimeout(() => setShareMessage(''), 3000);
+      }
+    } else {
+      // Share the hand
+      const handId = SharedHandService.shareHand(hand, sessionId, sessionMetadata);
+      const shareUrl = SharedHandService.getShareUrl(handId);
+
+      // Mark as shared
+      setSharedHands(prev => {
+        const newShared = new Set(prev);
+        newShared.add(hand.handNumber);
+        return newShared;
+      });
+
+      // Copy to clipboard
+      if (navigator.clipboard) {
+        try {
+          await navigator.clipboard.writeText(shareUrl);
+          setShareMessage(`Hand #${hand.handNumber} shared! Link copied to clipboard`);
+          setTimeout(() => setShareMessage(''), 3000);
+        } catch {
+          setShareMessage(`Hand #${hand.handNumber} shared! ${shareUrl}`);
+          setTimeout(() => setShareMessage(''), 5000);
+        }
       }
     }
   };
@@ -338,15 +359,20 @@ export function HandHistory({
               <button
                 onClick={(e) => handleShare(hand as StoredHand, e)}
                 className={cn(
-                  "p-1 rounded transition-colors",
+                  "p-1 rounded transition-colors relative group",
                   sharedHands.has(hand.handNumber) || SharedHandService.isHandShared(sessionId, hand.handNumber)
-                    ? "bg-green-100 hover:bg-green-200"
+                    ? "bg-green-100 hover:bg-red-100"
                     : "hover:bg-gray-200"
                 )}
-                title={sharedHands.has(hand.handNumber) || SharedHandService.isHandShared(sessionId, hand.handNumber) ? "Shared" : "Share hand"}
+                title={sharedHands.has(hand.handNumber) || SharedHandService.isHandShared(sessionId, hand.handNumber)
+                  ? "Click to unshare"
+                  : "Share hand"}
               >
                 {sharedHands.has(hand.handNumber) || SharedHandService.isHandShared(sessionId, hand.handNumber) ? (
-                  <Check className="h-4 w-4 text-green-600" />
+                  <>
+                    <Check className="h-4 w-4 text-green-600 group-hover:hidden" />
+                    <X className="h-4 w-4 text-red-600 hidden group-hover:block" />
+                  </>
                 ) : (
                   <Share2 className="h-4 w-4 text-gray-600" />
                 )}

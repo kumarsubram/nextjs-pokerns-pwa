@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Eye, MessageCircle, Trash2, User } from 'lucide-react';
+import { ArrowLeft, Eye, MessageCircle, Trash2, User, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { HandHistory } from '@/components/poker/HandHistory';
@@ -89,6 +89,16 @@ export default function SharedHandPage() {
     }
   };
 
+  const handleUnshare = () => {
+    if (window.confirm('Are you sure you want to unshare this hand? This will remove it from the shared list and delete all comments.')) {
+      if (SharedHandService.unshareHand(handId)) {
+        router.push('/shared');
+      } else {
+        alert('You can only unshare hands you shared');
+      }
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -146,6 +156,18 @@ export default function SharedHandPage() {
               </span>
             </div>
           </div>
+          {/* Unshare button for owner */}
+          {sharedHand.username === currentUser && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleUnshare}
+              className="text-red-600 border-red-200 hover:bg-red-50"
+            >
+              <XCircle className="h-4 w-4 mr-1" />
+              Unshare
+            </Button>
+          )}
         </div>
       </div>
 

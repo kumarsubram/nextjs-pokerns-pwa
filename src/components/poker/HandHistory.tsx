@@ -64,16 +64,6 @@ export function HandHistory({
     return position;
   };
 
-  // Toggle hand expansion
-  const toggleHand = (handNumber: number) => {
-    const newExpanded = new Set(expandedHands);
-    if (newExpanded.has(handNumber)) {
-      newExpanded.delete(handNumber);
-    } else {
-      newExpanded.add(handNumber);
-    }
-    setExpandedHands(newExpanded);
-  };
 
   // Handle share button click - now uses URL sharing for universal access
   const handleShare = async (hand: StoredHand, e: React.MouseEvent) => {
@@ -373,22 +363,21 @@ export function HandHistory({
     const isExpanded = expandedHands.has(handNumber);
     const hasCards = hand.userCards && hand.userCards[0] && hand.userCards[1];
     const outcome = 'result' in hand ? hand.result.handOutcome : null;
+    const potWon = 'result' in hand ? hand.result.potWon : null;
 
     return (
       <div key={handNumber} className="border rounded-lg bg-white shadow-sm overflow-hidden">
-        {/* Main container with 2 columns */}
-        <div className="flex">
-          {/* Left Column - 3/4 width */}
-          <div className="w-3/4 p-4">
-            {/* First Row - Hand Info */}
-            <div className="flex items-center gap-4 mb-3">
+        {/* Row 1: Hand info, cards, outcome, amount */}
+        <div className="p-4 border-b">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
               {/* Hand Number */}
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-base">
                   Hand #{handNumber}
                 </span>
                 {isCurrent && (
-                  <span className="text-sm bg-green-100 text-green-700 px-3 py-1 rounded">
+                  <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
                     Current
                   </span>
                 )}
@@ -397,147 +386,162 @@ export function HandHistory({
               {/* User Cards */}
               {hasCards ? (
                 <div className="flex gap-1">
-                  <span className={cn("text-base font-bold px-2 py-1 bg-white border rounded", getCardColor(hand.userCards![0]))}>
+                  <span className={cn("text-sm font-bold px-2 py-1 bg-white border rounded", getCardColor(hand.userCards![0]))}>
                     {hand.userCards![0]}
                   </span>
-                  <span className={cn("text-base font-bold px-2 py-1 bg-white border rounded", getCardColor(hand.userCards![1]))}>
+                  <span className={cn("text-sm font-bold px-2 py-1 bg-white border rounded", getCardColor(hand.userCards![1]))}>
                     {hand.userCards![1]}
                   </span>
                 </div>
               ) : (
-                <span className="text-sm text-gray-500 italic">Cards not selected</span>
-              )}
-
-              {/* Outcome */}
-              {outcome && (
-                <span className={cn(
-                  "text-sm font-medium px-4 py-2 rounded",
-                  outcome === 'won' ? 'bg-green-100 text-green-700' :
-                  outcome === 'lost' ? 'bg-red-100 text-red-700' :
-                  outcome === 'folded' ? 'bg-gray-100 text-gray-700' :
-                  'bg-yellow-100 text-yellow-700'
-                )}>
-                  {outcome === 'won' ? 'Won' :
-                   outcome === 'lost' ? 'Lost' :
-                   outcome === 'folded' ? 'Folded' :
-                   'Chopped'}
-                </span>
+                <span className="text-xs text-gray-500 italic">No cards</span>
               )}
             </div>
 
-            {/* Second Row - Action Buttons */}
-            {'result' in hand && (
-              <div className="flex flex-wrap gap-2">
-                {sharedHands.has(hand.handNumber) || SharedHandService.isHandShared(sessionId, hand.handNumber) ? (
-                  /* Show Unshare, Copy Link, Open Link when hand is shared */
-                  <>
-                    <button
-                      onClick={(e) => handleUnshare(hand as StoredHand, e)}
-                      className="flex items-center gap-2 px-4 py-3 rounded-md bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 transition-all hover:shadow-sm h-16 min-w-[140px] flex-1"
-                      title="Remove from your shared list"
-                    >
-                      <Trash2 className="h-4 w-4 text-red-600 flex-shrink-0" />
-                      <span className="text-sm font-medium">Unshare Hand</span>
-                    </button>
-
-                    <button
-                      onClick={(e) => handleCreateLink(hand as StoredHand, e)}
-                      className={cn(
-                        "flex items-center gap-2 px-4 py-3 rounded-md border transition-all hover:shadow-sm h-16 min-w-[140px] flex-1",
-                        copiedHandId === hand.handNumber
-                          ? "bg-green-50 border-green-200 text-green-700"
-                          : "bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
-                      )}
-                      title="Copy link to hand"
-                    >
-                      <Copy className={cn("h-4 w-4 flex-shrink-0", copiedHandId === hand.handNumber ? "text-green-600" : "text-blue-600")} />
-                      <span className="text-sm font-medium">{copiedHandId === hand.handNumber ? "Link Copied!" : "Copy Link"}</span>
-                    </button>
-
-                    <button
-                      onClick={(e) => handleOpenLink(hand as StoredHand, e)}
-                      className="flex items-center gap-2 px-4 py-3 rounded-md bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 transition-all hover:shadow-sm h-16 min-w-[140px] flex-1"
-                      title="Open hand in new tab"
-                    >
-                      <ExternalLink className="h-4 w-4 text-purple-600 flex-shrink-0" />
-                      <span className="text-sm font-medium">Open Link</span>
-                    </button>
-                  </>
-                ) : (
-                  /* Show Share, Copy Link, Open Link when hand is not shared */
-                  <>
-                    <button
-                      onClick={(e) => handleShare(hand as StoredHand, e)}
-                      className="flex items-center gap-2 px-4 py-3 rounded-md bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 transition-all hover:shadow-sm h-16 min-w-[140px] flex-1"
-                      title="Share hand and add to shared list"
-                    >
-                      <Share2 className="h-4 w-4 text-emerald-600 flex-shrink-0" />
-                      <div className="flex flex-col items-start">
-                        <span className="text-sm font-medium">Share Hand</span>
-                        <span className="text-xs italic text-emerald-600">visible to all</span>
-                      </div>
-                    </button>
-
-                    <button
-                      onClick={(e) => handleCreateLink(hand as StoredHand, e)}
-                      className={cn(
-                        "flex items-center gap-2 px-4 py-3 rounded-md border transition-all hover:shadow-sm h-16 min-w-[140px] flex-1",
-                        copiedHandId === hand.handNumber
-                          ? "bg-green-50 border-green-200 text-green-700"
-                          : "bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
-                      )}
-                      title="Copy link to hand"
-                    >
-                      <Copy className={cn("h-4 w-4 flex-shrink-0", copiedHandId === hand.handNumber ? "text-green-600" : "text-blue-600")} />
-                      <span className="text-sm font-medium">{copiedHandId === hand.handNumber ? "Link Copied!" : "Copy Link"}</span>
-                    </button>
-
-                    <button
-                      onClick={(e) => handleOpenLink(hand as StoredHand, e)}
-                      className="flex items-center gap-2 px-4 py-3 rounded-md bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 transition-all hover:shadow-sm h-16 min-w-[140px] flex-1"
-                      title="Open hand in new tab"
-                    >
-                      <ExternalLink className="h-4 w-4 text-purple-600 flex-shrink-0" />
-                      <span className="text-sm font-medium">Open Link</span>
-                    </button>
-                  </>
-                )}
-              </div>
+            {/* Outcome with Amount - Right Side */}
+            {outcome && (
+              <span className={cn(
+                "text-sm font-medium px-3 py-1 rounded",
+                outcome === 'won' ? 'bg-green-100 text-green-700' :
+                outcome === 'lost' ? 'bg-red-100 text-red-700' :
+                outcome === 'folded' ? 'bg-gray-100 text-gray-700' :
+                'bg-yellow-100 text-yellow-700'
+              )}>
+                {outcome === 'won' ? `Won ${potWon || 0}` :
+                 outcome === 'lost' ? `Lost ${Math.abs(potWon || 0)}` :
+                 outcome === 'folded' ? 'Folded' :
+                 'Chopped'}
+              </span>
             )}
           </div>
+        </div>
 
-          {/* Right Column - 1/4 width - Expand/Collapse */}
-          <button
-            onClick={() => toggleHand(handNumber)}
-            className="w-1/4 bg-gray-50 hover:bg-gray-100 transition-colors border-l border-gray-200 flex flex-col items-center justify-center gap-2 cursor-pointer"
-          >
-            <div className={cn(
-              "w-12 h-12 rounded-full flex items-center justify-center transition-all",
-              isExpanded ? "bg-blue-100" : "bg-gray-200"
-            )}>
-              {isExpanded ? (
-                <ChevronUp className="h-6 w-6 text-blue-600" />
-              ) : (
-                <ChevronDown className="h-6 w-6 text-gray-600" />
+        {/* Row 2: Buttons and Dropdown */}
+        <div className="p-4">
+          <div className="flex gap-4">
+            {/* Left Column: Action Buttons (3/4 width) */}
+            <div className="flex-1">
+              {'result' in hand && (
+                <>
+                  {sharedHands.has(hand.handNumber) || SharedHandService.isHandShared(sessionId, hand.handNumber) ? (
+                    /* Show Unshare, Copy Link, Open Link when hand is shared */
+                    <div className="space-y-2">
+                      <button
+                        onClick={(e) => handleUnshare(hand as StoredHand, e)}
+                        className="flex items-center justify-center gap-2 px-3 py-3 rounded-md bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 transition-all text-xs h-12 w-full"
+                        title="Remove from your shared list"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        <span>Unshare</span>
+                      </button>
+
+                      <button
+                        onClick={(e) => handleCreateLink(hand as StoredHand, e)}
+                        className={cn(
+                          "flex items-center justify-center gap-2 px-3 py-3 rounded-md border transition-all text-xs h-12 w-full",
+                          copiedHandId === hand.handNumber
+                            ? "bg-green-50 border-green-200 text-green-700"
+                            : "bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
+                        )}
+                        title="Copy share link to clipboard"
+                      >
+                        <Copy className="h-3 w-3" />
+                        <span>{copiedHandId === hand.handNumber ? 'Copied!' : 'Copy Link'}</span>
+                      </button>
+
+                      <button
+                        onClick={(e) => handleOpenLink(hand as StoredHand, e)}
+                        className="flex items-center justify-center gap-2 px-3 py-3 rounded-md bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 transition-all text-xs h-12 w-full"
+                        title="Open hand in shared view"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        <span>Open</span>
+                      </button>
+                    </div>
+                  ) : (
+                    /* Show Share Hand when hand is not shared */
+                    <div className="space-y-2">
+                      <button
+                        onClick={(e) => handleShare(hand as StoredHand, e)}
+                        className="flex flex-col items-center justify-center px-3 py-2 rounded-md bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 transition-all text-xs h-12 w-full"
+                        title="Share hand for review and feedback"
+                      >
+                        <div className="flex items-center gap-1">
+                          <Share2 className="h-3 w-3" />
+                          <span>Share Hand</span>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-0.5">Visible to All</div>
+                      </button>
+
+                      <button
+                        onClick={(e) => handleCreateLink(hand as StoredHand, e)}
+                        className={cn(
+                          "flex items-center justify-center gap-2 px-3 py-3 rounded-md border transition-all text-xs h-12 w-full",
+                          copiedHandId === hand.handNumber
+                            ? "bg-green-50 border-green-200 text-green-700"
+                            : "bg-green-50 hover:bg-green-100 border-green-200 text-green-700"
+                        )}
+                        title="Copy share link to clipboard"
+                      >
+                        <Copy className="h-3 w-3" />
+                        <span>{copiedHandId === hand.handNumber ? 'Copied!' : 'Copy Link'}</span>
+                      </button>
+
+                      <button
+                        onClick={(e) => handleOpenLink(hand as StoredHand, e)}
+                        className="flex items-center justify-center gap-2 px-3 py-3 rounded-md bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 transition-all text-xs h-12 w-full"
+                        title="Open hand in shared view"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        <span>Open Link</span>
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
-            <span className="text-xs font-medium text-gray-600 text-center px-2">
-              {isExpanded ? "Hide Details" : "View Hand Flow"}
-            </span>
-          </button>
+
+            {/* Divider */}
+            <div className="w-px bg-gray-200"></div>
+
+            {/* Right Column: Dropdown Toggle (1/4 width) */}
+            <div className="w-24 flex flex-col items-center justify-center">
+              <button
+                className="flex flex-col items-center justify-center w-full bg-gray-50 hover:bg-gray-100 rounded-md transition-colors py-2"
+                onClick={() => {
+                  const newExpanded = new Set(expandedHands);
+                  if (isExpanded) {
+                    newExpanded.delete(handNumber);
+                  } else {
+                    newExpanded.add(handNumber);
+                  }
+                  setExpandedHands(newExpanded);
+                }}
+              >
+                {isExpanded ? (
+                  <>
+                    <ChevronUp className="h-5 w-5 text-blue-600 mb-1" />
+                    <span className="text-xs text-gray-600 text-center">
+                      Hide Details
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-5 w-5 text-gray-600 mb-1" />
+                    <span className="text-xs text-gray-600 text-center">
+                      Show Details
+                    </span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Expandable Action Log */}
         {isExpanded && (
           <div className="border-t px-4 pb-4 pt-3">
             {renderActionLog(hand)}
-
-            {/* Pot Information */}
-            {'result' in hand && hand.result.potWon !== undefined && (
-              <div className="mt-3 text-sm text-gray-600">
-                Pot won: <span className="font-semibold">{hand.result.potWon}</span>
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -546,8 +550,6 @@ export function HandHistory({
 
   return (
     <div className={cn("space-y-2", className)}>
-      <h3 className="text-lg font-semibold mb-3">Hand History</h3>
-
       {/* Current Hand */}
       {currentHand && renderHand(currentHand, true)}
 

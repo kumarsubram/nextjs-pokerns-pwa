@@ -58,25 +58,6 @@ export default function SharedHandsList() {
     }
   };
 
-  const getOutcomeColor = (outcome?: string) => {
-    switch (outcome) {
-      case 'won': return 'text-green-600';
-      case 'lost': return 'text-red-600';
-      case 'folded': return 'text-gray-600';
-      case 'chopped': return 'text-yellow-600';
-      default: return 'text-gray-600';
-    }
-  };
-
-  const getOutcomeLabel = (outcome?: string) => {
-    switch (outcome) {
-      case 'won': return 'Won';
-      case 'lost': return 'Lost';
-      case 'folded': return 'Folded';
-      case 'chopped': return 'Chopped';
-      default: return 'Unknown';
-    }
-  };
 
   const sortedHands = getSortedHands();
 
@@ -169,9 +150,11 @@ export default function SharedHandsList() {
                         {hand.sessionMetadata.sessionName} • Hand #{hand.handData.handNumber}
                       </div>
                     </div>
-                    <span className={cn("text-xs font-medium px-2 py-0.5 rounded", getOutcomeColor(hand.handData.result?.handOutcome))}>
-                      {getOutcomeLabel(hand.handData.result?.handOutcome)}
-                    </span>
+                    {hand.handData.result?.potWon && (
+                      <span className="text-green-600 font-medium text-sm">
+                        Won {hand.handData.result.potWon}
+                      </span>
+                    )}
                   </div>
 
                   {/* Cards and Details */}
@@ -214,11 +197,6 @@ export default function SharedHandsList() {
                       <MessageCircle className="h-3 w-3" />
                       {hand.comments.length} comments
                     </span>
-                    {hand.handData.result?.potWon && (
-                      <span className="text-green-600 font-medium">
-                        Won ${hand.handData.result.potWon}
-                      </span>
-                    )}
                   </div>
                 </CardContent>
               </Card>

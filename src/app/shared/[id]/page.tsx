@@ -207,45 +207,36 @@ export default function SharedHandPage() {
       <div className="p-4 max-w-4xl mx-auto space-y-4">
         {/* Game Details */}
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Game Details</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0 pb-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <div className="text-sm">
-                <span className="text-gray-600">Game Type: </span>
+          <CardContent className="p-3">
+            <div className="text-sm font-medium mb-1">Game Details</div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 text-xs">
+              <div>
+                <span className="text-gray-500">Game: </span>
                 <span className="font-medium">{sharedHand.sessionMetadata.gameType}</span>
               </div>
-              <div className="text-sm">
-                <span className="text-gray-600">Table Size: </span>
-                <span className="font-medium">{sharedHand.sessionMetadata.tableSeats}-handed</span>
+              <div>
+                <span className="text-gray-500">Size: </span>
+                <span className="font-medium">{sharedHand.sessionMetadata.tableSeats}h</span>
               </div>
-              <div className="text-sm">
-                <span className="text-gray-600">Hero Position: </span>
+              <div>
+                <span className="text-gray-500">Hero: </span>
                 <span className="font-medium">{sharedHand.sessionMetadata.userSeat}</span>
               </div>
-              <div className="text-sm">
-                <span className="text-gray-600">Shared: </span>
+              <div>
+                <span className="text-gray-500">Shared: </span>
                 <span className="font-medium">{formatDate(sharedHand.sharedAt)}</span>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Hand History */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Hand History</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <HandHistory
-              completedHands={[sharedHand.handData]}
-              userSeat={sharedHand.sessionMetadata.userSeat}
-              className="space-y-3"
-              defaultExpanded={true}
-            />
-          </CardContent>
-        </Card>
+        {/* Hand Details */}
+        <HandHistory
+          completedHands={[sharedHand.handData]}
+          userSeat={sharedHand.sessionMetadata.userSeat}
+          className="space-y-3"
+          defaultExpanded={true}
+        />
 
         {/* Comments Section */}
         <Card>

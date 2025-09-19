@@ -259,6 +259,11 @@ export default function SessionPage() {
     setSelectedCard2(null);
     setHeroMoneyInvested(initialHeroInvestment);
 
+    // Reset community selector states to prevent auto-trigger
+    setShowCommunitySelector(false);
+    setSelectingCommunityCard(null);
+    setAutoSelectingCommunityCards(false);
+
     // Deduct blinds from hero's stack if on blind position
     if (userSeat === 'SB') {
       setStack(prev => prev - smallBlind);

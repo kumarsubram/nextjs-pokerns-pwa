@@ -2,14 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Eye, MessageCircle, Trash2, User, XCircle } from 'lucide-react';
+import { ArrowLeft, Eye, MessageCircle, Trash2, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { HandHistory } from '@/components/poker/HandHistory';
-import { UnshareDialog } from '@/components/dialog/UnshareDialog';
 import { SharedHandService } from '@/services/shared-hand.service';
 import { SharedHand } from '@/types/poker-v2';
 
@@ -26,7 +25,6 @@ export default function SharedHandPage() {
   const [usernameInput, setUsernameInput] = useState('');
   const [showUsernameDialog, setShowUsernameDialog] = useState(false);
   const [attemptedComment, setAttemptedComment] = useState('');
-  const [showUnshareDialog, setShowUnshareDialog] = useState(false);
 
   useEffect(() => {
     if (!handId) return;
@@ -117,19 +115,6 @@ export default function SharedHandPage() {
     }
   };
 
-  const handleUnshare = () => {
-    setShowUnshareDialog(true);
-  };
-
-  const handleConfirmUnshare = () => {
-    if (SharedHandService.unshareHand(handId)) {
-      setShowUnshareDialog(false);
-      router.push('/');
-    } else {
-      setShowUnshareDialog(false);
-      alert('You can only unshare hands you shared');
-    }
-  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -188,18 +173,6 @@ export default function SharedHandPage() {
               </span>
             </div>
           </div>
-          {/* Unshare button for owner */}
-          {sharedHand.username === currentUser && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleUnshare}
-              className="text-red-600 border-red-200 hover:bg-red-50"
-            >
-              <XCircle className="h-4 w-4 mr-1" />
-              Unshare
-            </Button>
-          )}
         </div>
       </div>
 
@@ -236,6 +209,7 @@ export default function SharedHandPage() {
           userSeat={sharedHand.sessionMetadata.userSeat}
           className="space-y-3"
           defaultExpanded={true}
+          hideShareButtons={true}
         />
 
         {/* Comments Section */}
@@ -301,13 +275,6 @@ export default function SharedHandPage() {
         </Card>
       </div>
 
-      {/* Unshare Dialog */}
-      <UnshareDialog
-        open={showUnshareDialog}
-        onOpenChange={setShowUnshareDialog}
-        onConfirm={handleConfirmUnshare}
-        onCancel={() => setShowUnshareDialog(false)}
-      />
 
       {/* Username Setup Dialog */}
       <Dialog open={showUsernameDialog} onOpenChange={setShowUsernameDialog}>

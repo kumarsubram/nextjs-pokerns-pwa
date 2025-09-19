@@ -150,9 +150,20 @@ export default function SharedHandsList() {
                         {hand.sessionMetadata.sessionName} • Hand #{hand.handData.handNumber}
                       </div>
                     </div>
-                    {hand.handData.result?.potWon && (
-                      <span className="text-green-600 font-medium text-sm">
-                        Won {hand.handData.result.potWon}
+                    {hand.handData.result?.potWon !== undefined && hand.handData.result?.handOutcome && (
+                      <span className={`font-medium text-sm ${
+                        hand.handData.result.handOutcome === 'won'
+                          ? 'text-green-600'
+                          : hand.handData.result.handOutcome === 'lost'
+                          ? 'text-red-600'
+                          : 'text-gray-600'
+                      }`}>
+                        {hand.handData.result.handOutcome === 'won'
+                          ? `Won ${hand.handData.result.potWon}`
+                          : hand.handData.result.handOutcome === 'lost'
+                          ? `Lost ${hand.handData.result.potWon}`
+                          : 'Folded'
+                        }
                       </span>
                     )}
                   </div>

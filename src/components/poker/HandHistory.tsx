@@ -15,6 +15,7 @@ interface HandHistoryProps {
   userSeat?: Position;
   className?: string;
   defaultExpanded?: boolean;
+  hideShareButtons?: boolean;
 }
 
 export function HandHistory({
@@ -22,7 +23,8 @@ export function HandHistory({
   completedHands = [],
   userSeat,
   className,
-  defaultExpanded = false
+  defaultExpanded = false,
+  hideShareButtons = false
 }: HandHistoryProps) {
   const [expandedHands, setExpandedHands] = useState<Set<number>>(() => {
     if (defaultExpanded) {
@@ -408,7 +410,7 @@ export function HandHistory({
                 'bg-yellow-100 text-yellow-700'
               )}>
                 {outcome === 'won' ? `Won ${potWon || 0}` :
-                 outcome === 'lost' ? `Lost ${Math.abs(potWon || 0)}` :
+                 outcome === 'lost' ? `Lost ${potWon || 0}` :
                  outcome === 'folded' ? 'Folded' :
                  'Chopped'}
               </span>
@@ -418,124 +420,160 @@ export function HandHistory({
 
         {/* Row 2: Buttons and Dropdown */}
         <div className="p-4">
-          <div className="flex gap-4">
-            {/* Left Column: Action Buttons (3/4 width) */}
-            <div className="flex-1">
-              {'result' in hand && (
-                <>
-                  {sharedHands.has(hand.handNumber) || SharedHandService.isHandShared(sessionId, hand.handNumber) ? (
-                    /* Show Unshare, Copy Link, Open Link when hand is shared */
-                    <div className="space-y-2">
-                      <button
-                        onClick={(e) => handleUnshare(hand as StoredHand, e)}
-                        className="flex items-center justify-center gap-2 px-3 py-3 rounded-md bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 transition-all text-xs h-12 w-full"
-                        title="Remove from your shared list"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                        <span>Unshare</span>
-                      </button>
-
-                      <button
-                        onClick={(e) => handleCreateLink(hand as StoredHand, e)}
-                        className={cn(
-                          "flex items-center justify-center gap-2 px-3 py-3 rounded-md border transition-all text-xs h-12 w-full",
-                          copiedHandId === hand.handNumber
-                            ? "bg-green-50 border-green-200 text-green-700"
-                            : "bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
-                        )}
-                        title="Copy share link to clipboard"
-                      >
-                        <Copy className="h-3 w-3" />
-                        <span>{copiedHandId === hand.handNumber ? 'Copied!' : 'Copy Link'}</span>
-                      </button>
-
-                      <button
-                        onClick={(e) => handleOpenLink(hand as StoredHand, e)}
-                        className="flex items-center justify-center gap-2 px-3 py-3 rounded-md bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 transition-all text-xs h-12 w-full"
-                        title="Open hand in shared view"
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        <span>Open</span>
-                      </button>
-                    </div>
+          {hideShareButtons ? (
+            /* When share buttons are hidden, show only the toggle button centered */
+            <div className="flex justify-center">
+              <div className="w-24 flex flex-col items-center justify-center">
+                <button
+                  className="flex flex-col items-center justify-center w-full bg-gray-50 hover:bg-gray-100 rounded-md transition-colors py-2"
+                  onClick={() => {
+                    const newExpanded = new Set(expandedHands);
+                    if (isExpanded) {
+                      newExpanded.delete(handNumber);
+                    } else {
+                      newExpanded.add(handNumber);
+                    }
+                    setExpandedHands(newExpanded);
+                  }}
+                >
+                  {isExpanded ? (
+                    <>
+                      <ChevronUp className="h-5 w-5 text-blue-600 mb-1" />
+                      <span className="text-xs text-gray-600 text-center">
+                        Hide Details
+                      </span>
+                    </>
                   ) : (
-                    /* Show Share Hand when hand is not shared */
-                    <div className="space-y-2">
-                      <button
-                        onClick={(e) => handleShare(hand as StoredHand, e)}
-                        className="flex flex-col items-center justify-center px-3 py-2 rounded-md bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 transition-all text-xs h-12 w-full"
-                        title="Share hand for review and feedback"
-                      >
-                        <div className="flex items-center gap-1">
-                          <Share2 className="h-3 w-3" />
-                          <span>Share Hand</span>
-                        </div>
-                        <div className="text-xs text-gray-500 mt-0.5">Visible to All</div>
-                      </button>
-
-                      <button
-                        onClick={(e) => handleCreateLink(hand as StoredHand, e)}
-                        className={cn(
-                          "flex items-center justify-center gap-2 px-3 py-3 rounded-md border transition-all text-xs h-12 w-full",
-                          copiedHandId === hand.handNumber
-                            ? "bg-green-50 border-green-200 text-green-700"
-                            : "bg-green-50 hover:bg-green-100 border-green-200 text-green-700"
-                        )}
-                        title="Copy share link to clipboard"
-                      >
-                        <Copy className="h-3 w-3" />
-                        <span>{copiedHandId === hand.handNumber ? 'Copied!' : 'Copy Link'}</span>
-                      </button>
-
-                      <button
-                        onClick={(e) => handleOpenLink(hand as StoredHand, e)}
-                        className="flex items-center justify-center gap-2 px-3 py-3 rounded-md bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 transition-all text-xs h-12 w-full"
-                        title="Open hand in shared view"
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        <span>Open Link</span>
-                      </button>
-                    </div>
+                    <>
+                      <ChevronDown className="h-5 w-5 text-gray-600 mb-1" />
+                      <span className="text-xs text-gray-600 text-center">
+                        Show Details
+                      </span>
+                    </>
                   )}
-                </>
-              )}
+                </button>
+              </div>
             </div>
-
-            {/* Divider */}
-            <div className="w-px bg-gray-200"></div>
-
-            {/* Right Column: Dropdown Toggle (1/4 width) */}
-            <div className="w-24 flex flex-col items-center justify-center">
-              <button
-                className="flex flex-col items-center justify-center w-full bg-gray-50 hover:bg-gray-100 rounded-md transition-colors py-2"
-                onClick={() => {
-                  const newExpanded = new Set(expandedHands);
-                  if (isExpanded) {
-                    newExpanded.delete(handNumber);
-                  } else {
-                    newExpanded.add(handNumber);
-                  }
-                  setExpandedHands(newExpanded);
-                }}
-              >
-                {isExpanded ? (
+          ) : (
+            <div className="flex gap-4">
+              {/* Left Column: Action Buttons (3/4 width) */}
+              <div className="flex-1">
+                {'result' in hand && (
                   <>
-                    <ChevronUp className="h-5 w-5 text-blue-600 mb-1" />
-                    <span className="text-xs text-gray-600 text-center">
-                      Hide Details
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <ChevronDown className="h-5 w-5 text-gray-600 mb-1" />
-                    <span className="text-xs text-gray-600 text-center">
-                      Show Details
-                    </span>
+                    {sharedHands.has(hand.handNumber) || SharedHandService.isHandShared(sessionId, hand.handNumber) ? (
+                      /* Show Unshare, Copy Link, Open Link when hand is shared */
+                      <div className="space-y-2">
+                        <button
+                          onClick={(e) => handleUnshare(hand as StoredHand, e)}
+                          className="flex items-center justify-center gap-2 px-3 py-3 rounded-md bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 transition-all text-xs h-12 w-full"
+                          title="Remove from your shared list"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          <span>Unshare</span>
+                        </button>
+
+                        <button
+                          onClick={(e) => handleCreateLink(hand as StoredHand, e)}
+                          className={cn(
+                            "flex items-center justify-center gap-2 px-3 py-3 rounded-md border transition-all text-xs h-12 w-full",
+                            copiedHandId === hand.handNumber
+                              ? "bg-green-50 border-green-200 text-green-700"
+                              : "bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
+                          )}
+                          title="Copy share link to clipboard"
+                        >
+                          <Copy className="h-3 w-3" />
+                          <span>{copiedHandId === hand.handNumber ? 'Copied!' : 'Copy Link'}</span>
+                        </button>
+
+                        <button
+                          onClick={(e) => handleOpenLink(hand as StoredHand, e)}
+                          className="flex items-center justify-center gap-2 px-3 py-3 rounded-md bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 transition-all text-xs h-12 w-full"
+                          title="Open hand in shared view"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          <span>Open</span>
+                        </button>
+                      </div>
+                    ) : (
+                      /* Show Share Hand when hand is not shared */
+                      <div className="space-y-2">
+                        <button
+                          onClick={(e) => handleShare(hand as StoredHand, e)}
+                          className="flex flex-col items-center justify-center px-3 py-2 rounded-md bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 transition-all text-xs h-12 w-full"
+                          title="Share hand for review and feedback"
+                        >
+                          <div className="flex items-center gap-1">
+                            <Share2 className="h-3 w-3" />
+                            <span>Share Hand</span>
+                          </div>
+                          <div className="text-xs text-gray-500 mt-0.5">Visible to All</div>
+                        </button>
+
+                        <button
+                          onClick={(e) => handleCreateLink(hand as StoredHand, e)}
+                          className={cn(
+                            "flex items-center justify-center gap-2 px-3 py-3 rounded-md border transition-all text-xs h-12 w-full",
+                            copiedHandId === hand.handNumber
+                              ? "bg-green-50 border-green-200 text-green-700"
+                              : "bg-green-50 hover:bg-green-100 border-green-200 text-green-700"
+                          )}
+                          title="Copy share link to clipboard"
+                        >
+                          <Copy className="h-3 w-3" />
+                          <span>{copiedHandId === hand.handNumber ? 'Copied!' : 'Copy Link'}</span>
+                        </button>
+
+                        <button
+                          onClick={(e) => handleOpenLink(hand as StoredHand, e)}
+                          className="flex items-center justify-center gap-2 px-3 py-3 rounded-md bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 transition-all text-xs h-12 w-full"
+                          title="Open hand in shared view"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          <span>Open Link</span>
+                        </button>
+                      </div>
+                    )}
                   </>
                 )}
-              </button>
+              </div>
+
+              {/* Divider */}
+              <div className="w-px bg-gray-200"></div>
+
+              {/* Right Column: Dropdown Toggle (1/4 width) */}
+              <div className="w-24 flex flex-col items-center justify-center">
+                <button
+                  className="flex flex-col items-center justify-center w-full bg-gray-50 hover:bg-gray-100 rounded-md transition-colors py-2"
+                  onClick={() => {
+                    const newExpanded = new Set(expandedHands);
+                    if (isExpanded) {
+                      newExpanded.delete(handNumber);
+                    } else {
+                      newExpanded.add(handNumber);
+                    }
+                    setExpandedHands(newExpanded);
+                  }}
+                >
+                  {isExpanded ? (
+                    <>
+                      <ChevronUp className="h-5 w-5 text-blue-600 mb-1" />
+                      <span className="text-xs text-gray-600 text-center">
+                        Hide Details
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="h-5 w-5 text-gray-600 mb-1" />
+                      <span className="text-xs text-gray-600 text-center">
+                        Show Details
+                      </span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Expandable Action Log */}

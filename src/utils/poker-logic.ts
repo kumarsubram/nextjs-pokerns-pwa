@@ -111,16 +111,17 @@ export function isBettingRoundComplete(
   playerStates: PlayerState[],
   bettingRound: BettingRound
 ): boolean {
-  const activePlayers = playerStates.filter(p => p.status === 'active');
+  // Include both active and all-in players who can still participate in the hand
+  const activeAndAllInPlayers = playerStates.filter(p => p.status === 'active' || p.status === 'all-in');
 
-  if (activePlayers.length <= 1) {
-    return true; // Only one active player left
+  if (activeAndAllInPlayers.filter(p => p.status === 'active').length <= 1) {
+    return true; // Only one active (non all-in) player left
   }
 
   const currentBet = bettingRound.currentBet;
 
-  // All active players must have acted and matched the current bet
-  return activePlayers.every(player =>
+  // All active and all-in players must have acted and matched the current bet (or be all-in)
+  return activeAndAllInPlayers.every(player =>
     player.hasActed && (player.currentBet === currentBet || player.status === 'all-in')
   );
 }

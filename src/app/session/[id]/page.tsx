@@ -741,7 +741,7 @@ export default function SessionPage() {
       bettingRounds: currentHand.bettingRounds,
       result: {
         winner: outcome === 'won' ? session.userSeat : undefined,
-        potWon: outcome === 'won' ? effectivePotWon : undefined,
+        potWon: outcome === 'won' ? (effectivePotWon - heroMoneyInvested) : (outcome === 'lost' ? heroMoneyInvested : undefined),
         stackAfter: stack + (outcome === 'won' ? effectivePotWon : 0) - heroMoneyInvested,
         handOutcome: outcome,
         opponentCards: Object.keys(opponentCards).length > 0 ? opponentCards : undefined

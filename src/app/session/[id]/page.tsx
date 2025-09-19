@@ -1245,6 +1245,9 @@ export default function SessionPage() {
     const hasActions = currentRound && currentRound.actions && currentRound.actions.length > 0;
     if (!hasActions) return;
 
+    // Additional safety check: Don't auto-trigger if we're showing seat selection
+    if (showSeatSelection) return;
+
     if (needsCommunityCards) {
       // Auto-trigger the first card selection
       const getNextCardToSelect = () => {
@@ -1272,7 +1275,7 @@ export default function SessionPage() {
     } else {
       setAutoSelectingCommunityCards(false);
     }
-  }, [currentHand, isBettingComplete, showCommunitySelector, needsCommunityCards]);
+  }, [currentHand, isBettingComplete, showCommunitySelector, needsCommunityCards, showSeatSelection]);
 
   const endSession = () => {
     SessionService.endCurrentSession();

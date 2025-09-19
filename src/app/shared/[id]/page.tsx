@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { HandHistory } from '@/components/poker/HandHistory';
+import { UnshareDialog } from '@/components/dialog/UnshareDialog';
 import { SharedHandService } from '@/services/shared-hand.service';
 import { SharedHand } from '@/types/poker-v2';
 
@@ -25,6 +26,7 @@ export default function SharedHandPage() {
   const [usernameInput, setUsernameInput] = useState('');
   const [showUsernameDialog, setShowUsernameDialog] = useState(false);
   const [attemptedComment, setAttemptedComment] = useState('');
+  const [showUnshareDialog, setShowUnshareDialog] = useState(false);
 
   useEffect(() => {
     if (!handId) return;
@@ -116,12 +118,16 @@ export default function SharedHandPage() {
   };
 
   const handleUnshare = () => {
-    if (window.confirm('Are you sure you want to unshare this hand? This will remove it from the shared list and delete all comments.')) {
-      if (SharedHandService.unshareHand(handId)) {
-        router.push('/shared');
-      } else {
-        alert('You can only unshare hands you shared');
-      }
+    setShowUnshareDialog(true);
+  };
+
+  const handleConfirmUnshare = () => {
+    if (SharedHandService.unshareHand(handId)) {
+      setShowUnshareDialog(false);
+      router.push('/');
+    } else {
+      setShowUnshareDialog(false);
+      alert('You can only unshare hands you shared');
     }
   };
 
@@ -201,26 +207,26 @@ export default function SharedHandPage() {
       <div className="p-4 max-w-4xl mx-auto space-y-4">
         {/* Game Details */}
         <Card>
-          <CardHeader className="pb-3">
+          <CardHeader className="pb-2">
             <CardTitle className="text-base">Game Details</CardTitle>
           </CardHeader>
-          <CardContent className="pt-0">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="flex justify-between py-1">
-                <span className="text-sm text-gray-600">Game Type:</span>
-                <span className="text-sm font-medium">{sharedHand.sessionMetadata.gameType}</span>
+          <CardContent className="pt-0 pb-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="text-sm">
+                <span className="text-gray-600">Game Type: </span>
+                <span className="font-medium">{sharedHand.sessionMetadata.gameType}</span>
               </div>
-              <div className="flex justify-between py-1">
-                <span className="text-sm text-gray-600">Table Size:</span>
-                <span className="text-sm font-medium">{sharedHand.sessionMetadata.tableSeats}-handed</span>
+              <div className="text-sm">
+                <span className="text-gray-600">Table Size: </span>
+                <span className="font-medium">{sharedHand.sessionMetadata.tableSeats}-handed</span>
               </div>
-              <div className="flex justify-between py-1">
-                <span className="text-sm text-gray-600">Hero Position:</span>
-                <span className="text-sm font-medium">{sharedHand.sessionMetadata.userSeat}</span>
+              <div className="text-sm">
+                <span className="text-gray-600">Hero Position: </span>
+                <span className="font-medium">{sharedHand.sessionMetadata.userSeat}</span>
               </div>
-              <div className="flex justify-between py-1">
-                <span className="text-sm text-gray-600">Shared:</span>
-                <span className="text-sm font-medium">{formatDate(sharedHand.sharedAt)}</span>
+              <div className="text-sm">
+                <span className="text-gray-600">Shared: </span>
+                <span className="font-medium">{formatDate(sharedHand.sharedAt)}</span>
               </div>
             </div>
           </CardContent>
@@ -303,6 +309,14 @@ export default function SharedHandPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Unshare Dialog */}
+      <UnshareDialog
+        open={showUnshareDialog}
+        onOpenChange={setShowUnshareDialog}
+        onConfirm={handleConfirmUnshare}
+        onCancel={() => setShowUnshareDialog(false)}
+      />
 
       {/* Username Setup Dialog */}
       <Dialog open={showUsernameDialog} onOpenChange={setShowUsernameDialog}>

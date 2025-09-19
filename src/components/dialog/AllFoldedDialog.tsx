@@ -139,8 +139,9 @@ export function AllFoldedDialog({
         {/* Action Button */}
         <div className="flex justify-center mt-6">
           <Button
-            className="bg-green-600 hover:bg-green-700 text-white px-8 py-2"
+            className="bg-green-600 hover:bg-green-700 text-white px-8 py-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
             onClick={onCompleteHand}
+            disabled={!currentHand?.userCards || !currentHand.userCards[0] || !currentHand.userCards[1]}
           >
             Complete Hand
           </Button>

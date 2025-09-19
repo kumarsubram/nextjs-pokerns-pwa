@@ -2123,7 +2123,22 @@ export default function SessionPage() {
 
         <AllFoldedDialog
           open={showAllFoldedDialog}
-          onOpenChange={setShowAllFoldedDialog}
+          onOpenChange={(open) => {
+            if (!open) {
+              // If dialog is being closed, check if user has selected cards
+              const hasUserCards = currentHand?.userCards && currentHand.userCards[0] && currentHand.userCards[1];
+              if (hasUserCards) {
+                // Complete hand normally if cards are selected
+                completeHand('won', currentHand?.pot || 0);
+              } else {
+                // Discard hand and move to next hand if no cards selected
+                if (session && session.userSeat) {
+                  startNewHandWithPosition(session, session.userSeat);
+                }
+              }
+            }
+            setShowAllFoldedDialog(open);
+          }}
           currentHand={currentHand}
           userSeat={session?.userSeat}
           inlineCardSelection={inlineCardSelection}

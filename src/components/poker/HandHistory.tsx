@@ -419,50 +419,59 @@ export function HandHistory({
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             {/* Share Buttons */}
             {'result' in hand && (
-              <div className="flex items-center gap-1">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-1">
                 <button
                   onClick={(e) => handleShare(hand as StoredHand, e)}
                   className={cn(
-                    "p-1 rounded transition-colors",
+                    "flex items-center gap-2 px-3 py-2 sm:p-1 rounded transition-colors text-sm sm:text-xs font-medium sm:font-normal min-h-[44px] sm:min-h-auto",
                     sharedHands.has(hand.handNumber) || SharedHandService.isHandShared(sessionId, hand.handNumber)
-                      ? "bg-green-100 hover:bg-green-200"
-                      : "hover:bg-gray-200"
+                      ? "bg-green-100 hover:bg-green-200 text-green-700"
+                      : "bg-gray-100 hover:bg-gray-200 text-gray-700"
                   )}
                   title="Share hand and add to shared list"
                 >
                   {sharedHands.has(hand.handNumber) || SharedHandService.isHandShared(sessionId, hand.handNumber) ? (
-                    <Link className="h-4 w-4 text-green-600" />
+                    <>
+                      <Link className="h-4 w-4 text-green-600" />
+                      <span className="sm:hidden">Hand Shared</span>
+                    </>
                   ) : (
-                    <Share2 className="h-4 w-4 text-gray-600" />
+                    <>
+                      <Share2 className="h-4 w-4 text-gray-600" />
+                      <span className="sm:hidden">Share Hand</span>
+                    </>
                   )}
                 </button>
 
                 <button
                   onClick={(e) => handleCreateLink(hand as StoredHand, e)}
-                  className="p-1 rounded hover:bg-blue-100 transition-colors"
+                  className="flex items-center gap-2 px-3 py-2 sm:p-1 rounded bg-blue-100 hover:bg-blue-200 text-blue-700 transition-colors text-sm sm:text-xs font-medium sm:font-normal min-h-[44px] sm:min-h-auto"
                   title="Copy link to hand"
                 >
                   <Copy className="h-4 w-4 text-blue-600" />
+                  <span className="sm:hidden">Copy Link</span>
                 </button>
 
                 <button
                   onClick={(e) => handleOpenLink(hand as StoredHand, e)}
-                  className="p-1 rounded hover:bg-purple-100 transition-colors"
+                  className="flex items-center gap-2 px-3 py-2 sm:p-1 rounded bg-purple-100 hover:bg-purple-200 text-purple-700 transition-colors text-sm sm:text-xs font-medium sm:font-normal min-h-[44px] sm:min-h-auto"
                   title="Open hand in new tab"
                 >
                   <ExternalLink className="h-4 w-4 text-purple-600" />
+                  <span className="sm:hidden">Open Link</span>
                 </button>
 
                 {(sharedHands.has(hand.handNumber) || SharedHandService.isHandShared(sessionId, hand.handNumber)) && (
                   <button
                     onClick={(e) => handleUnshare(hand as StoredHand, e)}
-                    className="p-1 rounded hover:bg-red-100 transition-colors"
+                    className="flex items-center gap-2 px-3 py-2 sm:p-1 rounded bg-red-100 hover:bg-red-200 text-red-700 transition-colors text-sm sm:text-xs font-medium sm:font-normal min-h-[44px] sm:min-h-auto"
                     title="Remove from your shared list"
                   >
                     <Trash2 className="h-4 w-4 text-red-600" />
+                    <span className="sm:hidden">Unshare Hand</span>
                   </button>
                 )}
               </div>

@@ -188,14 +188,16 @@ export default function SessionPage() {
     }
   }, [currentHand, session]);
 
-  // Save stack changes to session metadata
+  // Save stack changes to session metadata using ref to avoid infinite loop
+  const prevStackRef = useRef(stack);
   useEffect(() => {
-    if (session && stack !== session.currentStack) {
+    if (session && stack !== prevStackRef.current && stack !== session.currentStack) {
       const updatedSession = { ...session, currentStack: stack };
       SessionService.updateSessionMetadata(updatedSession);
-      setSession(updatedSession); // Update local session state too
+      setSession(updatedSession);
+      prevStackRef.current = stack;
     }
-  }, [stack]); // Removed session from dependencies to avoid infinite loop
+  }, [stack, session]);
 
   // Function to start new hand with explicit session data
   const startNewHandWithPosition = useCallback((sessionData: SessionMetadata, userSeat: Position) => {

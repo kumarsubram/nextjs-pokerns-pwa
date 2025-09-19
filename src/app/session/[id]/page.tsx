@@ -2659,6 +2659,7 @@ export default function SessionPage() {
               currentHand={handHistoryCurrentHand}
               completedHands={completedHands}
               userSeat={session.userSeat}
+              defaultExpanded={false}
             />
           </div>
         )}

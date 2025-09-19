@@ -14,15 +14,26 @@ interface HandHistoryProps {
   completedHands: StoredHand[];
   userSeat?: Position;
   className?: string;
+  defaultExpanded?: boolean;
 }
 
 export function HandHistory({
   currentHand,
   completedHands = [],
   userSeat,
-  className
+  className,
+  defaultExpanded = false
 }: HandHistoryProps) {
-  const [expandedHands, setExpandedHands] = useState<Set<number>>(new Set());
+  const [expandedHands, setExpandedHands] = useState<Set<number>>(() => {
+    if (defaultExpanded) {
+      // Initialize with all hand numbers expanded
+      const allHandNumbers = new Set<number>();
+      if (currentHand) allHandNumbers.add(currentHand.handNumber);
+      completedHands.forEach(hand => allHandNumbers.add(hand.handNumber));
+      return allHandNumbers;
+    }
+    return new Set();
+  });
   const [sharedHands, setSharedHands] = useState<Set<number>>(new Set());
   const [copiedHandId, setCopiedHandId] = useState<number | null>(null);
   const params = useParams();

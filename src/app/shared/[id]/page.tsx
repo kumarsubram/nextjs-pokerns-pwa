@@ -201,22 +201,26 @@ export default function SharedHandPage() {
       <div className="p-4 max-w-4xl mx-auto space-y-4">
         {/* Game Info */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Game Details</CardTitle>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Game Details</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-2 text-sm">
+          <CardContent className="pt-2 pb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
               <div>
-                <span className="text-gray-600">Type:</span> {sharedHand.sessionMetadata.gameType}
+                <span className="text-gray-500">Type:</span>
+                <div className="font-medium">{sharedHand.sessionMetadata.gameType}</div>
               </div>
               <div>
-                <span className="text-gray-600">Table:</span> {sharedHand.sessionMetadata.tableSeats} handed
+                <span className="text-gray-500">Table:</span>
+                <div className="font-medium">{sharedHand.sessionMetadata.tableSeats} handed</div>
               </div>
               <div>
-                <span className="text-gray-600">Hero Seat:</span> {sharedHand.sessionMetadata.userSeat}
+                <span className="text-gray-500">Hero Seat:</span>
+                <div className="font-medium">{sharedHand.sessionMetadata.userSeat}</div>
               </div>
-              <div>
-                <span className="text-gray-600">Shared:</span> {formatDate(sharedHand.sharedAt)}
+              <div className="col-span-2 sm:col-span-1">
+                <span className="text-gray-500">Shared:</span>
+                <div className="font-medium">{formatDate(sharedHand.sharedAt)}</div>
               </div>
             </div>
           </CardContent>

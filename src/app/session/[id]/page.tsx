@@ -685,64 +685,18 @@ export default function SessionPage() {
   };
 
   // Complete the current hand
-  // Calculate total investment for a specific player across all betting rounds
-  const calculatePlayerTotalInvestment = (position: Position): number => {
-    if (!currentHand) return 0;
 
-    let totalInvestment = 0;
-    const bettingRounds = ['preflop', 'flop', 'turn', 'river'] as const;
-
-    for (const roundName of bettingRounds) {
-      const round = currentHand.bettingRounds[roundName];
-      if (round && round.actions) {
-        // Sum all betting actions for this player in this round
-        for (const action of round.actions) {
-          if (action.position === position && action.amount) {
-            totalInvestment += action.amount;
-          }
-        }
-      }
-    }
-
-    return totalInvestment;
-  };
-
-  // Calculate effective pot winnings based on side pot logic
+  // Calculate effective pot winnings - simplified to return actual pot for now
+  // Side pot logic is complex and should only apply in all-in scenarios
   const calculateEffectivePotWinnings = (outcome: 'won' | 'lost' | 'folded', potWon?: number) => {
     if (outcome !== 'won' || !currentHand || !potWon) {
       return 0;
     }
 
-    // Calculate hero's maximum possible winnings based on their investment
-    // In poker, you can only win what you put in from each opponent, plus your own investment back
-    const heroInvestment = heroMoneyInvested;
-
-    // Get all active player states to calculate their investments
-    const activePlayers = currentHand.playerStates.filter(p => p.status === 'active');
-
-    // Calculate total investment from all opponents
-    let totalOpponentInvestment = 0;
-    for (const player of activePlayers) {
-      if (player.position !== session?.userSeat) {
-        // Calculate opponent's total investment across all rounds
-        const opponentInvestment = calculatePlayerTotalInvestment(player.position);
-        // Each opponent contributed at most min(heroInvestment, theirInvestment) to hero's potential winnings
-        const effectiveContribution = Math.min(heroInvestment, opponentInvestment);
-        totalOpponentInvestment += effectiveContribution;
-      }
-    }
-
-    // Hero's maximum winnings = their own investment back + what they can win from opponents
-    const maxPossibleWinnings = heroInvestment + totalOpponentInvestment;
-
-    // Actual winnings is the minimum of stated pot winnings and calculated maximum
-    const effectiveWinnings = Math.min(potWon, maxPossibleWinnings);
-
-    if (effectiveWinnings !== potWon) {
-      console.log(`Side pot applied: Limited winnings from $${potWon} to $${effectiveWinnings} (hero invested $${heroInvestment})`);
-    }
-
-    return effectiveWinnings;
+    // For now, return the full pot won amount
+    // Side pot logic should only apply in complex all-in scenarios
+    // When everyone folds to hero, hero wins the entire pot regardless of investment
+    return potWon;
   };
 
   const completeHand = (outcome: 'won' | 'lost' | 'folded', potWon?: number) => {
@@ -1431,7 +1385,7 @@ export default function SessionPage() {
               </div>
             </div>
 
-            {/* Stack and Blinds */}
+            {/* Stack, Profit/Loss and Blinds */}
             <div className="grid grid-cols-4 gap-2">
               <div>
                 <label className="text-xs text-gray-500 block mb-1 text-center">Stack</label>
@@ -1452,6 +1406,25 @@ export default function SessionPage() {
                   onFocus={(e) => e.target.select()}
                   className="w-full px-2 py-1 text-base border rounded text-center"
                 />
+                {/* Profit/Loss indicator */}
+                {session && session.buyIn && (
+                  <div className="text-xs text-center mt-1">
+                    {(() => {
+                      const profitLoss = stack - session.buyIn;
+                      const isProfit = profitLoss > 0;
+                      const isLoss = profitLoss < 0;
+                      return (
+                        <span className={
+                          isProfit ? 'text-green-600 font-medium' :
+                          isLoss ? 'text-red-600 font-medium' :
+                          'text-gray-500'
+                        }>
+                          {isProfit ? '+' : ''}{profitLoss}
+                        </span>
+                      );
+                    })()}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="text-xs text-gray-500 block mb-1 text-center">SB</label>

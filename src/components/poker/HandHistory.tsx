@@ -421,10 +421,10 @@ export function HandHistory({
                   /* Show only Unshare when hand is shared */
                   <button
                     onClick={(e) => handleUnshare(hand as StoredHand, e)}
-                    className="flex items-center gap-2 px-4 py-3 rounded-md bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 transition-all hover:shadow-sm"
+                    className="flex items-center gap-2 px-4 py-3 rounded-md bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 transition-all hover:shadow-sm h-16 min-w-[120px]"
                     title="Remove from your shared list"
                   >
-                    <Trash2 className="h-4 w-4 text-red-600" />
+                    <Trash2 className="h-4 w-4 text-red-600 flex-shrink-0" />
                     <span className="text-sm font-medium">Unshare Hand</span>
                   </button>
                 ) : (
@@ -432,33 +432,36 @@ export function HandHistory({
                   <>
                     <button
                       onClick={(e) => handleShare(hand as StoredHand, e)}
-                      className="flex items-center gap-2 px-4 py-3 rounded-md bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 transition-all hover:shadow-sm"
+                      className="flex items-center gap-2 px-4 py-3 rounded-md bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 transition-all hover:shadow-sm h-16 min-w-[120px]"
                       title="Share hand and add to shared list"
                     >
-                      <Share2 className="h-4 w-4 text-emerald-600" />
-                      <span className="text-sm font-medium">Share Hand (Visible to All)</span>
+                      <Share2 className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                      <div className="flex flex-col items-start">
+                        <span className="text-sm font-medium">Share Hand</span>
+                        <span className="text-xs italic text-emerald-600">visible to all</span>
+                      </div>
                     </button>
 
                     <button
                       onClick={(e) => handleCreateLink(hand as StoredHand, e)}
                       className={cn(
-                        "flex items-center gap-2 px-4 py-3 rounded-md border transition-all hover:shadow-sm",
+                        "flex items-center gap-2 px-4 py-3 rounded-md border transition-all hover:shadow-sm h-16 min-w-[120px]",
                         copiedHandId === hand.handNumber
                           ? "bg-green-50 border-green-200 text-green-700"
                           : "bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
                       )}
                       title="Copy link to hand"
                     >
-                      <Copy className={cn("h-4 w-4", copiedHandId === hand.handNumber ? "text-green-600" : "text-blue-600")} />
+                      <Copy className={cn("h-4 w-4 flex-shrink-0", copiedHandId === hand.handNumber ? "text-green-600" : "text-blue-600")} />
                       <span className="text-sm font-medium">{copiedHandId === hand.handNumber ? "Link Copied!" : "Copy Link"}</span>
                     </button>
 
                     <button
                       onClick={(e) => handleOpenLink(hand as StoredHand, e)}
-                      className="flex items-center gap-2 px-4 py-3 rounded-md bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 transition-all hover:shadow-sm"
+                      className="flex items-center gap-2 px-4 py-3 rounded-md bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 transition-all hover:shadow-sm h-16 min-w-[120px]"
                       title="Open hand in new tab"
                     >
-                      <ExternalLink className="h-4 w-4 text-purple-600" />
+                      <ExternalLink className="h-4 w-4 text-purple-600 flex-shrink-0" />
                       <span className="text-sm font-medium">Open Link</span>
                     </button>
                   </>

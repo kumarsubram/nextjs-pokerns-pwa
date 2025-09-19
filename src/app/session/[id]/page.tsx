@@ -288,6 +288,9 @@ export default function SessionPage() {
 
         // Show seat selection for Hand #1
         setShowSeatSelection(true);
+
+        // Scroll to top when showing seat selection
+        window.scrollTo(0, 0);
         const handNumber = SessionService.getCurrentHandNumber();
         setHandCount(handNumber - 1); // Set to current hand number - 1 since it will be incremented
       }
@@ -791,6 +794,9 @@ export default function SessionPage() {
     // Always show seat selection for every hand
     setCurrentHand(null);
     setShowSeatSelection(true);
+
+    // Scroll to top when showing seat selection
+    window.scrollTo(0, 0);
   };
 
   // Handle confirmed auto-action
@@ -911,6 +917,9 @@ export default function SessionPage() {
 
       // Always show seat selection for next hand
       setShowSeatSelection(true);
+
+      // Scroll to top when showing seat selection
+      window.scrollTo(0, 0);
       return;
     }
 
@@ -1230,6 +1239,11 @@ export default function SessionPage() {
   // Auto-trigger community card selection when betting round completes
   useEffect(() => {
     if (!currentHand || !isBettingComplete || showCommunitySelector) return;
+
+    // Don't auto-trigger if this is a brand new hand with no actions yet
+    const currentRound = currentHand.bettingRounds[currentHand.currentBettingRound as 'preflop' | 'flop' | 'turn' | 'river'];
+    const hasActions = currentRound && currentRound.actions && currentRound.actions.length > 0;
+    if (!hasActions) return;
 
     if (needsCommunityCards) {
       // Auto-trigger the first card selection

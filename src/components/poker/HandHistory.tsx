@@ -24,6 +24,7 @@ export function HandHistory({
 }: HandHistoryProps) {
   const [expandedHands, setExpandedHands] = useState<Set<number>>(new Set());
   const [sharedHands, setSharedHands] = useState<Set<number>>(new Set());
+  const [copiedHandId, setCopiedHandId] = useState<number | null>(null);
   const params = useParams();
   const sessionId = params?.id as string;
 
@@ -133,10 +134,12 @@ export function HandHistory({
       username
     });
 
-    // Copy to clipboard silently (no message needed as requested)
+    // Copy to clipboard with feedback
     if (navigator.clipboard) {
       try {
         await navigator.clipboard.writeText(shareUrl);
+        setCopiedHandId(hand.handNumber);
+        setTimeout(() => setCopiedHandId(null), 2000);
       } catch {
         // Silently handle clipboard errors
       }
@@ -276,11 +279,11 @@ export function HandHistory({
 
           return (
             <div key={round}>
-              {/* Show community cards for this round with updated format */}
+              {/* Show community cards for this round */}
               {communityCards ? (
                 <div className="mb-3">
                   <div className="text-base font-semibold text-gray-700 mb-2">
-                    {round}: {communityCards.length} card{communityCards.length !== 1 ? 's' : ''}
+                    {round}:
                   </div>
                   <div className="flex gap-1">
                     {communityCards.map((card, i) => (
@@ -362,111 +365,132 @@ export function HandHistory({
     const outcome = 'result' in hand ? hand.result.handOutcome : null;
 
     return (
-      <div key={handNumber} className="border rounded-lg bg-white shadow-sm">
-        <div
-          className="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50"
-          onClick={() => toggleHand(handNumber)}
-        >
-          <div className="flex items-center gap-4">
-            {/* Hand Number */}
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-base sm:text-sm">
-                Hand #{handNumber}
-              </span>
-              {isCurrent && (
-                <span className="text-sm sm:text-xs bg-green-100 text-green-700 px-3 py-1 sm:px-2 sm:py-0.5 rounded">
-                  Current
+      <div key={handNumber} className="border rounded-lg bg-white shadow-sm overflow-hidden">
+        {/* Main container with 2 columns */}
+        <div className="flex">
+          {/* Left Column - 3/4 width */}
+          <div className="w-3/4 p-4">
+            {/* First Row - Hand Info */}
+            <div className="flex items-center gap-4 mb-3">
+              {/* Hand Number */}
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-base">
+                  Hand #{handNumber}
+                </span>
+                {isCurrent && (
+                  <span className="text-sm bg-green-100 text-green-700 px-3 py-1 rounded">
+                    Current
+                  </span>
+                )}
+              </div>
+
+              {/* User Cards */}
+              {hasCards ? (
+                <div className="flex gap-1">
+                  <span className={cn("text-base font-bold px-2 py-1 bg-white border rounded", getCardColor(hand.userCards![0]))}>
+                    {hand.userCards![0]}
+                  </span>
+                  <span className={cn("text-base font-bold px-2 py-1 bg-white border rounded", getCardColor(hand.userCards![1]))}>
+                    {hand.userCards![1]}
+                  </span>
+                </div>
+              ) : (
+                <span className="text-sm text-gray-500 italic">Cards not selected</span>
+              )}
+
+              {/* Outcome */}
+              {outcome && (
+                <span className={cn(
+                  "text-sm font-medium px-4 py-2 rounded",
+                  outcome === 'won' ? 'bg-green-100 text-green-700' :
+                  outcome === 'lost' ? 'bg-red-100 text-red-700' :
+                  outcome === 'folded' ? 'bg-gray-100 text-gray-700' :
+                  'bg-yellow-100 text-yellow-700'
+                )}>
+                  {outcome === 'won' ? 'Won' :
+                   outcome === 'lost' ? 'Lost' :
+                   outcome === 'folded' ? 'Folded' :
+                   'Chopped'}
                 </span>
               )}
             </div>
 
-            {/* User Cards */}
-            {hasCards ? (
-              <div className="flex gap-1">
-                <span className={cn("text-base sm:text-sm font-bold", getCardColor(hand.userCards![0]))}>
-                  {hand.userCards![0]}
-                </span>
-                <span className={cn("text-base sm:text-sm font-bold", getCardColor(hand.userCards![1]))}>
-                  {hand.userCards![1]}
-                </span>
+            {/* Second Row - Action Buttons */}
+            {'result' in hand && (
+              <div className="flex flex-wrap gap-2">
+                {sharedHands.has(hand.handNumber) || SharedHandService.isHandShared(sessionId, hand.handNumber) ? (
+                  /* Show only Unshare when hand is shared */
+                  <button
+                    onClick={(e) => handleUnshare(hand as StoredHand, e)}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-md bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 transition-all hover:shadow-sm text-sm font-medium"
+                    title="Remove from your shared list"
+                  >
+                    <Trash2 className="h-4 w-4 text-red-600" />
+                    <span>Unshare Hand</span>
+                  </button>
+                ) : (
+                  /* Show Share, Copy Link, Open Link when hand is not shared */
+                  <>
+                    <button
+                      onClick={(e) => handleShare(hand as StoredHand, e)}
+                      className="flex flex-col items-center gap-1 px-4 py-2.5 rounded-md bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 transition-all hover:shadow-sm"
+                      title="Share hand and add to shared list"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Share2 className="h-4 w-4 text-emerald-600" />
+                        <span className="text-sm font-medium">Share Hand</span>
+                      </div>
+                      <span className="text-xs text-emerald-600">Visible to all players</span>
+                    </button>
+
+                    <button
+                      onClick={(e) => handleCreateLink(hand as StoredHand, e)}
+                      className={cn(
+                        "flex items-center gap-2 px-4 py-2.5 rounded-md border transition-all hover:shadow-sm text-sm font-medium",
+                        copiedHandId === hand.handNumber
+                          ? "bg-green-50 border-green-200 text-green-700"
+                          : "bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
+                      )}
+                      title="Copy link to hand"
+                    >
+                      <Copy className={cn("h-4 w-4", copiedHandId === hand.handNumber ? "text-green-600" : "text-blue-600")} />
+                      <span>{copiedHandId === hand.handNumber ? "Link Copied!" : "Copy Link"}</span>
+                    </button>
+
+                    <button
+                      onClick={(e) => handleOpenLink(hand as StoredHand, e)}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-md bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 transition-all hover:shadow-sm text-sm font-medium"
+                      title="Open hand in new tab"
+                    >
+                      <ExternalLink className="h-4 w-4 text-purple-600" />
+                      <span>Open Link</span>
+                    </button>
+                  </>
+                )}
               </div>
-            ) : (
-              <span className="text-sm sm:text-xs text-gray-500 italic">Cards not selected</span>
-            )}
-
-            {/* Outcome */}
-            {outcome && (
-              <span className={cn(
-                "text-sm sm:text-xs font-medium px-3 py-1 sm:px-2 sm:py-0.5 rounded min-h-[44px] sm:min-h-auto flex items-center",
-                outcome === 'won' ? 'bg-green-100 text-green-700' :
-                outcome === 'lost' ? 'bg-red-100 text-red-700' :
-                outcome === 'folded' ? 'bg-gray-100 text-gray-700' :
-                'bg-yellow-100 text-yellow-700'
-              )}>
-                {outcome === 'won' ? 'Won' :
-                 outcome === 'lost' ? 'Lost' :
-                 outcome === 'folded' ? 'Folded' :
-                 'Chopped'}
-              </span>
             )}
           </div>
 
-          <div className="flex items-center justify-end">
-            {/* Expand/Collapse Icon */}
-            {isExpanded ? (
-              <ChevronUp className="h-4 w-4 text-gray-500" />
-            ) : (
-              <ChevronDown className="h-4 w-4 text-gray-500" />
-            )}
-          </div>
+          {/* Right Column - 1/4 width - Expand/Collapse */}
+          <button
+            onClick={() => toggleHand(handNumber)}
+            className="w-1/4 bg-gray-50 hover:bg-gray-100 transition-colors border-l border-gray-200 flex flex-col items-center justify-center gap-2 cursor-pointer"
+          >
+            <div className={cn(
+              "w-12 h-12 rounded-full flex items-center justify-center transition-all",
+              isExpanded ? "bg-blue-100" : "bg-gray-200"
+            )}>
+              {isExpanded ? (
+                <ChevronUp className="h-6 w-6 text-blue-600" />
+              ) : (
+                <ChevronDown className="h-6 w-6 text-gray-600" />
+              )}
+            </div>
+            <span className="text-xs font-medium text-gray-600 text-center px-2">
+              {isExpanded ? "Hide Details" : "View Hand Flow"}
+            </span>
+          </button>
         </div>
-
-        {/* Share Buttons - Second Row */}
-        {'result' in hand && (
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-1 pt-2 border-t border-gray-100">
-            {sharedHands.has(hand.handNumber) || SharedHandService.isHandShared(sessionId, hand.handNumber) ? (
-              /* Show only Unshare when hand is shared */
-              <button
-                onClick={(e) => handleUnshare(hand as StoredHand, e)}
-                className="flex items-center gap-2 px-3 py-2 sm:p-1 rounded bg-red-100 hover:bg-red-200 text-red-700 transition-colors text-sm sm:text-xs font-medium sm:font-normal min-h-[44px] sm:min-h-auto"
-                title="Remove from your shared list"
-              >
-                <Trash2 className="h-4 w-4 text-red-600" />
-                <span className="sm:hidden">Unshare Hand</span>
-              </button>
-            ) : (
-              /* Show Share, Copy Link, Open Link when hand is not shared */
-              <>
-                <button
-                  onClick={(e) => handleShare(hand as StoredHand, e)}
-                  className="flex items-center gap-2 px-3 py-2 sm:p-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors text-sm sm:text-xs font-medium sm:font-normal min-h-[44px] sm:min-h-auto"
-                  title="Share hand and add to shared list"
-                >
-                  <Share2 className="h-4 w-4 text-gray-600" />
-                  <span className="sm:hidden">Share Hand</span>
-                </button>
-
-                <button
-                  onClick={(e) => handleCreateLink(hand as StoredHand, e)}
-                  className="flex items-center gap-2 px-3 py-2 sm:p-1 rounded bg-blue-100 hover:bg-blue-200 text-blue-700 transition-colors text-sm sm:text-xs font-medium sm:font-normal min-h-[44px] sm:min-h-auto"
-                  title="Copy link to hand"
-                >
-                  <Copy className="h-4 w-4 text-blue-600" />
-                  <span className="sm:hidden">Copy Link</span>
-                </button>
-
-                <button
-                  onClick={(e) => handleOpenLink(hand as StoredHand, e)}
-                  className="flex items-center gap-2 px-3 py-2 sm:p-1 rounded bg-purple-100 hover:bg-purple-200 text-purple-700 transition-colors text-sm sm:text-xs font-medium sm:font-normal min-h-[44px] sm:min-h-auto"
-                  title="Open hand in new tab"
-                >
-                  <ExternalLink className="h-4 w-4 text-purple-600" />
-                  <span className="sm:hidden">Open Link</span>
-                </button>
-              </>
-            )}
-          </div>
-        )}
 
         {/* Expandable Action Log */}
         {isExpanded && (

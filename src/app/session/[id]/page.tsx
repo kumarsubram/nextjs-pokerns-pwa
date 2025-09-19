@@ -391,6 +391,18 @@ export default function SessionPage() {
           userCards: [selectedCard1!, card] as [string, string]
         });
       }
+
+      // If we have a pending hand completion (from everyone folding), retry it now
+      if (pendingHandCompletion && selectedCard1) {
+        setShowCardSelector(false);
+        // Small delay to ensure state updates are processed
+        setTimeout(() => {
+          const { outcome, potWon } = pendingHandCompletion;
+          setPendingHandCompletion(null);
+          completeHand(outcome, potWon);
+        }, 100);
+        return;
+      }
     }
 
     // Reset states
@@ -646,6 +658,7 @@ export default function SessionPage() {
   // Add state for validation error dialog
   const [showValidationError, setShowValidationError] = useState(false);
   const [validationErrorMessage, setValidationErrorMessage] = useState('');
+  const [pendingHandCompletion, setPendingHandCompletion] = useState<{ outcome: 'won' | 'lost' | 'folded', potWon?: number } | null>(null);
 
   // Validate required values before hand completion
   const validateHandRequirements = (): { isValid: boolean; error?: string } => {
@@ -741,6 +754,8 @@ export default function SessionPage() {
     if (!validation.isValid) {
       setValidationErrorMessage(validation.error || 'Validation error');
       setShowValidationError(true);
+      // Store pending completion to retry after cards are selected
+      setPendingHandCompletion({ outcome, potWon });
       return;
     }
 
@@ -2494,10 +2509,16 @@ export default function SessionPage() {
             </DialogHeader>
             <div className="flex justify-end mt-4">
               <Button
-                onClick={() => setShowValidationError(false)}
+                onClick={() => {
+                  setShowValidationError(false);
+                  // If the error was about missing hole cards, open the card selector
+                  if (validationErrorMessage.includes('hole cards')) {
+                    setShowCardSelector(true);
+                  }
+                }}
                 className="bg-blue-600 hover:bg-blue-700 text-white"
               >
-                OK
+                Select Cards
               </Button>
             </div>
           </DialogContent>

@@ -199,28 +199,37 @@ export default function SharedHandPage() {
 
       {/* Main Content */}
       <div className="p-4 max-w-4xl mx-auto space-y-4">
-        {/* Game Info - Minimal Design */}
-        <div className="bg-gray-50 rounded-lg p-2 mb-2">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 text-xs">
-            <div className="text-center">
-              <span className="text-gray-500 block">{sharedHand.sessionMetadata.gameType}</span>
+        {/* Game Details */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Game Details</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="flex justify-between py-1">
+                <span className="text-sm text-gray-600">Game Type:</span>
+                <span className="text-sm font-medium">{sharedHand.sessionMetadata.gameType}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-sm text-gray-600">Table Size:</span>
+                <span className="text-sm font-medium">{sharedHand.sessionMetadata.tableSeats}-handed</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-sm text-gray-600">Hero Position:</span>
+                <span className="text-sm font-medium">{sharedHand.sessionMetadata.userSeat}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-sm text-gray-600">Shared:</span>
+                <span className="text-sm font-medium">{formatDate(sharedHand.sharedAt)}</span>
+              </div>
             </div>
-            <div className="text-center">
-              <span className="text-gray-500 block">{sharedHand.sessionMetadata.tableSeats}-handed</span>
-            </div>
-            <div className="text-center">
-              <span className="text-gray-500 block">Hero: {sharedHand.sessionMetadata.userSeat}</span>
-            </div>
-            <div className="text-center col-span-2 sm:col-span-1">
-              <span className="text-gray-500 block text-xs">{formatDate(sharedHand.sharedAt)}</span>
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Hand History */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Hand #{sharedHand.handData.handNumber}</CardTitle>
+            <CardTitle className="text-lg">Hand History</CardTitle>
           </CardHeader>
           <CardContent>
             <HandHistory

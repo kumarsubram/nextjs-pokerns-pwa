@@ -782,6 +782,12 @@ export default function SessionPage() {
     setSelectedCard2(null);
     setOpponentCards({} as Record<Position, [string, string] | null>);
 
+    // Close any open dialogs
+    setShowAllFoldedDialog(false);
+    setShowOutcomeSelection(false);
+    setShowFoldConfirmation(false);
+    setShowValidationError(false);
+
     // Always show seat selection for every hand
     setCurrentHand(null);
     setShowSeatSelection(true);

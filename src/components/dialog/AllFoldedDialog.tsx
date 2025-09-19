@@ -1,6 +1,6 @@
 'use client';
 
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { CardSelector } from '@/components/poker/CardSelector';
 import { CurrentHand, Position } from '@/types/poker-v2';
@@ -44,16 +44,13 @@ export function AllFoldedDialog({
       <DialogContent className={getDialogClasses("sm:max-w-[500px] max-w-[95vw] w-full")}>
         <DialogHeader>
           <DialogTitle>Hand Won - All Opponents Folded</DialogTitle>
-          <DialogDescription>
-            All opponents have folded to your action
-          </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4 mt-4 max-h-80 overflow-y-auto">
           {/* Pot Size Display */}
           <div className="text-center">
             <div className="text-2xl font-bold text-green-600 mb-2">
-              You Win: {currentHand?.pot || 0} chips
+              You Win: {currentHand?.pot || 0}
             </div>
             <div className="text-sm text-gray-600">
               All opponents folded

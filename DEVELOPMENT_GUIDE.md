@@ -3,7 +3,58 @@
 ## Project Overview
 A Progressive Web App for tracking poker sessions, hands, and statistics. Built with Next.js 15, TypeScript, and Tailwind CSS.
 
-## RECENT UPDATES (v2.5) ✅
+## RECENT UPDATES (v2.6) ✅
+
+### Dialog Component Refactoring - COMPLETED
+✅ **Modular Dialog Architecture**
+- Extracted all 7 dialog components from main session page into separate, reusable modules
+- Organized under `/src/components/dialog/` with centralized exports via `index.ts`
+- Each dialog component has comprehensive TypeScript interfaces and proper prop definitions
+- Clean separation of concerns with self-contained dialog logic
+
+✅ **Extracted Dialog Components**
+- **AllFoldedDialog**: Hand Won - All Opponents Folded scenario with inline card selection
+- **ShowdownDialog**: Showdown outcome selection with hero and opponent card inputs
+- **AmountModal**: Raise and all-in amount input with validation
+- **ConfirmFoldDialog**: Fold confirmation with conditional card selection for invested money
+- **HeroMustActFirstDialog**: Simple informational dialog about action sequence
+- **AutoActionConfirmDialog**: Confirms auto-folding/checking of skipped players
+- **ValidationErrorDialog**: General validation error display with card selection trigger
+
+✅ **Improved Code Organization**
+- Main session page significantly cleaner and more focused (removed ~500 lines of inline dialog code)
+- Better maintainability with each dialog isolated in its own file
+- Enhanced reusability - components can be used across different parts of the application
+- Clear visibility of all dialog types for easier development and debugging
+
+✅ **TypeScript Interface Architecture**
+```typescript
+// Example: Comprehensive prop definitions for each dialog
+interface AllFoldedDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  currentHand: CurrentHand | null;
+  userSeat?: Position;
+  inlineCardSelection: InlineCardSelectionState;
+  // ... additional props for full functionality
+}
+```
+
+✅ **Clean Import Structure**
+```typescript
+// Centralized dialog imports
+import {
+  AllFoldedDialog,
+  ShowdownDialog,
+  AmountModal,
+  ConfirmFoldDialog,
+  HeroMustActFirstDialog,
+  AutoActionConfirmDialog,
+  ValidationErrorDialog
+} from '@/components/dialog';
+```
+
+## PREVIOUS UPDATES (v2.5) ✅
 
 ### Smooth Community Card Selection Experience - COMPLETED
 ✅ **Enhanced Community Card Selection Flow**
@@ -655,11 +706,21 @@ src/
 │   ├── create-session/page.tsx    # Session creation (uses SeatSelector)
 │   ├── session/[id]/page.tsx      # Main game screen
 │   └── layout.tsx                 # Root layout
-├── components/poker/
-│   ├── SimplePokerTable.tsx       # Fixed position table
-│   ├── SeatSelector.tsx           # Reusable seat selection
-│   ├── CardSelector.tsx           # Card selection modal
-│   └── HandTracker.tsx            # Hand history display
+├── components/
+│   ├── dialog/                    # ✅ NEW: Modular dialog components
+│   │   ├── AllFoldedDialog.tsx    # Hand won - all opponents folded
+│   │   ├── ShowdownDialog.tsx     # Showdown outcome selection
+│   │   ├── AmountModal.tsx        # Raise/all-in amount input
+│   │   ├── ConfirmFoldDialog.tsx  # Fold confirmation with cards
+│   │   ├── HeroMustActFirstDialog.tsx # Action sequence info
+│   │   ├── AutoActionConfirmDialog.tsx # Auto-fold confirmation
+│   │   ├── ValidationErrorDialog.tsx # Validation errors
+│   │   └── index.ts               # Centralized exports
+│   └── poker/
+│       ├── SimplePokerTable.tsx   # Fixed position table
+│       ├── SeatSelector.tsx       # Reusable seat selection
+│       ├── CardSelector.tsx       # Card selection modal
+│       └── HandTracker.tsx        # Hand history display
 ├── services/
 │   └── session.service.ts         # Session data management
 ├── types/

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'poker-notes-v135'; // Increment version to force update
+const CACHE_NAME = 'poker-notes-v136'; // Increment version to force update
 const urlsToCache = [
   '/',
   '/offline.html',

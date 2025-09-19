@@ -4,11 +4,19 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { ArrowLeft, MousePointer2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SimplePokerTable } from '@/components/poker/SimplePokerTable';
 import { CardSelector } from '@/components/poker/CardSelector';
 import { SeatSelector } from '@/components/poker/SeatSelector';
 import { HandHistory } from '@/components/poker/HandHistory';
+import {
+  AllFoldedDialog,
+  ShowdownDialog,
+  AmountModal,
+  ConfirmFoldDialog,
+  HeroMustActFirstDialog,
+  AutoActionConfirmDialog,
+  ValidationErrorDialog
+} from '@/components/dialog';
 import { SessionService } from '@/services/session.service';
 import { SessionMetadata, CurrentHand, Position, BettingAction, StoredHand } from '@/types/poker-v2';
 import {
@@ -61,12 +69,12 @@ export default function SessionPage() {
   // Showdown outcome
   const [showOutcomeSelection, setShowOutcomeSelection] = useState(false);
   // Opponent cards logging
-  const [opponentCards, setOpponentCards] = useState<{[position: string]: [string, string] | null}>({});
+  const [opponentCards, setOpponentCards] = useState<Record<Position, [string, string] | null>>({} as Record<Position, [string, string] | null>);
   // Inline card selection state
   const [inlineCardSelection, setInlineCardSelection] = useState<{
     show: boolean;
     position: Position | null;
-    cardIndex: 1 | 2;
+    cardIndex: number;
     title: string;
   }>({
     show: false,
@@ -640,9 +648,10 @@ export default function SessionPage() {
     const activePlayers = updatedHand.playerStates.filter(p => p.status === 'active' || p.status === 'all-in');
     if (activePlayers.length === 1) {
       if (activePlayers[0].position === session.userSeat) {
-        // Hero wins - complete hand immediately
-        completeHand('won', updatedHand.pot || 0);
-        return; // Exit early, don't set currentHand
+        // Show "All Folded" dialog instead of directly completing
+        setCurrentHand(updatedHand);
+        setShowAllFoldedDialog(true);
+        return;
       } else {
         // Hero lost (already folded)
         completeHand('lost', 0);
@@ -771,7 +780,7 @@ export default function SessionPage() {
     // Reset other states
     setSelectedCard1(null);
     setSelectedCard2(null);
-    setOpponentCards({});
+    setOpponentCards({} as Record<Position, [string, string] | null>);
 
     // Always show seat selection for every hand
     setCurrentHand(null);
@@ -1982,636 +1991,128 @@ export default function SessionPage() {
           </div>
         )}
 
-        {/* Amount Input Modal for Raise/All-In */}
-        <Dialog open={showAmountModal} onOpenChange={setShowAmountModal}>
-          <DialogContent className={getDialogClasses("sm:max-w-[425px] max-w-[95vw] w-full mx-4")}>
-            <DialogHeader>
-              <DialogTitle className="text-lg">
-                {amountModalAction === 'raise' ? 'Raise Amount' : 'All-In Amount'}
-              </DialogTitle>
-              <DialogDescription className="text-sm">
-                Enter the total amount to {amountModalAction === 'raise' ? 'raise to' : 'go all-in with'}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 pt-2">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Amount</label>
-                <input
-                  type="number"
-                  value={amountModalValue}
-                  onChange={(e) => {
-                    const inputValue = e.target.value;
-                    setAmountModalError(null); // Clear error on input change
-                    if (inputValue === '') {
-                      setAmountModalValue(0);
-                    } else {
-                      const numValue = parseInt(inputValue, 10);
-                      if (!isNaN(numValue) && numValue >= 0) {
-                        if (amountModalAction === 'all-in') {
-                          setAmountModalValue(Math.min(numValue, stack));
-                        } else {
-                          // Allow any value for raise input, validation will happen on submit
-                          setAmountModalValue(numValue);
-                        }
-                      }
-                    }
-                  }}
-                  onFocus={(e) => e.target.select()}
-                  className="w-full px-3 py-3 text-base border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  min={(currentBettingRound?.currentBet || 0) * 2}
-                  max={amountModalAction === 'all-in' ? stack : undefined}
-                  step="1"
-                />
-                <div className="text-xs text-gray-500">
-                  {amountModalAction === 'raise' && (
-                    <>Min: ${(currentBettingRound?.currentBet || 0) * 2}</>
-                  )}
-                  {amountModalAction === 'all-in' && (
-                    <>Max: ${stack}</>
-                  )}
-                </div>
-                {amountModalError && (
-                  <div className="text-xs text-red-600 mt-1">
-                    {amountModalError}
-                  </div>
-                )}
-              </div>
-              <div className="flex gap-3 pt-2">
-                <Button
-                  className="flex-1 h-11"
-                  variant="outline"
-                  onClick={() => {
-                    setShowAmountModal(false);
-                    setAmountModalPosition(null);
-                    setAmountModalError(null);
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  className="flex-1 h-11 bg-green-600 hover:bg-green-700 text-white"
-                  onClick={() => {
-                    if (amountModalPosition) {
-                      const minRaise = (currentBettingRound?.currentBet || 0) * 2;
-                      const amount = Math.floor(amountModalValue);
+        <AmountModal
+          open={showAmountModal}
+          onOpenChange={setShowAmountModal}
+          action={amountModalAction}
+          position={amountModalPosition}
+          value={amountModalValue}
+          error={amountModalError}
+          stack={stack}
+          currentBet={currentBettingRound?.currentBet || 0}
+          onValueChange={setAmountModalValue}
+          onConfirm={() => {
+            if (amountModalPosition) {
+              const minRaise = (currentBettingRound?.currentBet || 0) * 2;
+              const amount = Math.floor(amountModalValue);
 
-                      // Validate minimum raise amount
-                      if (amountModalAction === 'raise' && amount < minRaise) {
-                        setAmountModalError(`Minimum raise is $${minRaise}`);
-                        return;
-                      }
+              // Validate minimum raise amount
+              if (amountModalAction === 'raise' && amount < minRaise) {
+                setAmountModalError(`Minimum raise is $${minRaise}`);
+                return;
+              }
 
-                      handleBettingAction(
-                        amountModalPosition,
-                        amountModalAction,
-                        amount
-                      );
-                      setShowAmountModal(false);
-                      setAmountModalPosition(null);
-                      setAmountModalError(null);
-                      setSelectedPosition(null);
-                    }
-                  }}
-                >
-                  Confirm
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+              handleBettingAction(
+                amountModalPosition,
+                amountModalAction,
+                amount
+              );
+              setShowAmountModal(false);
+              setAmountModalPosition(null);
+              setAmountModalError(null);
+              setSelectedPosition(null);
+            }
+          }}
+          onCancel={() => {
+            setShowAmountModal(false);
+            setAmountModalPosition(null);
+            setAmountModalError(null);
+          }}
+          getDialogClasses={getDialogClasses}
+        />
 
-        {/* Unified Fold Confirmation and Card Selection Dialog */}
-        <Dialog open={showFoldConfirmation} onOpenChange={setShowFoldConfirmation}>
-          <DialogContent className={getDialogClasses("sm:max-w-[500px] max-w-[95vw] w-full")}>
-            <DialogHeader>
-              <DialogTitle>Confirm Fold</DialogTitle>
-              <DialogDescription>
-                {heroMoneyInvested > 0
-                  ? `You have invested ${heroMoneyInvested} chips. Folding will result in a loss. The hand will end.`
-                  : 'Folding will end the hand. Are you sure?'
-                }
-              </DialogDescription>
-            </DialogHeader>
+        <ConfirmFoldDialog
+          open={showFoldConfirmation}
+          onOpenChange={setShowFoldConfirmation}
+          position={foldPosition}
+          heroMoneyInvested={heroMoneyInvested}
+          currentHand={currentHand}
+          userSeat={session?.userSeat}
+          inlineCardSelection={inlineCardSelection}
+          onSetInlineCardSelection={setInlineCardSelection}
+          selectedCard1={selectedCard1}
+          selectedCard2={selectedCard2}
+          opponentCards={opponentCards}
+          onInlineCardSelect={handleInlineCardSelect}
+          onConfirmFold={handleConfirmedHeroFold}
+          onCancel={() => {
+            setShowFoldConfirmation(false);
+            setFoldPosition(null);
+          }}
+          getDialogClasses={getDialogClasses}
+        />
 
-            {/* Card Selection Section - Only show if user invested money */}
-            {heroMoneyInvested > 0 && (
-              <div className="mt-4 border-t pt-4">
-                <div className="grid gap-4 max-h-60 overflow-y-auto">
-                  {/* Hero Cards Section - Only show if not already selected */}
-                  {(!currentHand?.userCards || !currentHand.userCards[0] || !currentHand.userCards[1]) && (
-                    <div className="border-2 border-blue-200 rounded-lg p-3 bg-blue-50">
-                      <div className="font-medium mb-2 text-sm text-blue-800">Your Hole Cards (Required)</div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setInlineCardSelection({
-                              show: true,
-                              position: session?.userSeat || null,
-                              cardIndex: 1,
-                              title: 'Select Card 1'
-                            });
-                          }}
-                          className="text-xs border-blue-300 hover:bg-blue-100"
-                        >
-                          {currentHand?.userCards?.[0] || 'Card 1'}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setInlineCardSelection({
-                              show: true,
-                              position: session?.userSeat || null,
-                              cardIndex: 2,
-                              title: 'Select Card 2'
-                            });
-                          }}
-                          className="text-xs border-blue-300 hover:bg-blue-100"
-                        >
-                          {currentHand?.userCards?.[1] || 'Card 2'}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Optional Cards Section Header */}
-                  {currentHand?.userCards?.[0] && currentHand?.userCards?.[1] && (
-                    <div className="text-sm font-medium text-gray-700 mb-2">
-                      Optional: Add any cards revealed
-                    </div>
-                  )}
-
-                  {/* Opponent Cards Section */}
-                  {currentHand?.playerStates &&
-                    currentHand.playerStates.filter(p => p.status === 'active' && p.position !== session?.userSeat)
-                    .length > 0 && (
-                    <div className="border rounded-lg p-3">
-                      <div className="font-medium mb-2 text-sm text-gray-700">Opponent Cards</div>
-                      <div className="grid gap-2">
-                        {currentHand?.playerStates &&
-                          currentHand.playerStates.filter(p => p.status === 'active' && p.position !== session?.userSeat)
-                          .map(player => (
-                            <div key={player.position} className="border rounded p-2 bg-gray-50">
-                              <div className="font-medium mb-1 text-xs">{player.position}</div>
-                              <div className="grid grid-cols-2 gap-1">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setInlineCardSelection({
-                                      show: true,
-                                      position: player.position,
-                                      cardIndex: 1,
-                                      title: `Select ${player.position} Card 1`
-                                    });
-                                  }}
-                                  className="text-xs h-8"
-                                >
-                                  {opponentCards[player.position]?.[0] || 'Card 1'}
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setInlineCardSelection({
-                                      show: true,
-                                      position: player.position,
-                                      cardIndex: 2,
-                                      title: `Select ${player.position} Card 2`
-                                    });
-                                  }}
-                                  className="text-xs h-8"
-                                >
-                                  {opponentCards[player.position]?.[1] || 'Card 2'}
-                                </Button>
-                              </div>
-                            </div>
-                          ))
-                        }
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Inline Card Selector */}
-            {inlineCardSelection.show && (
-              <div className="mt-4 border-t pt-4">
-                <CardSelector
-                  title={inlineCardSelection.title}
-                  selectedCards={[
-                    selectedCard1,
-                    selectedCard2,
-                    ...(currentHand?.communityCards.flop || []),
-                    currentHand?.communityCards.turn,
-                    currentHand?.communityCards.river,
-                    ...Object.values(opponentCards).flat()
-                  ].filter(Boolean) as string[]}
-                  onCardSelect={handleInlineCardSelect}
-                  onCancel={() => setInlineCardSelection({ show: false, position: null, cardIndex: 1, title: '' })}
-                />
-              </div>
-            )}
-
-            <div className="flex gap-2 mt-4">
-              <Button
-                className="flex-1"
-                variant="outline"
-                onClick={() => {
-                  setShowFoldConfirmation(false);
-                  setFoldPosition(null);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
-                onClick={handleConfirmedHeroFold}
-                disabled={heroMoneyInvested > 0 && (!currentHand?.userCards || !currentHand.userCards[0] || !currentHand.userCards[1])}
-              >
-                Confirm Fold
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Unified Showdown Dialog */}
-        <Dialog open={showOutcomeSelection} onOpenChange={setShowOutcomeSelection}>
-          <DialogContent className={getDialogClasses("sm:max-w-[500px] max-w-[95vw] w-full")}>
-            <DialogHeader>
-              <DialogTitle>Showdown</DialogTitle>
-              <DialogDescription>
-                Add any cards that were revealed at showdown, then select the outcome
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="grid gap-4 mt-4 max-h-80 overflow-y-auto">
-              <div className="text-center text-sm font-medium text-gray-700 mb-2">
-                Pot Size: {currentHand?.pot || 0}
-              </div>
-
-              {/* Hero Cards Section - Only show if not already selected */}
-              {(!currentHand?.userCards || !currentHand.userCards[0] || !currentHand.userCards[1]) && (
-                <div className="border-2 border-blue-200 rounded-lg p-4 bg-blue-50">
-                  <div className="font-medium mb-3 text-blue-800">
-                    Your Hole Cards (Required for showdown)
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setInlineCardSelection({
-                          show: true,
-                          position: session?.userSeat || null,
-                          cardIndex: 1,
-                          title: 'Select Your Card 1'
-                        });
-                      }}
-                      className="text-xs border-blue-300 hover:bg-blue-100"
-                    >
-                      {currentHand?.userCards?.[0] || 'Card 1'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setInlineCardSelection({
-                          show: true,
-                          position: session?.userSeat || null,
-                          cardIndex: 2,
-                          title: 'Select Your Card 2'
-                        });
-                      }}
-                      className="text-xs border-blue-300 hover:bg-blue-100"
-                    >
-                      {currentHand?.userCards?.[1] || 'Card 2'}
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Opponent Cards Section - Show all active opponents */}
-              {currentHand?.playerStates &&
-                currentHand.playerStates.filter(p => p.status === 'active' && p.position !== session?.userSeat)
-                .length > 0 && (
-                <div className="border rounded-lg p-4">
-                  <div className="font-medium mb-3 text-gray-700">
-                    Opponent Cards (Optional - add any cards that were shown)
-                  </div>
-                  <div className="grid gap-3">
-                    {currentHand?.playerStates &&
-                      currentHand.playerStates.filter(p => p.status === 'active' && p.position !== session?.userSeat)
-                      .map(player => (
-                        <div key={player.position} className="border rounded p-3 bg-gray-50">
-                          <div className="font-medium mb-2 text-sm">{player.position}</div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setInlineCardSelection({
-                                  show: true,
-                                  position: player.position,
-                                  cardIndex: 1,
-                                  title: `Select ${player.position} Card 1`
-                                });
-                              }}
-                              className="text-xs"
-                            >
-                              {opponentCards[player.position]?.[0] || 'Card 1'}
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setInlineCardSelection({
-                                  show: true,
-                                  position: player.position,
-                                  cardIndex: 2,
-                                  title: `Select ${player.position} Card 2`
-                                });
-                              }}
-                              className="text-xs"
-                            >
-                              {opponentCards[player.position]?.[1] || 'Card 2'}
-                            </Button>
-                          </div>
-                        </div>
-                      ))
-                    }
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Inline Card Selector for Showdown Dialog */}
-            {inlineCardSelection.show && (
-              <div className="mt-4 border-t pt-4">
-                <CardSelector
-                  title={inlineCardSelection.title}
-                  selectedCards={[
-                    selectedCard1,
-                    selectedCard2,
-                    ...(currentHand?.communityCards.flop || []),
-                    currentHand?.communityCards.turn,
-                    currentHand?.communityCards.river,
-                    ...Object.values(opponentCards).flat()
-                  ].filter(Boolean) as string[]}
-                  onCardSelect={handleInlineCardSelect}
-                  onCancel={() => setInlineCardSelection({ show: false, position: null, cardIndex: 1, title: '' })}
-                />
-              </div>
-            )}
-
-            {/* Outcome Selection */}
-            <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t">
-              <Button
-                className="bg-green-600 hover:bg-green-700 text-white"
-                onClick={() => {
-                  setShowOutcomeSelection(false);
-                  completeHand('won', currentHand?.pot || 0);
-                }}
-                disabled={!currentHand?.userCards || !currentHand.userCards[0] || !currentHand.userCards[1]}
-              >
-                I Won
-              </Button>
-              <Button
-                className="bg-red-600 hover:bg-red-700 text-white"
-                onClick={() => {
-                  setShowOutcomeSelection(false);
-                  completeHand('lost', 0);
-                }}
-                disabled={!currentHand?.userCards || !currentHand.userCards[0] || !currentHand.userCards[1]}
-              >
-                I Lost
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <ShowdownDialog
+          open={showOutcomeSelection}
+          onOpenChange={setShowOutcomeSelection}
+          currentHand={currentHand}
+          userSeat={session?.userSeat}
+          inlineCardSelection={inlineCardSelection}
+          onSetInlineCardSelection={setInlineCardSelection}
+          selectedCard1={selectedCard1}
+          selectedCard2={selectedCard2}
+          opponentCards={opponentCards}
+          onInlineCardSelect={handleInlineCardSelect}
+          onCompleteHandWon={() => completeHand('won', currentHand?.pot || 0)}
+          onCompleteHandLost={() => completeHand('lost', 0)}
+          getDialogClasses={getDialogClasses}
+        />
 
 
-        {/* Hero Must Act First Dialog */}
-        <Dialog open={showHeroMustActFirst} onOpenChange={setShowHeroMustActFirst}>
-          <DialogContent className={getDialogClasses("sm:max-w-[400px] max-w-[90vw] w-full")}>
-            <DialogHeader>
-              <DialogTitle>Choose Hero&apos;s Action First</DialogTitle>
-              <DialogDescription>
-                You must choose your action before other players can act.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="py-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-sm text-gray-700">
-                  Since the action is currently before you in the sequence, you need to decide what your hero does first.
-                  Clicking on seats after your position would mean your hero folded.
-                </p>
-              </div>
-            </div>
-            <div className="flex justify-end">
-              <Button
-                onClick={() => setShowHeroMustActFirst(false)}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                Continue
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <HeroMustActFirstDialog
+          open={showHeroMustActFirst}
+          onOpenChange={setShowHeroMustActFirst}
+          onContinue={() => setShowHeroMustActFirst(false)}
+          getDialogClasses={getDialogClasses}
+        />
 
-        {/* Auto-Action Confirmation Dialog */}
-        <Dialog open={showAutoActionConfirmation} onOpenChange={setShowAutoActionConfirmation}>
-          <DialogContent className={getDialogClasses("sm:max-w-[500px] max-w-[95vw] w-full")}>
-            <DialogHeader>
-              <DialogTitle>Confirm Action</DialogTitle>
-              <DialogDescription>
-                This action will skip other players&apos; turns.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="py-4">
-              {affectedSeats.length > 0 && (
-                (() => {
-                  const currentRound = currentHand?.bettingRounds[currentHand.currentBettingRound as 'preflop' | 'flop' | 'turn' | 'river'];
-                  const hasBet = currentRound?.currentBet && currentRound.currentBet > 0;
-                  const autoAction = hasBet ? 'fold' : 'check';
+        <AutoActionConfirmDialog
+          open={showAutoActionConfirmation}
+          onOpenChange={setShowAutoActionConfirmation}
+          affectedSeats={affectedSeats}
+          currentBet={currentHand?.bettingRounds[currentHand.currentBettingRound as 'preflop' | 'flop' | 'turn' | 'river']?.currentBet || 0}
+          onConfirm={handleConfirmedAutoAction}
+          onCancel={() => {
+            setShowAutoActionConfirmation(false);
+            setPendingAction(null);
+            setAffectedSeats([]);
+          }}
+          getDialogClasses={getDialogClasses}
+        />
 
-                  return (
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                      <p className="text-sm text-gray-700 mb-2">
-                        <strong>{affectedSeats.join(', ')}</strong> will automatically <strong>{autoAction}</strong>.
-                      </p>
-                      <p className="text-xs text-gray-600">
-                        Do you want to continue with this action?
-                      </p>
-                    </div>
-                  );
-                })()
-              )}
-            </div>
-            <div className="flex justify-between gap-3">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowAutoActionConfirmation(false);
-                  setPendingAction(null);
-                  setAffectedSeats([]);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleConfirmedAutoAction}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                Continue
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* All Opponents Folded Dialog */}
-        <Dialog open={showAllFoldedDialog} onOpenChange={setShowAllFoldedDialog}>
-          <DialogContent className={getDialogClasses("sm:max-w-[500px] max-w-[95vw] w-full")}>
-            <DialogHeader>
-              <DialogTitle>Hand Won - All Opponents Folded</DialogTitle>
-              <DialogDescription>
-                All opponents have folded to your action
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="grid gap-4 mt-4 max-h-80 overflow-y-auto">
-              {/* Pot Size Display */}
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600 mb-2">
-                  You Win: {currentHand?.pot || 0} chips
-                </div>
-                <div className="text-sm text-gray-600">
-                  All opponents folded
-                </div>
-              </div>
-
-              {/* Hero Cards Section - Only show if not already selected */}
-              {(!currentHand?.userCards || !currentHand.userCards[0] || !currentHand.userCards[1]) && (
-                <div className="border-2 border-blue-200 rounded-lg p-4 bg-blue-50">
-                  <div className="font-medium mb-3 text-blue-800">
-                    Select Your Hole Cards (Optional)
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setInlineCardSelection({
-                          show: true,
-                          position: session?.userSeat || null,
-                          cardIndex: 1,
-                          title: 'Select Your Card 1'
-                        });
-                      }}
-                      className="text-xs border-blue-300 hover:bg-blue-100"
-                    >
-                      {currentHand?.userCards?.[0] || 'Card 1'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setInlineCardSelection({
-                          show: true,
-                          position: session?.userSeat || null,
-                          cardIndex: 2,
-                          title: 'Select Your Card 2'
-                        });
-                      }}
-                      className="text-xs border-blue-300 hover:bg-blue-100"
-                    >
-                      {currentHand?.userCards?.[1] || 'Card 2'}
-                    </Button>
-                  </div>
-                  <div className="text-xs text-gray-600 mt-2 text-center">
-                    Recording your cards helps with hand history tracking
-                  </div>
-                </div>
-              )}
-
-              {/* If cards are selected, show them */}
-              {currentHand?.userCards && currentHand.userCards[0] && currentHand.userCards[1] && (
-                <div className="text-center">
-                  <div className="text-sm text-gray-600 mb-2">Your Cards:</div>
-                  <div className="flex gap-2 justify-center">
-                    <span className="text-lg font-bold px-3 py-2 bg-white border rounded">
-                      {currentHand.userCards[0]}
-                    </span>
-                    <span className="text-lg font-bold px-3 py-2 bg-white border rounded">
-                      {currentHand.userCards[1]}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Inline Card Selector for All Folded Dialog */}
-            {inlineCardSelection.show && (
-              <div className="mt-4 border-t pt-4">
-                <CardSelector
-                  title={inlineCardSelection.title}
-                  selectedCards={[
-                    selectedCard1,
-                    selectedCard2,
-                    ...(currentHand?.communityCards.flop || []),
-                    currentHand?.communityCards.turn,
-                    currentHand?.communityCards.river,
-                    ...Object.values(opponentCards).flat()
-                  ].filter(Boolean) as string[]}
-                  onCardSelect={handleInlineCardSelect}
-                  onCancel={() => setInlineCardSelection({ show: false, position: null, cardIndex: 1, title: '' })}
-                />
-              </div>
-            )}
-
-            {/* Action Button */}
-            <div className="flex justify-center mt-6">
-              <Button
-                className="bg-green-600 hover:bg-green-700 text-white px-8 py-2"
-                onClick={() => {
-                  setShowAllFoldedDialog(false);
-                  completeHand('won', currentHand?.pot || 0);
-                }}
-              >
-                Complete Hand
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <AllFoldedDialog
+          open={showAllFoldedDialog}
+          onOpenChange={setShowAllFoldedDialog}
+          currentHand={currentHand}
+          userSeat={session?.userSeat}
+          inlineCardSelection={inlineCardSelection}
+          onSetInlineCardSelection={setInlineCardSelection}
+          selectedCard1={selectedCard1}
+          selectedCard2={selectedCard2}
+          opponentCards={opponentCards}
+          onInlineCardSelect={handleInlineCardSelect}
+          onCompleteHand={() => completeHand('won', currentHand?.pot || 0)}
+          getDialogClasses={getDialogClasses}
+        />
 
         {/* Validation Error Dialog */}
-        <Dialog open={showValidationError} onOpenChange={setShowValidationError}>
-          <DialogContent className={getDialogClasses("sm:max-w-[425px] max-w-[350px]")}>
-            <DialogHeader>
-              <DialogTitle>Action Required</DialogTitle>
-              <DialogDescription>
-                {validationErrorMessage}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex justify-end mt-4">
-              <Button
-                onClick={() => {
-                  setShowValidationError(false);
-                  // If the error was about missing hole cards, open the card selector
-                  if (validationErrorMessage.includes('hole cards')) {
-                    setShowCardSelector(true);
-                  }
-                }}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                Select Cards
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <ValidationErrorDialog
+          open={showValidationError}
+          onOpenChange={setShowValidationError}
+          message={validationErrorMessage}
+          onSelectCards={() => setShowCardSelector(true)}
+          getDialogClasses={getDialogClasses}
+        />
 
         {/* Community Card Selector Space - Reserve space to prevent layout shift */}
         {!showSeatSelection && (needsCommunityCards || showCommunitySelector) && (

@@ -2509,7 +2509,7 @@ export default function SessionPage() {
               </DialogDescription>
             </DialogHeader>
 
-            <div className="grid gap-4 mt-4">
+            <div className="grid gap-4 mt-4 max-h-80 overflow-y-auto">
               {/* Pot Size Display */}
               <div className="text-center">
                 <div className="text-2xl font-bold text-green-600 mb-2">
@@ -2531,25 +2531,31 @@ export default function SessionPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        setShowAllFoldedDialog(false);
-                        setSelectingCard(1);
-                        setShowCardSelector(true);
+                        setInlineCardSelection({
+                          show: true,
+                          position: session?.userSeat || null,
+                          cardIndex: 1,
+                          title: 'Select Your Card 1'
+                        });
                       }}
                       className="text-xs border-blue-300 hover:bg-blue-100"
                     >
-                      {selectedCard1 || 'Select Card 1'}
+                      {currentHand?.userCards?.[0] || 'Card 1'}
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        setShowAllFoldedDialog(false);
-                        setSelectingCard(2);
-                        setShowCardSelector(true);
+                        setInlineCardSelection({
+                          show: true,
+                          position: session?.userSeat || null,
+                          cardIndex: 2,
+                          title: 'Select Your Card 2'
+                        });
                       }}
                       className="text-xs border-blue-300 hover:bg-blue-100"
                     >
-                      {selectedCard2 || 'Select Card 2'}
+                      {currentHand?.userCards?.[1] || 'Card 2'}
                     </Button>
                   </div>
                   <div className="text-xs text-gray-600 mt-2 text-center">
@@ -2573,6 +2579,25 @@ export default function SessionPage() {
                 </div>
               )}
             </div>
+
+            {/* Inline Card Selector for All Folded Dialog */}
+            {inlineCardSelection.show && (
+              <div className="mt-4 border-t pt-4">
+                <CardSelector
+                  title={inlineCardSelection.title}
+                  selectedCards={[
+                    selectedCard1,
+                    selectedCard2,
+                    ...(currentHand?.communityCards.flop || []),
+                    currentHand?.communityCards.turn,
+                    currentHand?.communityCards.river,
+                    ...Object.values(opponentCards).flat()
+                  ].filter(Boolean) as string[]}
+                  onCardSelect={handleInlineCardSelect}
+                  onCancel={() => setInlineCardSelection({ show: false, position: null, cardIndex: 1, title: '' })}
+                />
+              </div>
+            )}
 
             {/* Action Button */}
             <div className="flex justify-center mt-6">

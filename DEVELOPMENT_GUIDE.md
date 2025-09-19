@@ -3,7 +3,60 @@
 ## Project Overview
 A Progressive Web App for tracking poker sessions, hands, and statistics. Built with Next.js 15, TypeScript, and Tailwind CSS.
 
-## RECENT UPDATES (v2.4) ✅
+## RECENT UPDATES (v2.5) ✅
+
+### Smooth Community Card Selection Experience - COMPLETED
+✅ **Enhanced Community Card Selection Flow**
+- Replaced generic "Betting Round Complete" with specific messages:
+  - Preflop: "Select Flop Community Cards to continue"
+  - Flop: "Select Turn Card to continue"
+  - Turn: "Select River Card to continue"
+- Implemented auto-triggered guided progression for community card selection
+- Cards automatically progress through First → Second → Third flop card selection
+- Smooth card-to-card transitions without closing/reopening card selector
+
+✅ **Eliminated All Visual Blinks and Layout Shifts**
+- Fixed Action Buttons blinking when betting round completes
+- Added computed `needsCommunityCards` variable for synchronous state evaluation
+- Reserved space for community card selector to prevent HandHistory layout shifts
+- Implemented stable HandHistory during community card selection using frozen state snapshots
+- Fixed timing issues between `isBettingComplete` and auto-trigger useEffect
+
+✅ **Optimized Auto-Trigger Community Card Selection**
+- useEffect immediately triggers community card selection when betting completes
+- Seamless progression: betting completes → space reserved → card selector appears
+- No visual interruptions or flashing during transitions
+- HandHistory remains stable and visible throughout entire selection process
+
+✅ **Technical Implementation Details**
+```typescript
+// Computed variable for synchronous evaluation
+const needsCommunityCards = currentHand && isBettingComplete && (
+  (currentHand.currentBettingRound === 'preflop' && (!flop_cards_complete)) ||
+  (currentHand.currentBettingRound === 'flop' && !currentHand.communityCards.turn) ||
+  (currentHand.currentBettingRound === 'turn' && !currentHand.communityCards.river)
+);
+
+// Stable HandHistory during selection
+const stableCurrentHandRef = useRef<CurrentHand | null>(null);
+const handHistoryCurrentHand = showCommunitySelector ? stableCurrentHandRef.current : currentHand;
+
+// Reserved space prevents layout shifts
+{!showSeatSelection && (needsCommunityCards || showCommunitySelector) && (
+  <div className="mt-4 transition-opacity duration-300" style={{ minHeight: '200px' }}>
+    {/* Community card selector */}
+  </div>
+)}
+```
+
+✅ **User Experience Improvements**
+- Completely smooth transitions with no visual blinks or jumps
+- HandHistory remains stable and visible during community card selection
+- Immediate space reservation when last user acts prevents any layout shifts
+- Professional, polished feel with 300ms smooth transitions
+- Progressive card selection with clear guidance text
+
+## PREVIOUS UPDATES (v2.4) ✅
 
 ### Layout and Betting Logic Fixes - COMPLETED
 ✅ **Fixed SeatSelector Layout Issues**

@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, MousePointer2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SimplePokerTable } from '@/components/poker/SimplePokerTable';
@@ -50,6 +50,12 @@ export default function SessionPage() {
   // Hero fold confirmation
   const [showFoldConfirmation, setShowFoldConfirmation] = useState(false);
   const [foldPosition, setFoldPosition] = useState<Position | null>(null);
+  // Auto-action confirmation
+  const [showAutoActionConfirmation, setShowAutoActionConfirmation] = useState(false);
+  const [pendingAction, setPendingAction] = useState<{ position: Position; action: 'fold' | 'check' | 'call' | 'raise' | 'all-in'; amount?: number } | null>(null);
+  const [affectedSeats, setAffectedSeats] = useState<Position[]>([]);
+  // Hero must act first dialog
+  const [showHeroMustActFirst, setShowHeroMustActFirst] = useState(false);
   // Hero money tracking
   const [heroMoneyInvested, setHeroMoneyInvested] = useState<number>(0);
   // Showdown outcome
@@ -68,6 +74,8 @@ export default function SessionPage() {
     cardIndex: 1,
     title: ''
   });
+  // Auto community card selection state
+  const [autoSelectingCommunityCards, setAutoSelectingCommunityCards] = useState(false);
   // Seat selection for new hands
   const [showSeatSelection, setShowSeatSelection] = useState(false);
   const [handCount, setHandCount] = useState(0);
@@ -182,11 +190,12 @@ export default function SessionPage() {
 
   // Save stack changes to session metadata
   useEffect(() => {
-    if (session) {
+    if (session && stack !== session.currentStack) {
       const updatedSession = { ...session, currentStack: stack };
       SessionService.updateSessionMetadata(updatedSession);
+      setSession(updatedSession); // Update local session state too
     }
-  }, [stack, session]);
+  }, [stack]); // Removed session from dependencies to avoid infinite loop
 
   // Function to start new hand with explicit session data
   const startNewHandWithPosition = useCallback((sessionData: SessionMetadata, userSeat: Position) => {
@@ -388,9 +397,28 @@ export default function SessionPage() {
 
   const handleCommunityCardClick = (cardType: 'flop', cardIndex: number) => {
     // Only allow community card selection when betting round is complete
-    if (!isBettingComplete) {
+    if (!isBettingComplete || !currentHand) {
       return; // Don't allow community card selection during active betting
     }
+
+    // Validate which cards can be selected based on current betting round
+    const currentRound = currentHand.currentBettingRound;
+
+    if (currentRound === 'preflop') {
+      // After preflop, only flop cards (0, 1, 2) can be selected
+      if (cardIndex > 2) {
+        return; // Prevent turn and river selection after preflop
+      }
+    } else if (currentRound === 'flop') {
+      // After flop, only turn card (3) can be selected (and flop cards if not set)
+      if (cardIndex === 4) {
+        return; // Prevent river selection after flop
+      }
+    } else if (currentRound === 'turn') {
+      // After turn, only river card (4) can be selected (and previous cards if not set)
+      // All cards are allowed at this point
+    }
+
     setSelectingCommunityCard({ type: cardType, index: cardIndex });
     setShowCommunitySelector(true);
   };
@@ -417,8 +445,20 @@ export default function SessionPage() {
     }
 
     setCurrentHand(updatedHand);
-    setShowCommunitySelector(false);
-    setSelectingCommunityCard(null);
+
+    // Auto-progress to next card if in guided mode
+    if (autoSelectingCommunityCards && currentHand.currentBettingRound === 'preflop' && index < 2) {
+      // Continue to next flop card immediately without closing selector
+      setSelectingCommunityCard({ type: 'flop', index: index + 1 });
+      // Keep showCommunitySelector true - don't close and reopen
+    } else {
+      // Close selector only when we're done with auto-progression
+      setShowCommunitySelector(false);
+      setSelectingCommunityCard(null);
+      if (autoSelectingCommunityCards) {
+        setAutoSelectingCommunityCards(false);
+      }
+    }
   };
 
   // Handle betting actions for any position
@@ -432,11 +472,50 @@ export default function SessionPage() {
       return;
     }
 
+    // Check if this is the hero's action and if it will cause auto-actions
+    if (position === session.userSeat && currentHand.nextToAct && position !== currentHand.nextToAct) {
+      // Calculate which seats will be auto-actioned
+      const fullActionSequence = currentHand.currentBettingRound === 'preflop'
+        ? getPreflopActionSequence(session.tableSeats || 9)
+        : getPostflopActionSequence(session.tableSeats || 9);
+
+      const activePlayers = currentHand.playerStates.filter(p => p.status === 'active');
+      const activePositions = activePlayers.map(p => p.position);
+      const actionSequence = fullActionSequence.filter(pos => activePositions.includes(pos));
+
+      const nextIndex = actionSequence.indexOf(currentHand.nextToAct);
+      const heroIndex = actionSequence.indexOf(position);
+
+      const skippedPositions: Position[] = [];
+      if (nextIndex !== -1 && heroIndex !== -1 && heroIndex !== nextIndex) {
+        let currentIdx = nextIndex;
+        while (currentIdx !== heroIndex) {
+          skippedPositions.push(actionSequence[currentIdx]);
+          currentIdx = (currentIdx + 1) % actionSequence.length;
+        }
+      }
+    }
+
+    // Clear selected position after action
+    setSelectedPosition(null);
+    setShowPositionActions(false);
+
     let updatedHand = { ...currentHand };
 
-    // Auto-fold players between current next-to-act and target position (when user skips positions)
+    // If there are skipped positions, auto-fold/check them (user already sees hint)
     if (currentHand.nextToAct && currentHand.nextToAct !== position) {
-      updatedHand = autoFoldPlayersBetween(updatedHand, currentHand.nextToAct, position);
+      const fullActionSequence = currentHand.currentBettingRound === 'preflop'
+        ? getPreflopActionSequence(session?.tableSeats || 9)
+        : getPostflopActionSequence(session?.tableSeats || 9);
+      const activePlayers = currentHand.playerStates.filter(p => p.status === 'active');
+      const activePositions = activePlayers.map(p => p.position);
+      const actionSequence = fullActionSequence.filter(pos => activePositions.includes(pos));
+      const nextIndex = actionSequence.indexOf(currentHand.nextToAct);
+      const targetIndex = actionSequence.indexOf(position);
+
+      if (nextIndex !== -1 && targetIndex !== -1 && nextIndex !== targetIndex) {
+        updatedHand = autoFoldPlayersBetween(updatedHand, currentHand.nextToAct, position);
+      }
     }
 
     // Track hero's money investment
@@ -688,8 +767,25 @@ export default function SessionPage() {
     SessionService.clearCurrentHand(session.sessionId);
 
     // Update stack to the calculated stackAfter value
-    const newStackAmount = stack + (outcome === 'won' ? effectivePotWon : 0) - heroMoneyInvested;
+    const stackBefore = stack;
+    const winnings = outcome === 'won' ? effectivePotWon : 0;
+    const newStackAmount = stackBefore + winnings - heroMoneyInvested;
+
+    console.log('Stack update:', {
+      stackBefore,
+      outcome,
+      winnings,
+      heroMoneyInvested,
+      newStackAmount,
+      calculation: `${stackBefore} + ${winnings} - ${heroMoneyInvested} = ${newStackAmount}`
+    });
+
     setStack(newStackAmount);
+
+    // Immediately update session metadata with new stack
+    const updatedSession = { ...session, currentStack: newStackAmount };
+    SessionService.updateSessionMetadata(updatedSession);
+    setSession(updatedSession);
 
     // Reset and prepare for next hand
     const newHandCount = handCount + 1;
@@ -699,10 +795,115 @@ export default function SessionPage() {
     const hands = SessionService.getSessionHands(session.sessionId);
     setCompletedHands(hands);
 
+    // Reset hero money invested for next hand
+    setHeroMoneyInvested(0);
+
+    // Reset other states
+    setSelectedCard1(null);
+    setSelectedCard2(null);
+    setOpponentCards({});
+
     // Always show seat selection for every hand
     setCurrentHand(null);
     setShowSeatSelection(true);
   };
+
+  // Handle confirmed auto-action
+  const handleConfirmedAutoAction = () => {
+    if (!pendingAction || !currentHand || !session) return;
+
+    setShowAutoActionConfirmation(false);
+
+    // Execute the pending action
+    const { position, action, amount } = pendingAction;
+    setPendingAction(null);
+    setAffectedSeats([]);
+
+    // Clear selected position after action
+    setSelectedPosition(null);
+    setShowPositionActions(false);
+
+    let updatedHand = { ...currentHand };
+
+    // Auto-fold players between current next-to-act and target position (when user skips positions)
+    if (currentHand.nextToAct && currentHand.nextToAct !== position) {
+      updatedHand = autoFoldPlayersBetween(updatedHand, currentHand.nextToAct, position);
+    }
+
+    // Process the betting action
+    const actionForProcessing: Omit<BettingAction, 'timestamp'> = {
+      position,
+      action,
+      amount
+    };
+
+    updatedHand = processBettingAction(updatedHand, actionForProcessing);
+
+    // Track hero's investment
+    if (position === session.userSeat && amount) {
+      const currentBet = updatedHand.playerStates.find(p => p.position === position)?.currentBet || 0;
+      const additionalInvestment = amount - currentBet;
+      setHeroMoneyInvested(prev => prev + additionalInvestment);
+    }
+
+    // Update pot - it's already updated by processBettingAction
+
+    // Special handling for BB preflop action
+    if (updatedHand.currentBettingRound === 'preflop' &&
+      position === 'BB' &&
+      ['call', 'check'].includes(action)) {
+
+      const activePlayers = updatedHand.playerStates.filter(p => p.status === 'active');
+      const currentRound = updatedHand.bettingRounds[updatedHand.currentBettingRound as 'preflop' | 'flop' | 'turn' | 'river'];
+      const allMatched = activePlayers.every(p => {
+        const playerBet = p.currentBet || 0;
+        return playerBet === (currentRound?.currentBet || 0);
+      });
+
+      if (allMatched) {
+        const bbPlayer = updatedHand.playerStates.find(p => p.position === 'BB');
+        if (bbPlayer && !bbPlayer.hasActed) {
+          bbPlayer.hasActed = true;
+        }
+      }
+    }
+
+    // Check if betting round is complete
+    const currentRound = updatedHand.bettingRounds[updatedHand.currentBettingRound as 'preflop' | 'flop' | 'turn' | 'river'];
+    const isComplete = currentRound ? isBettingRoundComplete(updatedHand.playerStates, currentRound) : false;
+
+    // Update nextToAct if betting is not complete
+    if (!isComplete && updatedHand.currentBettingRound !== 'showdown') {
+      const currentRound = updatedHand.bettingRounds[updatedHand.currentBettingRound as 'preflop' | 'flop' | 'turn' | 'river'];
+      if (currentRound) {
+        const nextPlayer = getNextToAct(
+          updatedHand.currentBettingRound,
+          session.tableSeats || 9,
+          updatedHand.playerStates,
+          currentRound
+        );
+        updatedHand.nextToAct = nextPlayer || undefined;
+      }
+    } else {
+      updatedHand.nextToAct = undefined;
+    }
+
+    // Check if the hand should end (only one player left)
+    const activePlayers = updatedHand.playerStates.filter(p => p.status === 'active' || p.status === 'all-in');
+    if (activePlayers.length === 1) {
+      if (activePlayers[0].position === session.userSeat) {
+        completeHand('won', updatedHand.pot || 0);
+        return;
+      } else {
+        completeHand('lost', 0);
+        return;
+      }
+    }
+
+    setCurrentHand(updatedHand);
+  };
+
+  // Execute betting action without confirmation checks (removed - duplicate logic)
 
   // Handle confirmed hero fold
   const handleConfirmedHeroFold = () => {
@@ -1019,6 +1220,59 @@ export default function SessionPage() {
     currentHand?.currentBettingRound === 'turn' &&
     !currentHand?.communityCards.river;
 
+  // Compute if community cards are needed for auto-trigger
+  const needsCommunityCards = currentHand && isBettingComplete && (
+    (currentHand.currentBettingRound === 'preflop' && (!currentHand.communityCards.flop || currentHand.communityCards.flop.length < 3 || currentHand.communityCards.flop.some(card => !card))) ||
+    (currentHand.currentBettingRound === 'flop' && !currentHand.communityCards.turn) ||
+    (currentHand.currentBettingRound === 'turn' && !currentHand.communityCards.river)
+  );
+
+  // Stable currentHand for HandHistory - freeze during community card selection to prevent blink
+  const stableCurrentHandRef = useRef<CurrentHand | null>(null);
+
+  // Update stable hand when we have a current hand and are NOT in community card selection mode
+  useEffect(() => {
+    if (currentHand && !showCommunitySelector) {
+      stableCurrentHandRef.current = { ...currentHand };
+    }
+  }, [currentHand, showCommunitySelector]);
+
+  // Use the stable version during community card selection, current version otherwise
+  const handHistoryCurrentHand = showCommunitySelector ? stableCurrentHandRef.current : currentHand;
+
+  // Auto-trigger community card selection when betting round completes
+  useEffect(() => {
+    if (!currentHand || !isBettingComplete || showCommunitySelector) return;
+
+    if (needsCommunityCards) {
+      // Auto-trigger the first card selection
+      const getNextCardToSelect = () => {
+        if (currentHand.currentBettingRound === 'preflop') {
+          // Find first empty flop card
+          const flopCards = currentHand.communityCards.flop || [null, null, null];
+          for (let i = 0; i < 3; i++) {
+            if (!flopCards[i]) return { type: 'flop' as const, index: i };
+          }
+        } else if (currentHand.currentBettingRound === 'flop') {
+          return { type: 'flop' as const, index: 3 }; // Turn card
+        } else if (currentHand.currentBettingRound === 'turn') {
+          return { type: 'flop' as const, index: 4 }; // River card
+        }
+        return null;
+      };
+
+      const nextCard = getNextCardToSelect();
+      if (nextCard) {
+        // Show card selector immediately
+        setSelectingCommunityCard(nextCard);
+        setShowCommunitySelector(true);
+        setAutoSelectingCommunityCards(true);
+      }
+    } else {
+      setAutoSelectingCommunityCards(false);
+    }
+  }, [currentHand, isBettingComplete, showCommunitySelector, needsCommunityCards]);
+
   const endSession = () => {
     SessionService.endCurrentSession();
     router.push('/');
@@ -1090,8 +1344,73 @@ export default function SessionPage() {
         {/* Hand Info - Top */}
         {currentHand && !showSeatSelection && (
           <div className="bg-white rounded-lg p-3 shadow-sm mb-3">
-            <div className="text-center mb-2">
-              <h2 className="text-lg font-semibold">Hand #{currentHand.handNumber} - <span className="text-blue-600 capitalize">{currentHand.currentBettingRound}</span></h2>
+            <div className="mb-2">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">Hand #{currentHand.handNumber} - <span className="text-blue-600 capitalize">{currentHand.currentBettingRound}</span></h2>
+                {currentHand.currentBettingRound !== 'showdown' && (
+                  <div className="text-xs italic text-right">
+                    {currentHand.nextToAct === session.userSeat ? (
+                      <div className="text-blue-600 font-medium animate-pulse">Your turn to act</div>
+                    ) : (
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1 justify-end text-gray-600">
+                          <MousePointer2 className="h-3 w-3" />
+                          <span>Tap any seat to record action</span>
+                        </div>
+                        {selectedPosition && selectedPosition !== session.userSeat && currentHand.nextToAct && !showPositionActions && !showCardSelector && (
+                          (() => {
+                            const currentRound = currentHand.bettingRounds[currentHand.currentBettingRound as 'preflop' | 'flop' | 'turn' | 'river'];
+                            const hasBet = currentRound?.currentBet && currentRound.currentBet > 0;
+                            const autoAction = hasBet ? 'fold' : 'check';
+
+                            // Get positions between nextToAct and selectedPosition
+                            const fullActionSequence = currentHand.currentBettingRound === 'preflop'
+                              ? getPreflopActionSequence(session.tableSeats || 9)
+                              : getPostflopActionSequence(session.tableSeats || 9);
+
+                            const activePlayers = currentHand.playerStates.filter(p => p.status === 'active');
+                            const activePositions = activePlayers.map(p => p.position);
+                            const actionSequence = fullActionSequence.filter(pos => activePositions.includes(pos));
+
+                            const nextIndex = actionSequence.indexOf(currentHand.nextToAct);
+                            const selectedIndex = actionSequence.indexOf(selectedPosition);
+
+                            let skippedCount = 0;
+                            if (nextIndex !== -1 && selectedIndex !== -1 && selectedIndex !== nextIndex) {
+                              if (selectedIndex > nextIndex) {
+                                skippedCount = selectedIndex - nextIndex - 1;
+                              } else {
+                                // Wraps around
+                                skippedCount = (actionSequence.length - nextIndex - 1) + selectedIndex;
+                              }
+                            }
+
+                            if (skippedCount > 0) {
+                              // Get the actual positions that will be skipped
+                              const skippedPositions: Position[] = [];
+                              let currentIdx = (nextIndex + 1) % actionSequence.length;
+                              while (currentIdx !== selectedIndex) {
+                                skippedPositions.push(actionSequence[currentIdx]);
+                                currentIdx = (currentIdx + 1) % actionSequence.length;
+                              }
+
+                              return (
+                                <div className="text-amber-600 text-xs">
+                                  {skippedPositions.length === 1
+                                    ? `${skippedPositions[0]} will auto-${autoAction}`
+                                    : `${skippedPositions.join(', ')} will auto-${autoAction}`
+                                  }
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Stack and Blinds */}
@@ -1193,6 +1512,36 @@ export default function SessionPage() {
             }}
             onSeatClick={(position) => {
               if (position !== 'DEALER') {
+                // Check if user is trying to act after hero when hero hasn't acted yet
+                if (position !== session?.userSeat && currentHand?.nextToAct && session?.userSeat) {
+                  const fullActionSequence = currentHand.currentBettingRound === 'preflop'
+                    ? getPreflopActionSequence(session.tableSeats || 9)
+                    : getPostflopActionSequence(session.tableSeats || 9);
+
+                  const activePlayers = currentHand.playerStates.filter(p => p.status === 'active');
+                  const activePositions = activePlayers.map(p => p.position);
+                  const actionSequence = fullActionSequence.filter(pos => activePositions.includes(pos));
+
+                  const nextToActIndex = actionSequence.indexOf(currentHand.nextToAct);
+                  const heroIndex = actionSequence.indexOf(session.userSeat);
+                  const clickedIndex = actionSequence.indexOf(position);
+
+                  // If next-to-act is before hero and clicked position is after hero
+                  const isNextBeforeHero = nextToActIndex < heroIndex;
+                  const isClickedAfterHero = clickedIndex > heroIndex;
+
+                  if (isNextBeforeHero && isClickedAfterHero) {
+                    // Check if hero has already acted in this round
+                    const currentRound = currentHand.bettingRounds[currentHand.currentBettingRound as 'preflop' | 'flop' | 'turn' | 'river'];
+                    const heroHasActed = currentRound?.actions.some(action => action.position === session.userSeat);
+
+                    if (!heroHasActed) {
+                      setShowHeroMustActFirst(true);
+                      return;
+                    }
+                  }
+                }
+
                 setSelectedPosition(position);
                 setShowPositionActions(true);
               }
@@ -1204,11 +1553,13 @@ export default function SessionPage() {
             playerStates={currentHand?.playerStates || []}
             nextToAct={currentHand?.nextToAct}
             currentBettingRound={currentBettingRound || undefined}
+            currentBettingRoundName={currentHand?.currentBettingRound}
             isBettingComplete={isBettingComplete}
             showFlopSelectionPrompt={showFlopSelectionPrompt}
             showTurnSelectionPrompt={showTurnSelectionPrompt}
             showRiverSelectionPrompt={showRiverSelectionPrompt}
             potSize={currentHand?.pot || 0}
+            highlightedPositions={selectedPosition ? [selectedPosition] : []}
           />
         </div>
         )}
@@ -1235,32 +1586,69 @@ export default function SessionPage() {
           />
         )}
 
-        {/* Community Card Selector */}
-        {showCommunitySelector && selectingCommunityCard && (
-          <CardSelector
-            title={`Select Community Card`}
-            selectedCards={[
-              ...(currentHand?.communityCards.flop || []),
-              currentHand?.communityCards.turn,
-              currentHand?.communityCards.river
-            ].filter(Boolean) as string[]}
-            onCardSelect={handleCommunityCardSelect}
-            onCancel={() => {
-              setShowCommunitySelector(false);
-              setSelectingCommunityCard(null);
-            }}
-          />
-        )}
 
         {/* Position Action Selector */}
         {showPositionActions && selectedPosition && (
           <div className="bg-white rounded-lg p-4 shadow-sm mb-4">
-            <h3 className="text-md font-semibold mb-3 text-center">
-              {selectedPosition} Action
-            </h3>
-            <div className="flex flex-wrap gap-2">
+            <div className="mb-3 text-center">
+              <h3 className="text-md font-semibold">
+                {selectedPosition} Action
+              </h3>
+              {(() => {
+                // Show auto-fold/check hint for selected position
+                if (!currentHand?.nextToAct) return null;
+
+                const currentRound = currentHand.bettingRounds[currentHand.currentBettingRound as 'preflop' | 'flop' | 'turn' | 'river'];
+                const hasBet = currentRound?.currentBet && currentRound.currentBet > 0;
+                const autoAction = hasBet ? 'fold' : 'check';
+
+                // Get positions between nextToAct and selectedPosition
+                const fullActionSequence = currentHand.currentBettingRound === 'preflop'
+                  ? getPreflopActionSequence(session.tableSeats || 9)
+                  : getPostflopActionSequence(session.tableSeats || 9);
+                const activePlayers = currentHand.playerStates.filter(p => p.status === 'active');
+                const activePositions = activePlayers.map(p => p.position);
+                const actionSequence = fullActionSequence.filter(pos => activePositions.includes(pos));
+
+                const nextIndex = actionSequence.indexOf(currentHand.nextToAct);
+                const targetIndex = actionSequence.indexOf(selectedPosition);
+
+                if (nextIndex === -1 || targetIndex === -1 || nextIndex === targetIndex) return null;
+
+                // Get the actual positions that will be skipped
+                const skippedPositions: Position[] = [];
+
+                if (targetIndex > nextIndex) {
+                  // Forward direction - include nextToAct position
+                  for (let i = nextIndex; i < targetIndex; i++) {
+                    skippedPositions.push(actionSequence[i]);
+                  }
+                } else {
+                  // Wraps around - include nextToAct position
+                  for (let i = nextIndex; i < actionSequence.length; i++) {
+                    skippedPositions.push(actionSequence[i]);
+                  }
+                  for (let i = 0; i < targetIndex; i++) {
+                    skippedPositions.push(actionSequence[i]);
+                  }
+                }
+
+                if (skippedPositions.length === 0) return null;
+
+                return (
+                  <div className="text-amber-600 text-xs mt-1">
+                    {skippedPositions.length === 1
+                      ? `${skippedPositions[0]} will auto-${autoAction}`
+                      : `${skippedPositions.join(', ')} will auto-${autoAction}`
+                    }
+                  </div>
+                );
+              })()}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {/* Left Column: Fold + All-In */}
               <Button
-                className="bg-red-600 hover:bg-red-700 text-white flex-1 min-w-[80px]"
+                className="bg-red-600 hover:bg-red-700 text-white"
                 onClick={() => {
                   handleBettingAction(selectedPosition, 'fold');
                   setShowPositionActions(false);
@@ -1269,47 +1657,51 @@ export default function SessionPage() {
               >
                 Fold
               </Button>
+
               {(() => {
                 const callAmount = getCallAmount(selectedPosition);
-                return callAmount > 0 ? (
-                  <Button
-                    className="bg-blue-600 hover:bg-blue-700 text-white flex-1 min-w-[80px]"
-                    onClick={() => {
-                      handleBettingAction(selectedPosition, 'call', currentBettingRound?.currentBet);
-                      setShowPositionActions(false);
-                      setSelectedPosition(null);
-                    }}
-                  >
-                    {selectedPosition && isCallAllIn(selectedPosition) ? `Call All-In ${callAmount}` : `Call ${callAmount}`}
-                  </Button>
-                ) : null;
+                const canCheckHere = canCheck(selectedPosition);
+
+                if (canCheckHere) {
+                  return (
+                    <Button
+                      className="bg-orange-600 hover:bg-orange-700 text-white"
+                      onClick={() => {
+                        handleBettingAction(selectedPosition, 'check');
+                        setShowPositionActions(false);
+                        setSelectedPosition(null);
+                      }}
+                    >
+                      Check
+                    </Button>
+                  );
+                } else if (callAmount > 0) {
+                  return (
+                    <Button
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                      onClick={() => {
+                        handleBettingAction(selectedPosition, 'call', currentBettingRound?.currentBet);
+                        setShowPositionActions(false);
+                        setSelectedPosition(null);
+                      }}
+                    >
+                      {selectedPosition && isCallAllIn(selectedPosition) ? `Call All-In ${callAmount}` : `Call ${callAmount}`}
+                    </Button>
+                  );
+                } else {
+                  return (
+                    <Button
+                      className="bg-gray-400 text-white cursor-not-allowed"
+                      disabled
+                    >
+                      No Action
+                    </Button>
+                  );
+                }
               })()}
+
               <Button
-                className="bg-green-600 hover:bg-green-700 text-white flex-1 min-w-[80px]"
-                onClick={() => {
-                  setAmountModalAction('raise');
-                  setAmountModalPosition(selectedPosition);
-                  setAmountModalValue((currentBettingRound?.currentBet || 0) * 2);
-                  setShowAmountModal(true);
-                  setShowPositionActions(false);
-                }}
-              >
-                Raise
-              </Button>
-              {canCheck(selectedPosition) && (
-                <Button
-                  className="bg-orange-600 hover:bg-orange-700 text-white flex-1 min-w-[80px]"
-                  onClick={() => {
-                    handleBettingAction(selectedPosition, 'check');
-                    setShowPositionActions(false);
-                    setSelectedPosition(null);
-                  }}
-                >
-                  Check
-                </Button>
-              )}
-              <Button
-                className="bg-purple-600 hover:bg-purple-700 text-white flex-1 min-w-[80px]"
+                className="bg-purple-600 hover:bg-purple-700 text-white"
                 onClick={() => {
                   setAmountModalAction('all-in');
                   setAmountModalPosition(selectedPosition);
@@ -1319,6 +1711,20 @@ export default function SessionPage() {
                 }}
               >
                 All-In
+              </Button>
+
+              {/* Right Column: Call/Check + Raise */}
+              <Button
+                className="bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => {
+                  setAmountModalAction('raise');
+                  setAmountModalPosition(selectedPosition);
+                  setAmountModalValue((currentBettingRound?.currentBet || 0) * 2);
+                  setShowAmountModal(true);
+                  setShowPositionActions(false);
+                }}
+              >
+                Raise
               </Button>
             </div>
             <div className="mt-3 text-center">
@@ -1338,7 +1744,8 @@ export default function SessionPage() {
 
         {/* Action Buttons */}
         {currentHand && !showCommunitySelector && !showPositionActions &&
-         !(showCardSelector && selectedPosition && selectedPosition !== session?.userSeat) && (
+         !(showCardSelector && selectedPosition && selectedPosition !== session?.userSeat) &&
+         !needsCommunityCards && (
           <div className="bg-white rounded-lg p-4 shadow-sm mb-4">
             {isBettingComplete ? (
               // Show advance button when betting round is complete
@@ -1351,18 +1758,58 @@ export default function SessionPage() {
 
                 return (
                   <div className="text-center">
-                    <h3 className="text-md font-semibold mb-3">
-                      {needsCommunityCards
-                        ? `Select community cards to continue`
-                        : 'Betting Round Complete'
-                      }
-                    </h3>
+                    {needsCommunityCards ? (
+                      <h3 className="text-md font-semibold mb-3">
+                        {(() => {
+                          const currentRound = currentHand.currentBettingRound;
+                          if (currentRound === 'preflop') {
+                            return 'Select Flop Community Cards to continue';
+                          } else if (currentRound === 'flop') {
+                            return 'Select Turn Card to continue';
+                          } else if (currentRound === 'turn') {
+                            return 'Select River Card to continue';
+                          }
+                          return 'Select community cards to continue';
+                        })()}
+                      </h3>
+                    ) : (
+                      // Show specific message based on current round
+                      (() => {
+                        const currentRound = currentHand.currentBettingRound;
+                        let message = '';
+
+                        if (currentRound === 'preflop') {
+                          message = 'Flop cards selected';
+                        } else if (currentRound === 'flop') {
+                          message = 'Turn card selected';
+                        } else if (currentRound === 'turn') {
+                          message = 'River card selected';
+                        } else if (currentRound === 'river') {
+                          message = 'All cards dealt';
+                        } else {
+                          message = 'Betting Round Complete';
+                        }
+
+                        return (
+                          <h3 className="text-md font-semibold mb-3">
+                            {message}
+                          </h3>
+                        );
+                      })()
+                    )}
                     <Button
                       className="bg-green-600 hover:bg-green-700 text-white px-6 py-2"
                       onClick={handleAdvanceToNextRound}
                       disabled={needsCommunityCards}
                     >
-                      Proceed
+                      {needsCommunityCards ? 'Proceed' : (() => {
+                        const currentRound = currentHand.currentBettingRound;
+                        if (currentRound === 'preflop') return 'Proceed to Flop Betting';
+                        if (currentRound === 'flop') return 'Proceed to Turn Betting';
+                        if (currentRound === 'turn') return 'Proceed to River Betting';
+                        if (currentRound === 'river') return 'Proceed to Showdown';
+                        return 'Proceed';
+                      })()}
                     </Button>
                   </div>
                 );
@@ -1384,14 +1831,68 @@ export default function SessionPage() {
 
                 return shouldShowActions ? (
                   <>
-                    <h3 className="text-md font-semibold mb-3 text-center">
-                      {showPositionActions && selectedPosition
-                        ? `${selectedPosition} Actions`
-                        : `Hero Actions (${session.userSeat})`}
-                    </h3>
-                <div className="flex flex-wrap gap-2">
+                    <div className="mb-3 text-center">
+                      <h3 className="text-md font-semibold">
+                        {showPositionActions && selectedPosition
+                          ? `${selectedPosition} Actions`
+                          : <span className="text-blue-600">{`Hero Actions (${session.userSeat})`}</span>}
+                      </h3>
+                      {(() => {
+                        // Show auto-fold/check hint for any selected position
+                        const targetPosition = showPositionActions && selectedPosition ? selectedPosition : session.userSeat;
+                        if (!targetPosition || !currentHand?.nextToAct) return null;
+
+                        const currentRound = currentHand.bettingRounds[currentHand.currentBettingRound as 'preflop' | 'flop' | 'turn' | 'river'];
+                        const hasBet = currentRound?.currentBet && currentRound.currentBet > 0;
+                        const autoAction = hasBet ? 'fold' : 'check';
+
+                        // Get positions between nextToAct and targetPosition
+                        const fullActionSequence = currentHand.currentBettingRound === 'preflop'
+                          ? getPreflopActionSequence(session.tableSeats || 9)
+                          : getPostflopActionSequence(session.tableSeats || 9);
+                        const activePlayers = currentHand.playerStates.filter(p => p.status === 'active');
+                        const activePositions = activePlayers.map(p => p.position);
+                        const actionSequence = fullActionSequence.filter(pos => activePositions.includes(pos));
+
+                        const nextIndex = actionSequence.indexOf(currentHand.nextToAct);
+                        const targetIndex = actionSequence.indexOf(targetPosition);
+
+                        if (nextIndex === -1 || targetIndex === -1 || nextIndex === targetIndex) return null;
+
+                        // Get the actual positions that will be skipped
+                        const skippedPositions: Position[] = [];
+
+                        if (targetIndex > nextIndex) {
+                          // Forward direction - include nextToAct position
+                          for (let i = nextIndex; i < targetIndex; i++) {
+                            skippedPositions.push(actionSequence[i]);
+                          }
+                        } else {
+                          // Wraps around - include nextToAct position
+                          for (let i = nextIndex; i < actionSequence.length; i++) {
+                            skippedPositions.push(actionSequence[i]);
+                          }
+                          for (let i = 0; i < targetIndex; i++) {
+                            skippedPositions.push(actionSequence[i]);
+                          }
+                        }
+
+                        if (skippedPositions.length === 0) return null;
+
+                        return (
+                          <div className="text-amber-600 text-xs mt-1">
+                            {skippedPositions.length === 1
+                              ? `${skippedPositions[0]} will auto-${autoAction}`
+                              : `${skippedPositions.join(', ')} will auto-${autoAction}`
+                            }
+                          </div>
+                        );
+                      })()}
+                    </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Left Column: Fold + All-In */}
                   <Button
-                    className="bg-red-600 hover:bg-red-700 text-white flex-1 min-w-[80px]"
+                    className="bg-red-600 hover:bg-red-700 text-white"
                     onClick={() => {
                       const targetPosition = showPositionActions && selectedPosition ? selectedPosition : session.userSeat;
                       if (targetPosition === session.userSeat) {
@@ -1406,38 +1907,54 @@ export default function SessionPage() {
                   >
                     Fold
                   </Button>
+
                   {(() => {
                     const targetPosition = showPositionActions && selectedPosition ? selectedPosition : session.userSeat;
                     const callAmount = targetPosition ? getCallAmount(targetPosition) : 0;
-                    return callAmount > 0 ? (
-                      <Button
-                        className="bg-blue-600 hover:bg-blue-700 text-white flex-1 min-w-[80px]"
-                        onClick={() => {
-                          if (targetPosition) {
-                            handleBettingAction(targetPosition, 'call', currentBettingRound?.currentBet);
-                          }
-                          setShowPositionActions(false);
-                          setSelectedPosition(null);
-                        }}
-                      >
-                        {selectedPosition && isCallAllIn(selectedPosition) ? `Call All-In ${callAmount}` : `Call ${callAmount}`}
-                      </Button>
-                    ) : null;
+                    const canCheckHere = targetPosition && canCheck(targetPosition);
+
+                    if (canCheckHere) {
+                      return (
+                        <Button
+                          className="bg-orange-600 hover:bg-orange-700 text-white"
+                          onClick={() => {
+                            if (targetPosition) handleBettingAction(targetPosition, 'check');
+                            setShowPositionActions(false);
+                            setSelectedPosition(null);
+                          }}
+                        >
+                          Check
+                        </Button>
+                      );
+                    } else if (callAmount > 0) {
+                      return (
+                        <Button
+                          className="bg-blue-600 hover:bg-blue-700 text-white"
+                          onClick={() => {
+                            if (targetPosition) {
+                              handleBettingAction(targetPosition, 'call', currentBettingRound?.currentBet);
+                            }
+                            setShowPositionActions(false);
+                            setSelectedPosition(null);
+                          }}
+                        >
+                          {selectedPosition && isCallAllIn(selectedPosition) ? `Call All-In ${callAmount}` : `Call ${callAmount}`}
+                        </Button>
+                      );
+                    } else {
+                      return (
+                        <Button
+                          className="bg-gray-400 text-white cursor-not-allowed"
+                          disabled
+                        >
+                          No Action
+                        </Button>
+                      );
+                    }
                   })()}
+
                   <Button
-                    className="bg-green-600 hover:bg-green-700 text-white flex-1 min-w-[80px]"
-                    onClick={() => {
-                      setAmountModalAction('raise');
-                      setAmountModalPosition((showPositionActions && selectedPosition) ? selectedPosition : (session.userSeat || null));
-                      setAmountModalValue((currentBettingRound?.currentBet || 0) * 2);
-                      setShowAmountModal(true);
-                      setShowPositionActions(false);
-                    }}
-                  >
-                    Raise
-                  </Button>
-                  <Button
-                    className="bg-purple-600 hover:bg-purple-700 text-white flex-1 min-w-[80px]"
+                    className="bg-purple-600 hover:bg-purple-700 text-white"
                     onClick={() => {
                       setAmountModalAction('all-in');
                       setAmountModalPosition((showPositionActions && selectedPosition) ? selectedPosition : (session.userSeat || null));
@@ -1448,23 +1965,21 @@ export default function SessionPage() {
                   >
                     All-In
                   </Button>
-                  {(() => {
-                    const targetPosition = showPositionActions && selectedPosition ? selectedPosition : session.userSeat;
-                    return targetPosition && canCheck(targetPosition);
-                  })() && (
-                    <Button
-                      className="bg-orange-600 hover:bg-orange-700 text-white flex-1 min-w-[80px]"
-                      onClick={() => {
-                        const targetPosition = showPositionActions && selectedPosition ? selectedPosition : session.userSeat;
-                        if (targetPosition) handleBettingAction(targetPosition, 'check');
-                        setShowPositionActions(false);
-                        setSelectedPosition(null);
-                      }}
-                    >
-                      Check
-                    </Button>
-                  )}
-                    </div>
+
+                  {/* Right Column: Call/Check + Raise */}
+                  <Button
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => {
+                      setAmountModalAction('raise');
+                      setAmountModalPosition((showPositionActions && selectedPosition) ? selectedPosition : (session.userSeat || null));
+                      setAmountModalValue((currentBettingRound?.currentBet || 0) * 2);
+                      setShowAmountModal(true);
+                      setShowPositionActions(false);
+                    }}
+                  >
+                    Raise
+                  </Button>
+                </div>
                   </>
                 ) : (
                   <div className="text-center py-4">
@@ -1888,6 +2403,84 @@ export default function SessionPage() {
         </Dialog>
 
 
+        {/* Hero Must Act First Dialog */}
+        <Dialog open={showHeroMustActFirst} onOpenChange={setShowHeroMustActFirst}>
+          <DialogContent className={getDialogClasses("sm:max-w-[400px] max-w-[90vw] w-full")}>
+            <DialogHeader>
+              <DialogTitle>Choose Hero&apos;s Action First</DialogTitle>
+              <DialogDescription>
+                You must choose your action before other players can act.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-gray-700">
+                  Since the action is currently before you in the sequence, you need to decide what your hero does first.
+                  Clicking on seats after your position would mean your hero folded.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Button
+                onClick={() => setShowHeroMustActFirst(false)}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                Continue
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Auto-Action Confirmation Dialog */}
+        <Dialog open={showAutoActionConfirmation} onOpenChange={setShowAutoActionConfirmation}>
+          <DialogContent className={getDialogClasses("sm:max-w-[500px] max-w-[95vw] w-full")}>
+            <DialogHeader>
+              <DialogTitle>Confirm Action</DialogTitle>
+              <DialogDescription>
+                This action will skip other players&apos; turns.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              {affectedSeats.length > 0 && (
+                (() => {
+                  const currentRound = currentHand?.bettingRounds[currentHand.currentBettingRound as 'preflop' | 'flop' | 'turn' | 'river'];
+                  const hasBet = currentRound?.currentBet && currentRound.currentBet > 0;
+                  const autoAction = hasBet ? 'fold' : 'check';
+
+                  return (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                      <p className="text-sm text-gray-700 mb-2">
+                        <strong>{affectedSeats.join(', ')}</strong> will automatically <strong>{autoAction}</strong>.
+                      </p>
+                      <p className="text-xs text-gray-600">
+                        Do you want to continue with this action?
+                      </p>
+                    </div>
+                  );
+                })()
+              )}
+            </div>
+            <div className="flex justify-between gap-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowAutoActionConfirmation(false);
+                  setPendingAction(null);
+                  setAffectedSeats([]);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleConfirmedAutoAction}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                Continue
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {/* Validation Error Dialog */}
         <Dialog open={showValidationError} onOpenChange={setShowValidationError}>
           <DialogContent className={getDialogClasses("sm:max-w-[425px] max-w-[350px]")}>
@@ -1908,14 +2501,54 @@ export default function SessionPage() {
           </DialogContent>
         </Dialog>
 
+        {/* Community Card Selector Space - Reserve space to prevent layout shift */}
+        {!showSeatSelection && (needsCommunityCards || showCommunitySelector) && (
+          <div className={`mt-4 transition-opacity duration-300 ease-in-out ${showCommunitySelector ? 'opacity-100' : 'opacity-0'}`} style={{ minHeight: '200px' }}>
+            {showCommunitySelector && selectingCommunityCard && (
+              <CardSelector
+                title={(() => {
+                  const { index } = selectingCommunityCard;
+                  if (currentHand?.currentBettingRound === 'preflop') {
+                    if (index === 0) return 'Select First Flop Card';
+                    if (index === 1) return 'Select Second Flop Card';
+                    if (index === 2) return 'Select Third Flop Card';
+                  } else if (currentHand?.currentBettingRound === 'flop') {
+                    return 'Select Turn Card';
+                  } else if (currentHand?.currentBettingRound === 'turn') {
+                    return 'Select River Card';
+                  }
+                  return 'Select Community Card';
+                })()}
+                selectedCards={[
+                  selectedCard1,
+                  selectedCard2,
+                  ...(currentHand?.communityCards.flop || []),
+                  currentHand?.communityCards.turn,
+                  currentHand?.communityCards.river,
+                  ...Object.values(opponentCards).flat()
+                ].filter(Boolean) as string[]}
+                onCardSelect={handleCommunityCardSelect}
+                onCancel={() => {
+                  setShowCommunitySelector(false);
+                  setSelectingCommunityCard(null);
+                  if (autoSelectingCommunityCards) {
+                    setAutoSelectingCommunityCards(false);
+                  }
+                }}
+              />
+            )}
+          </div>
+        )}
+
         {/* Hand History */}
         {!showSeatSelection && (
-          <HandHistory
-            currentHand={currentHand}
-            completedHands={completedHands}
-            userSeat={session.userSeat}
-            className="mt-4"
-          />
+          <div className="mt-4 min-h-[200px]">
+            <HandHistory
+              currentHand={handHistoryCurrentHand}
+              completedHands={completedHands}
+              userSeat={session.userSeat}
+            />
+          </div>
         )}
       </div>
 

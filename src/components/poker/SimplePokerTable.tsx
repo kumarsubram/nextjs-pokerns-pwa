@@ -31,6 +31,7 @@ interface SimplePokerTableProps {
     }>;
     currentBet?: number;
   };
+  currentBettingRoundName?: 'preflop' | 'flop' | 'turn' | 'river' | 'showdown';
   isBettingComplete?: boolean;
   showFlopSelectionPrompt?: boolean;
   showTurnSelectionPrompt?: boolean;
@@ -54,6 +55,7 @@ export function SimplePokerTable({
   playerStates = [],
   nextToAct,
   currentBettingRound,
+  currentBettingRoundName,
   isBettingComplete = false,
   showFlopSelectionPrompt = false,
   showTurnSelectionPrompt = false,
@@ -143,12 +145,12 @@ export function SimplePokerTable({
                 {/* Turn Card */}
                 <button
                   onClick={() => onCommunityCardClick?.('flop', 3)}
-                  disabled={!isBettingComplete}
+                  disabled={!isBettingComplete || (currentBettingRoundName === 'preflop')}
                   className={cn(
                     "w-8 h-12 rounded border text-sm font-bold flex items-center justify-center ml-1",
                     communityCards?.turn
                       ? `bg-white border-gray-800 ${getCardColor(communityCards.turn)}`
-                      : isBettingComplete
+                      : isBettingComplete && currentBettingRoundName !== 'preflop'
                       ? "bg-gray-200 border-gray-400 text-gray-600 hover:bg-gray-300 cursor-pointer"
                       : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-50",
                     showTurnSelectionPrompt && "animate-pulse bg-yellow-200 border-yellow-400"
@@ -159,12 +161,12 @@ export function SimplePokerTable({
                 {/* River Card */}
                 <button
                   onClick={() => onCommunityCardClick?.('flop', 4)}
-                  disabled={!isBettingComplete}
+                  disabled={!isBettingComplete || (currentBettingRoundName === 'preflop' || currentBettingRoundName === 'flop')}
                   className={cn(
                     "w-8 h-12 rounded border text-sm font-bold flex items-center justify-center",
                     communityCards?.river
                       ? `bg-white border-gray-800 ${getCardColor(communityCards.river)}`
-                      : isBettingComplete
+                      : isBettingComplete && currentBettingRoundName !== 'preflop' && currentBettingRoundName !== 'flop'
                       ? "bg-gray-200 border-gray-400 text-gray-600 hover:bg-gray-300 cursor-pointer"
                       : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-50",
                     showRiverSelectionPrompt && "animate-pulse bg-yellow-200 border-yellow-400"
@@ -295,20 +297,9 @@ export function SimplePokerTable({
           if (userIndex === -1) return null;
           const { x, y } = getSeatPosition(userIndex);
 
-          // Adjust card position based on user seat for mobile visibility
-          let cardOffsetX = '-translate-x-1/2';
-          if (userSeat === 'SB' || userSeat === 'BB') {
-            // Move cards left for right-side seats on mobile
-            cardOffsetX = '-translate-x-[70%]';
-          } else if ((seats === 9 && (userSeat === 'HJ' || userSeat === 'LJ')) ||
-                     (seats === 6 && userSeat === 'CO')) {
-            // Move cards right for left-side seats on mobile
-            cardOffsetX = '-translate-x-[30%]';
-          }
-
           return (
             <div
-              className={cn("absolute", cardOffsetX)}
+              className="absolute -translate-x-1/2"
               style={{ left: x, top: `${parseInt(y as string) - 15}%` }}
             >
               <div className="flex gap-1">

@@ -3,7 +3,7 @@
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { OnlineStatusIndicator } from '@/components/OnlineStatusIndicator';
-import { Calendar, History, User, ArrowLeft, Home } from 'lucide-react';
+import { Calendar, Share2, User, ArrowLeft, Home } from 'lucide-react';
 
 interface AppHeaderProps {
   title?: string;
@@ -44,39 +44,39 @@ export function AppHeader({
 
         {/* Desktop Navigation */}
         {showNavigation && (
-          <nav className="hidden sm:flex items-center gap-1">
+          <nav className="hidden sm:flex items-center gap-2">
             <Button
-              variant={isActive('/') ? 'secondary' : 'ghost'}
+              variant={isActive('/') ? 'default' : 'ghost'}
               size="sm"
               onClick={() => router.push('/')}
-              className="flex items-center gap-2"
+              className={`flex items-center gap-2 ${isActive('/') ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}`}
             >
               <Home className="h-4 w-4" />
               Home
             </Button>
             <Button
-              variant={isActive('/sessions') ? 'secondary' : 'ghost'}
+              variant={isActive('/sessions') ? 'default' : 'ghost'}
               size="sm"
               onClick={() => router.push('/sessions')}
-              className="flex items-center gap-2"
+              className={`flex items-center gap-2 ${isActive('/sessions') ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}`}
             >
               <Calendar className="h-4 w-4" />
               Sessions
             </Button>
             <Button
-              variant={isActive('/history') ? 'secondary' : 'ghost'}
+              variant={isActive('/shared') || pathname.startsWith('/shared/') ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => router.push('/history')}
-              className="flex items-center gap-2"
+              onClick={() => router.push('/shared')}
+              className={`flex items-center gap-2 ${isActive('/shared') || pathname.startsWith('/shared/') ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}`}
             >
-              <History className="h-4 w-4" />
-              History
+              <Share2 className="h-4 w-4" />
+              Shared
             </Button>
             <Button
-              variant={isActive('/account') ? 'secondary' : 'ghost'}
+              variant={isActive('/account') ? 'default' : 'ghost'}
               size="sm"
               onClick={() => router.push('/account')}
-              className="flex items-center gap-2"
+              className={`flex items-center gap-2 ${isActive('/account') ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}`}
             >
               <User className="h-4 w-4" />
               Account

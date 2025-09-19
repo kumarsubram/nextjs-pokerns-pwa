@@ -5,6 +5,9 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Eye, MessageCircle, Trash2, User, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { HandHistory } from '@/components/poker/HandHistory';
 import { SharedHandService } from '@/services/shared-hand.service';
 import { SharedHand } from '@/types/poker-v2';
@@ -20,6 +23,8 @@ export default function SharedHandPage() {
   const [currentUser, setCurrentUser] = useState('');
   const [isUsernameSet, setIsUsernameSet] = useState(false);
   const [usernameInput, setUsernameInput] = useState('');
+  const [showUsernameDialog, setShowUsernameDialog] = useState(false);
+  const [attemptedComment, setAttemptedComment] = useState('');
 
   useEffect(() => {
     if (!handId) return;
@@ -63,19 +68,40 @@ export default function SharedHandPage() {
       SharedHandService.setUsername(usernameInput.trim());
       setCurrentUser(usernameInput.trim());
       setIsUsernameSet(true);
+      setShowUsernameDialog(false);
+
+      // If there was an attempted comment, post it now
+      if (attemptedComment.trim()) {
+        SharedHandService.addComment(handId, attemptedComment);
+        setAttemptedComment('');
+        setCommentText('');
+        // Reload hand to get updated comments
+        const updatedHand = SharedHandService.getSharedHand(handId);
+        if (updatedHand) {
+          setSharedHand(updatedHand);
+        }
+      }
+
       setUsernameInput('');
     }
   };
 
   const handleAddComment = () => {
-    if (commentText.trim() && sharedHand) {
-      SharedHandService.addComment(handId, commentText);
-      setCommentText('');
-      // Reload hand to get updated comments
-      const updatedHand = SharedHandService.getSharedHand(handId);
-      if (updatedHand) {
-        setSharedHand(updatedHand);
-      }
+    if (!commentText.trim() || !sharedHand) return;
+
+    // If username not set, show dialog first
+    if (!isUsernameSet) {
+      setAttemptedComment(commentText);
+      setShowUsernameDialog(true);
+      return;
+    }
+
+    SharedHandService.addComment(handId, commentText);
+    setCommentText('');
+    // Reload hand to get updated comments
+    const updatedHand = SharedHandService.getSharedHand(handId);
+    if (updatedHand) {
+      setSharedHand(updatedHand);
     }
   };
 
@@ -219,50 +245,23 @@ export default function SharedHandPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Username Setup */}
-            {!isUsernameSet && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <p className="text-sm text-gray-700 mb-2">Set your username to comment:</p>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={usernameInput}
-                    onChange={(e) => setUsernameInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSetUsername()}
-                    placeholder="Enter username"
-                    className="flex-1 px-3 py-1.5 border rounded text-sm"
-                    maxLength={20}
-                  />
-                  <Button
-                    size="sm"
-                    onClick={handleSetUsername}
-                    disabled={!usernameInput.trim()}
-                  >
-                    Set Username
-                  </Button>
-                </div>
-              </div>
-            )}
-
             {/* Comment Input */}
-            {isUsernameSet && (
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddComment()}
-                  placeholder={`Comment as ${currentUser}...`}
-                  className="flex-1 px-3 py-2 border rounded"
-                />
-                <Button
-                  onClick={handleAddComment}
-                  disabled={!commentText.trim()}
-                >
-                  Post
-                </Button>
-              </div>
-            )}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddComment()}
+                placeholder={isUsernameSet ? `Comment as ${currentUser}...` : "Add a comment..."}
+                className="flex-1 px-3 py-2 border rounded"
+              />
+              <Button
+                onClick={handleAddComment}
+                disabled={!commentText.trim()}
+              >
+                Post
+              </Button>
+            </div>
 
             {/* Comments List */}
             <div className="space-y-3">
@@ -299,6 +298,54 @@ export default function SharedHandPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Username Setup Dialog */}
+      <Dialog open={showUsernameDialog} onOpenChange={setShowUsernameDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Set Your Username</DialogTitle>
+            <DialogDescription>
+              Choose a username to post comments and share hands. This will be saved for future use.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                type="text"
+                value={usernameInput}
+                onChange={(e) => setUsernameInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSetUsername()}
+                placeholder="Enter your username"
+                maxLength={20}
+                autoFocus
+              />
+              <p className="text-sm text-gray-500">
+                This username will be used across all shared hands and comments.
+              </p>
+            </div>
+          </div>
+          <div className="flex justify-between">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowUsernameDialog(false);
+                setAttemptedComment('');
+                setCommentText('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSetUsername}
+              disabled={!usernameInput.trim()}
+            >
+              Set Username & Comment
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

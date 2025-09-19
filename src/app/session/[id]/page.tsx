@@ -392,15 +392,13 @@ export default function SessionPage() {
         });
       }
 
-      // If we have a pending hand completion (from everyone folding), retry it now
-      if (pendingHandCompletion && selectedCard1) {
+      // If we came from the All Folded dialog, return to it
+      if (showAllFoldedDialog || pendingHandCompletion) {
         setShowCardSelector(false);
-        // Small delay to ensure state updates are processed
-        setTimeout(() => {
-          const { outcome, potWon } = pendingHandCompletion;
-          setPendingHandCompletion(null);
-          completeHand(outcome, potWon);
-        }, 100);
+        // Return to the All Folded dialog to show the selected cards
+        if (!showAllFoldedDialog) {
+          setShowAllFoldedDialog(true);
+        }
         return;
       }
     }
@@ -659,6 +657,7 @@ export default function SessionPage() {
   const [showValidationError, setShowValidationError] = useState(false);
   const [validationErrorMessage, setValidationErrorMessage] = useState('');
   const [pendingHandCompletion, setPendingHandCompletion] = useState<{ outcome: 'won' | 'lost' | 'folded', potWon?: number } | null>(null);
+  const [showAllFoldedDialog, setShowAllFoldedDialog] = useState(false);
 
   // Validate required values before hand completion
   const validateHandRequirements = (): { isValid: boolean; error?: string } => {
@@ -909,7 +908,9 @@ export default function SessionPage() {
     const activePlayers = updatedHand.playerStates.filter(p => p.status === 'active' || p.status === 'all-in');
     if (activePlayers.length === 1) {
       if (activePlayers[0].position === session.userSeat) {
-        completeHand('won', updatedHand.pot || 0);
+        // Show "All Folded" dialog instead of directly completing
+        setCurrentHand(updatedHand);
+        setShowAllFoldedDialog(true);
         return;
       } else {
         completeHand('lost', 0);
@@ -2493,6 +2494,96 @@ export default function SessionPage() {
                 className="bg-blue-600 hover:bg-blue-700 text-white"
               >
                 Continue
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* All Opponents Folded Dialog */}
+        <Dialog open={showAllFoldedDialog} onOpenChange={setShowAllFoldedDialog}>
+          <DialogContent className={getDialogClasses("sm:max-w-[500px] max-w-[95vw] w-full")}>
+            <DialogHeader>
+              <DialogTitle>Hand Won - All Opponents Folded</DialogTitle>
+              <DialogDescription>
+                All opponents have folded to your action
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid gap-4 mt-4">
+              {/* Pot Size Display */}
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600 mb-2">
+                  You Win: {currentHand?.pot || 0} chips
+                </div>
+                <div className="text-sm text-gray-600">
+                  All opponents folded
+                </div>
+              </div>
+
+              {/* Hero Cards Section - Only show if not already selected */}
+              {(!currentHand?.userCards || !currentHand.userCards[0] || !currentHand.userCards[1]) && (
+                <div className="border-2 border-blue-200 rounded-lg p-4 bg-blue-50">
+                  <div className="font-medium mb-3 text-blue-800">
+                    Select Your Hole Cards (Optional)
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setShowAllFoldedDialog(false);
+                        setSelectingCard(1);
+                        setShowCardSelector(true);
+                      }}
+                      className="text-xs border-blue-300 hover:bg-blue-100"
+                    >
+                      {selectedCard1 || 'Select Card 1'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setShowAllFoldedDialog(false);
+                        setSelectingCard(2);
+                        setShowCardSelector(true);
+                      }}
+                      className="text-xs border-blue-300 hover:bg-blue-100"
+                    >
+                      {selectedCard2 || 'Select Card 2'}
+                    </Button>
+                  </div>
+                  <div className="text-xs text-gray-600 mt-2 text-center">
+                    Recording your cards helps with hand history tracking
+                  </div>
+                </div>
+              )}
+
+              {/* If cards are selected, show them */}
+              {currentHand?.userCards && currentHand.userCards[0] && currentHand.userCards[1] && (
+                <div className="text-center">
+                  <div className="text-sm text-gray-600 mb-2">Your Cards:</div>
+                  <div className="flex gap-2 justify-center">
+                    <span className="text-lg font-bold px-3 py-2 bg-white border rounded">
+                      {currentHand.userCards[0]}
+                    </span>
+                    <span className="text-lg font-bold px-3 py-2 bg-white border rounded">
+                      {currentHand.userCards[1]}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Action Button */}
+            <div className="flex justify-center mt-6">
+              <Button
+                className="bg-green-600 hover:bg-green-700 text-white px-8 py-2"
+                onClick={() => {
+                  setShowAllFoldedDialog(false);
+                  completeHand('won', currentHand?.pot || 0);
+                }}
+              >
+                Complete Hand
               </Button>
             </div>
           </DialogContent>

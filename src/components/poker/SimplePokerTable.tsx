@@ -303,23 +303,14 @@ export function SimplePokerTable({
           const isLeftSide = xPercent < 30;
           const isRightSide = xPercent > 70;
 
-          // Calculate horizontal offset for mobile
-          // For left side seats, shift cards right on mobile
-          // For right side seats, shift cards left on mobile
-          let horizontalOffset = xPercent;
-          if (isLeftSide) {
-            // Add offset to move cards right on mobile
-            horizontalOffset = xPercent + 8; // Move 8% right
-          } else if (isRightSide) {
-            // Subtract offset to move cards left on mobile
-            horizontalOffset = xPercent - 8; // Move 8% left
-          }
+          // Only apply offset for side seats on mobile
+          // Top and bottom seats remain unchanged
 
           return (
             <div
               className="absolute -translate-x-1/2"
               style={{
-                left: `${horizontalOffset}%`,
+                left: x,
                 top: `${parseInt(y as string) - 15}%`
               }}
             >

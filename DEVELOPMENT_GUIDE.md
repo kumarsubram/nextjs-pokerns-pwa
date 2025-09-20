@@ -3,7 +3,81 @@
 ## Project Overview
 A Progressive Web App for tracking poker sessions, hands, and statistics. Built with Next.js 15, TypeScript, and Tailwind CSS.
 
-## RECENT UPDATES (v2.13) ✅
+## RECENT UPDATES (v2.14) ✅
+
+### Session Page Refactoring Phase 6A: PositionActionSelector Component - COMPLETED
+✅ **Position Action Selector Component Extraction**
+- Successfully extracted complex position action UI (~131 lines) into reusable component
+- Created `/src/components/session/PositionActionSelector.tsx` for centralized opponent betting UI
+- Reduced session page complexity from ~982 to ~851 lines (13% reduction this phase)
+- Replaced massive inline position action logic with clean component call and proper prop interface
+- Integrated all betting hook functions and auto-fold logic seamlessly
+
+✅ **Advanced Position-Based Betting Logic Preservation**
+- **Auto-Fold Hint System**: Complex logic for calculating skipped positions between next-to-act and target
+- **Action Sequence Calculation**: Proper handling of circular action flow for 6/9-handed tables
+- **Position-Aware Actions**: Full support for fold, check/call, raise, all-in with proper state management
+- **Amount Modal Integration**: Clean callbacks for raise and all-in amount selection
+- **Call All-In Detection**: Special handling for all-in call scenarios with proper text display
+- **State Cleanup**: Proper cleanup of position selection and modal states on action completion
+
+✅ **Component Architecture Benefits**
+- **Cleaner Session Page**: Reduced from ~982 to ~851 lines (13% reduction this phase)
+- **Cumulative Reduction**: Session page now 40% smaller than original (1910 → 851 lines)
+- **Reusable Betting UI**: Component can be used across different poker position interfaces
+- **Testable Logic**: Complex position-based betting logic now isolated and testable
+- **Type Safety**: Full TypeScript interfaces with proper null checks prevent runtime errors
+- **Component-Based**: Follows React best practices for UI composition and prop management
+- **No Breaking Changes**: All existing position action functionality preserved perfectly
+
+✅ **Technical Implementation**
+```typescript
+// New position action selector component structure
+<PositionActionSelector
+  currentHand={currentHand}
+  session={session}
+  selectedPosition={selectedPosition}
+  currentBettingRound={currentBettingRound}
+  stack={stack}
+  visible={showPositionActions && selectedPosition !== null}
+  // Hook function integration
+  handleBettingAction={handleBettingAction}
+  getCallAmount={getCallAmount}
+  canCheck={canCheck}
+  isCallAllIn={isCallAllIn}
+  // Callback integration
+  onClose={() => {...}}
+  onOpenAmountModal={(action, position, value) => {...}}
+/>
+```
+
+✅ **TypeScript Integration & Auto-Fold Logic**
+```typescript
+interface PositionActionSelectorProps {
+  // Core session data with null safety
+  currentHand: CurrentHand | null;
+  session: SessionMetadata;
+  selectedPosition: Position | null;
+
+  // Hook functions with proper typing
+  handleBettingAction: (position: Position, action: 'fold' | 'check' | 'call' | 'raise' | 'all-in', amount?: number) => void;
+  getCallAmount: (position: Position) => number;
+  canCheck: (position: Position) => boolean;
+  isCallAllIn: (position: Position) => boolean;
+
+  // Clean callback interfaces
+  onClose: () => void;
+  onOpenAmountModal: (action: 'raise' | 'all-in', position: Position, value: number) => void;
+}
+```
+
+✅ **Phase 6A Completion**
+- **Total Extracted**: ~1166 lines across 6 phases (hand flow + betting + community cards + hero cards + action buttons UI + position selector)
+- **Session Page Reduction**: 40% smaller and dramatically more maintainable
+- **5 Dedicated Hooks + 2 UI Components**: Complete business logic extraction + major UI component extraction achieved
+- **Ready for Phase 6B**: Dialog State Management consolidation or Game State Management hooks
+
+## PREVIOUS UPDATES (v2.13) ✅
 
 ### Session Page Refactoring Phase 5: ActionButtonsSection Component - COMPLETED
 ✅ **Action Buttons UI Component Extraction**

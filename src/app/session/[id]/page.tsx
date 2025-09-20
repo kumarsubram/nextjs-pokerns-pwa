@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Button } from '@/components/ui/button';
 import { SimplePokerTable } from '@/components/poker/SimplePokerTable';
 import { CardSelector } from '@/components/poker/CardSelector';
 import { SeatSelector } from '@/components/poker/SeatSelector';
@@ -22,7 +21,8 @@ import {
   HandInfoHeader,
   HandSettingsPanel,
   NextToAct,
-  ActionButtonsSection
+  ActionButtonsSection,
+  PositionActionSelector
 } from '@/components/session';
 import { useHandFlow } from '@/hooks/useHandFlow';
 import { useBettingLogic } from '@/hooks/useBettingLogic';
@@ -621,159 +621,28 @@ export default function SessionPage() {
 
 
         {/* Position Action Selector */}
-        {showPositionActions && selectedPosition && (
-          <div className="bg-white rounded-lg p-4 shadow-sm mb-4">
-            <div className="mb-3 text-center">
-              <h3 className="text-md font-semibold">
-                {selectedPosition} Action
-              </h3>
-              {(() => {
-                // Show auto-fold/check hint for selected position
-                if (!currentHand?.nextToAct) return null;
-
-                const currentRound = currentHand.bettingRounds[currentHand.currentBettingRound as 'preflop' | 'flop' | 'turn' | 'river'];
-                const hasBet = currentRound?.currentBet && currentRound.currentBet > 0;
-                const autoAction = hasBet ? 'fold' : 'check';
-
-                // Get positions between nextToAct and selectedPosition
-                const fullActionSequence = currentHand.currentBettingRound === 'preflop'
-                  ? getPreflopActionSequence(session.tableSeats || 9)
-                  : getPostflopActionSequence(session.tableSeats || 9);
-                const activePlayers = currentHand.playerStates.filter(p => p.status === 'active');
-                const activePositions = activePlayers.map(p => p.position);
-                const actionSequence = fullActionSequence.filter(pos => activePositions.includes(pos));
-
-                const nextIndex = actionSequence.indexOf(currentHand.nextToAct);
-                const targetIndex = actionSequence.indexOf(selectedPosition);
-
-                if (nextIndex === -1 || targetIndex === -1 || nextIndex === targetIndex) return null;
-
-                // Get the actual positions that will be skipped
-                const skippedPositions: Position[] = [];
-
-                if (targetIndex > nextIndex) {
-                  // Forward direction - include nextToAct position
-                  for (let i = nextIndex; i < targetIndex; i++) {
-                    skippedPositions.push(actionSequence[i]);
-                  }
-                } else {
-                  // Wraps around - include nextToAct position
-                  for (let i = nextIndex; i < actionSequence.length; i++) {
-                    skippedPositions.push(actionSequence[i]);
-                  }
-                  for (let i = 0; i < targetIndex; i++) {
-                    skippedPositions.push(actionSequence[i]);
-                  }
-                }
-
-                if (skippedPositions.length === 0) return null;
-
-                return (
-                  <div className="text-amber-600 text-xs mt-1">
-                    {skippedPositions.length === 1
-                      ? `${skippedPositions[0]} will auto-${autoAction}`
-                      : `${skippedPositions.join(', ')} will auto-${autoAction}`
-                    }
-                  </div>
-                );
-              })()}
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {/* Left Column: Fold + All-In */}
-              <Button
-                className="bg-red-600 hover:bg-red-700 text-white"
-                onClick={() => {
-                  handleBettingAction(selectedPosition, 'fold');
-                  setShowPositionActions(false);
-                  setSelectedPosition(null);
-                }}
-              >
-                Fold
-              </Button>
-
-              {(() => {
-                const callAmount = getCallAmount(selectedPosition);
-                const canCheckHere = canCheck(selectedPosition);
-
-                if (canCheckHere) {
-                  return (
-                    <Button
-                      className="bg-orange-600 hover:bg-orange-700 text-white"
-                      onClick={() => {
-                        handleBettingAction(selectedPosition, 'check');
-                        setShowPositionActions(false);
-                        setSelectedPosition(null);
-                      }}
-                    >
-                      Check
-                    </Button>
-                  );
-                } else if (callAmount > 0) {
-                  return (
-                    <Button
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                      onClick={() => {
-                        handleBettingAction(selectedPosition, 'call', currentBettingRound?.currentBet);
-                        setShowPositionActions(false);
-                        setSelectedPosition(null);
-                      }}
-                    >
-                      {selectedPosition && isCallAllIn(selectedPosition) ? `Call All-In ${callAmount}` : `Call ${callAmount}`}
-                    </Button>
-                  );
-                } else {
-                  return (
-                    <Button
-                      className="bg-gray-400 text-white cursor-not-allowed"
-                      disabled
-                    >
-                      No Action
-                    </Button>
-                  );
-                }
-              })()}
-
-              <Button
-                className="bg-purple-600 hover:bg-purple-700 text-white"
-                onClick={() => {
-                  setAmountModalAction('all-in');
-                  setAmountModalPosition(selectedPosition);
-                  setAmountModalValue(stack);
-                  setShowAmountModal(true);
-                  setShowPositionActions(false);
-                }}
-              >
-                All-In
-              </Button>
-
-              {/* Right Column: Call/Check + Raise */}
-              <Button
-                className="bg-green-600 hover:bg-green-700 text-white"
-                onClick={() => {
-                  setAmountModalAction('raise');
-                  setAmountModalPosition(selectedPosition);
-                  setAmountModalValue((currentBettingRound?.currentBet || 0) * 2);
-                  setShowAmountModal(true);
-                  setShowPositionActions(false);
-                }}
-              >
-                Raise
-              </Button>
-            </div>
-            <div className="mt-3 text-center">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setShowPositionActions(false);
-                  setSelectedPosition(null);
-                }}
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        )}
+        <PositionActionSelector
+          currentHand={currentHand}
+          session={session}
+          selectedPosition={selectedPosition}
+          currentBettingRound={currentBettingRound}
+          stack={stack}
+          visible={showPositionActions && selectedPosition !== null}
+          handleBettingAction={handleBettingAction}
+          getCallAmount={getCallAmount}
+          canCheck={canCheck}
+          isCallAllIn={isCallAllIn}
+          onClose={() => {
+            setShowPositionActions(false);
+            setSelectedPosition(null);
+          }}
+          onOpenAmountModal={(action: 'raise' | 'all-in', position: Position, value: number) => {
+            setAmountModalAction(action);
+            setAmountModalPosition(position);
+            setAmountModalValue(value);
+            setShowAmountModal(true);
+          }}
+        />
 
         {/* Action Buttons Section */}
         {currentHand && !showCommunitySelector && !showPositionActions &&

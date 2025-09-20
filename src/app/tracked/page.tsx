@@ -9,25 +9,25 @@ import { SharedHandService } from '@/services/shared-hand.service';
 import { SharedHand } from '@/types/poker-v2';
 import { cn } from '@/lib/utils';
 
-export default function SharedHandsList() {
+export default function TrackedHandsList() {
   const router = useRouter();
-  const [sharedHands, setSharedHands] = useState<SharedHand[]>([]);
+  const [trackedHands, setTrackedHands] = useState<SharedHand[]>([]);
   const [sortBy, setSortBy] = useState<'recent' | 'popular' | 'discussed'>('recent');
 
   useEffect(() => {
-    loadSharedHands();
+    loadTrackedHands();
     // Poll for updates
-    const interval = setInterval(loadSharedHands, 10000);
+    const interval = setInterval(loadTrackedHands, 10000);
     return () => clearInterval(interval);
   }, []);
 
-  const loadSharedHands = () => {
+  const loadTrackedHands = () => {
     const hands = SharedHandService.getAllSharedHands();
-    setSharedHands(hands);
+    setTrackedHands(hands);
   };
 
   const getSortedHands = () => {
-    const sorted = [...sharedHands];
+    const sorted = [...trackedHands];
     switch (sortBy) {
       case 'recent':
         return sorted.sort((a, b) => new Date(b.sharedAt).getTime() - new Date(a.sharedAt).getTime());
@@ -74,7 +74,7 @@ export default function SharedHandsList() {
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-lg font-semibold">Shared Hands</h1>
+          <h1 className="text-lg font-semibold">Tracked Hands</h1>
         </div>
       </div>
 
@@ -125,8 +125,8 @@ export default function SharedHandsList() {
         {sortedHands.length === 0 ? (
           <Card>
             <CardContent className="text-center py-12">
-              <p className="text-gray-500 mb-2">No shared hands yet</p>
-              <p className="text-sm text-gray-400">Be the first to share a hand!</p>
+              <p className="text-gray-500 mb-2">No tracked hands yet</p>
+              <p className="text-sm text-gray-400">Track hands for personal analysis!</p>
             </CardContent>
           </Card>
         ) : (
@@ -135,7 +135,7 @@ export default function SharedHandsList() {
               <Card
                 key={hand.id}
                 className="cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => router.push(`/shared/${hand.id}`)}
+                onClick={() => router.push(`/tracked/${hand.id}`)}
               >
                 <CardContent className="p-4">
                   {/* Header */}

@@ -736,6 +736,7 @@ export default function SessionPage() {
     const handData: StoredHand = {
       handNumber: currentHand.handNumber,
       timestamp: new Date().toISOString(),
+      userSeat: session.userSeat!,
       userCards: currentHand.userCards,
       communityCards: currentHand.communityCards,
       bettingRounds: currentHand.bettingRounds,
@@ -799,7 +800,7 @@ export default function SessionPage() {
     setSelectingCommunityCard(null);
     setAutoSelectingCommunityCards(false);
 
-    // Always show seat selection for every hand
+    // Reset current hand first, then show seat selection for every hand
     setCurrentHand(null);
     setShowSeatSelection(true);
 
@@ -984,6 +985,7 @@ export default function SessionPage() {
     const activePositions = activePlayers.map(p => p.position);
     const actionSequence = fullActionSequence.filter(pos => activePositions.includes(pos));
 
+
     const nextIndex = actionSequence.indexOf(nextToAct);
     const targetIndex = actionSequence.indexOf(targetPosition);
 
@@ -1005,6 +1007,7 @@ export default function SessionPage() {
       // Safety check to prevent infinite loop
       if (positionsToFold.length >= actionSequence.length) break;
     }
+
 
 
     // Fold the identified positions
@@ -1328,12 +1331,18 @@ export default function SessionPage() {
       {/* Main Content */}
       <div className="p-2 max-w-lg mx-auto">
         {/* Seat Selection View */}
-        {showSeatSelection && session && (
+        {showSeatSelection && session && !currentHand && (
           <SeatSelector
             tableSeats={session.tableSeats}
             currentSeat={session.userSeat}
             onSeatSelect={(position) => {
               if (position !== 'DEALER') {
+                // Prevent seat selection during active hands
+                if (currentHand) {
+                  console.warn('Cannot change seat during active hand');
+                  return;
+                }
+
                 setShowSeatSelection(false);
                 // Update session with new seat
                 const updatedSession = { ...session, userSeat: position };

@@ -3,7 +3,63 @@
 ## Project Overview
 A Progressive Web App for tracking poker sessions, hands, and statistics. Built with Next.js 15, TypeScript, and Tailwind CSS.
 
-## RECENT UPDATES (v2.6) ✅
+## RECENT UPDATES (v2.7) ✅
+
+### HandHistory Hero Position Fix - COMPLETED
+✅ **Fixed Action Logging Display Bug**
+- Fixed critical issue where HandHistory showed incorrect hero position in action logs
+- Problem: Changing seats between hands affected historical hand display retroactively
+- Root cause: HandHistory used current `session.userSeat` for ALL hands instead of original userSeat
+
+✅ **StoredHand Interface Enhancement**
+- Added `userSeat: Position` field to StoredHand interface to preserve original user position
+- Updated hand completion logic to store userSeat when saving hand data
+- Modified URL share service to include userSeat property for compressed hand data
+- Ensures each completed hand maintains its original context permanently
+
+✅ **HandHistory Component Improvements**
+- Updated `formatPosition` function to accept optional `handUserSeat` parameter
+- Modified `renderActionLog` to use hand-specific userSeat for action formatting
+- Added logic to determine correct userSeat: `'userSeat' in hand ? hand.userSeat : userSeat`
+- Fixed action logs to show correct hero position even after seat changes
+
+✅ **Seat Selection Safety Enhancements**
+- Prevented seat selection during active hands to avoid state corruption
+- Added safety checks in seat selection logic with console warnings
+- Improved seat selector visibility conditions to only show between hands
+- Enhanced user experience by preventing accidental seat changes mid-hand
+
+✅ **Technical Implementation Details**
+```typescript
+// Enhanced StoredHand interface
+interface StoredHand {
+  handNumber: number;
+  timestamp: string;
+  userSeat: Position;  // ✅ NEW: Preserves original user position
+  userCards: [string, string] | null;
+  // ... rest of interface
+}
+
+// Hand-specific userSeat determination
+const handUserSeat = 'userSeat' in hand ? hand.userSeat : userSeat;
+
+// Updated formatPosition function
+const formatPosition = (position: Position, includeOriginalPosition: boolean = false, handUserSeat?: Position) => {
+  const effectiveUserSeat = handUserSeat || userSeat;
+  if (position === effectiveUserSeat) {
+    return includeOriginalPosition ? `Hero (${position})` : 'Hero';
+  }
+  return position;
+};
+```
+
+✅ **PWA and Navigation Updates**
+- Updated service worker cache version to v140 for deployment
+- Fixed navigation references from '/shared' to '/tracked' in header and bottom navigation
+- Cleaned up removed shared hand pages and updated routing
+- Updated URL share service with proper userSeat property handling
+
+## PREVIOUS UPDATES (v2.6) ✅
 
 ### Dialog Component Refactoring - COMPLETED
 ✅ **Modular Dialog Architecture**

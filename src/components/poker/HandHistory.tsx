@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { ChevronDown, ChevronUp, Share2, Trash2, Copy, ExternalLink } from 'lucide-react';
+import { ChevronDown, ChevronUp, Link2, Copy } from 'lucide-react';
 import { CurrentHand, StoredHand, Position } from '@/types/poker-v2';
 import { SharedHandService } from '@/services/shared-hand.service';
 import { SessionService } from '@/services/session.service';
@@ -36,7 +36,6 @@ export function HandHistory({
     }
     return new Set();
   });
-  const [sharedHands, setSharedHands] = useState<Set<number>>(new Set());
   const [copiedHandId, setCopiedHandId] = useState<number | null>(null);
   const params = useParams();
   const sessionId = params?.id as string;
@@ -52,7 +51,7 @@ export function HandHistory({
   const formatActionConcise = (action: string, amount?: number) => {
     switch (action) {
       case 'fold': return 'F';
-      case 'check': return 'X';
+      case 'check': return 'CHK';
       case 'call': return amount ? `C:${amount}` : 'C';
       case 'raise': return amount ? `R:${amount}` : 'R';
       case 'all-in': return amount ? `A:${amount}` : 'A';
@@ -61,14 +60,18 @@ export function HandHistory({
   };
 
   // Helper function to format position
-  const formatPosition = (position: Position) => {
-    if (position === userSeat) return `Hero`;
+  const formatPosition = (position: Position, includeOriginalPosition: boolean = false, handUserSeat?: Position) => {
+    const effectiveUserSeat = handUserSeat || userSeat;
+    if (position === effectiveUserSeat) {
+      return includeOriginalPosition ? `Hero (${position})` : 'Hero';
+    }
     return position;
   };
 
 
-  // Handle share button click - now uses URL sharing for universal access
-  const handleShare = async (hand: StoredHand, e: React.MouseEvent) => {
+
+  // Handle copy link - creates a shareable URL with encoded hand data
+  const handleCopyLink = async (hand: StoredHand, e: React.MouseEvent) => {
     e.stopPropagation();
 
     if (!sessionId) return;
@@ -76,68 +79,14 @@ export function HandHistory({
     const sessionMetadata = SessionService.getSessionMetadata(sessionId);
     if (!sessionMetadata) return;
 
-    // Generate URL-based share link (works for everyone, no local storage needed)
+    // Generate URL with encoded hand data (works for anyone)
     const username = SharedHandService.getCurrentUsername();
     const shareUrl = URLShareService.generateShareableURL(hand, {
       ...sessionMetadata,
       username
     });
 
-    // Also save locally for the "Shared" list (local only)
-    const isLocallyShared = SharedHandService.isHandShared(sessionId, hand.handNumber);
-
-    if (!isLocallyShared) {
-      SharedHandService.shareHand(hand, sessionId, sessionMetadata);
-      setSharedHands(prev => {
-        const newShared = new Set(prev);
-        newShared.add(hand.handNumber);
-        return newShared;
-      });
-    }
-
-    // Copy to clipboard silently (no message needed as requested)
-    if (navigator.clipboard) {
-      try {
-        await navigator.clipboard.writeText(shareUrl);
-      } catch {
-        // Silently handle clipboard errors
-      }
-    }
-  };
-
-  // Handle unshare (local only)
-  const handleUnshare = async (hand: StoredHand, e: React.MouseEvent) => {
-    e.stopPropagation();
-
-    if (!sessionId) return;
-
-    const handId = SharedHandService.generateHandId(sessionId, hand.handNumber);
-    if (SharedHandService.unshareHand(handId)) {
-      setSharedHands(prev => {
-        const newShared = new Set(prev);
-        newShared.delete(hand.handNumber);
-        return newShared;
-      });
-      // Hand removed silently (no message needed as requested)
-    }
-  };
-
-  // Handle create link (just copy URL without sharing locally)
-  const handleCreateLink = async (hand: StoredHand, e: React.MouseEvent) => {
-    e.stopPropagation();
-
-    if (!sessionId) return;
-
-    const sessionMetadata = SessionService.getSessionMetadata(sessionId);
-    if (!sessionMetadata) return;
-
-    const username = SharedHandService.getCurrentUsername();
-    const shareUrl = URLShareService.generateShareableURL(hand, {
-      ...sessionMetadata,
-      username
-    });
-
-    // Copy to clipboard with feedback
+    // Copy to clipboard and show feedback
     if (navigator.clipboard) {
       try {
         await navigator.clipboard.writeText(shareUrl);
@@ -147,24 +96,6 @@ export function HandHistory({
         // Silently handle clipboard errors
       }
     }
-  };
-
-  // Handle open link in new tab
-  const handleOpenLink = (hand: StoredHand, e: React.MouseEvent) => {
-    e.stopPropagation();
-
-    if (!sessionId) return;
-
-    const sessionMetadata = SessionService.getSessionMetadata(sessionId);
-    if (!sessionMetadata) return;
-
-    const username = SharedHandService.getCurrentUsername();
-    const shareUrl = URLShareService.generateShareableURL(hand, {
-      ...sessionMetadata,
-      username
-    });
-
-    window.open(shareUrl, '_blank');
   };
 
   // Group actions for better display readability
@@ -207,7 +138,7 @@ export function HandHistory({
   };
 
   // Render action log for a hand
-  const renderActionLog = (hand: CurrentHand | StoredHand) => {
+  const renderActionLog = (hand: CurrentHand | StoredHand, handUserSeat?: Position) => {
     const actions: Array<{ round: string; position: Position; action: string; amount?: number }> = [];
 
     // Collect all actions
@@ -219,6 +150,7 @@ export function HandHistory({
         });
       }
     });
+
 
     // Group actions by round and format concisely
     const roundGroups: Record<string, Array<{ position: Position; action: string; amount?: number }>> = {};
@@ -277,7 +209,7 @@ export function HandHistory({
       <div className="space-y-4 p-4 bg-gray-50 rounded-md mt-2">
         {Object.entries(roundGroups).map(([round, roundActions]) => {
           // Group actions intelligently for better readability
-          const actionGroups = groupActionsForDisplay(roundActions, userSeat);
+          const actionGroups = groupActionsForDisplay(roundActions, handUserSeat || userSeat);
           const communityCards = getCommunityCardsForRound(round);
 
           return (
@@ -307,9 +239,9 @@ export function HandHistory({
                     {group.map((action, idx) => (
                       <span key={idx} className="text-sm font-medium">
                         <span className={cn(
-                          action.position === userSeat ? "text-blue-600" : "text-gray-700"
+                          action.position === (handUserSeat || userSeat) ? "text-blue-600" : "text-gray-700"
                         )}>
-                          {formatPosition(action.position)}
+                          {formatPosition(action.position, true, handUserSeat)}
                         </span>
                         <span className={cn(
                           "ml-1",
@@ -367,6 +299,9 @@ export function HandHistory({
     const outcome = 'result' in hand ? hand.result.handOutcome : null;
     const potWon = 'result' in hand ? hand.result.potWon : null;
 
+    // Use the hand's stored userSeat for completed hands, fallback to current userSeat for current hands
+    const handUserSeat = 'userSeat' in hand ? hand.userSeat : userSeat;
+
     return (
       <div key={handNumber} className="border rounded-lg bg-white shadow-sm overflow-hidden">
         {/* Row 1: Hand info, cards, outcome, amount */}
@@ -423,118 +358,58 @@ export function HandHistory({
           {hideShareButtons ? (
             /* When share buttons are hidden, show only the toggle button centered */
             <div className="flex justify-center">
-              <div className="w-24 flex flex-col items-center justify-center">
-                <button
-                  className="flex flex-col items-center justify-center w-full bg-gray-50 hover:bg-gray-100 rounded-md transition-colors py-2"
-                  onClick={() => {
-                    const newExpanded = new Set(expandedHands);
-                    if (isExpanded) {
-                      newExpanded.delete(handNumber);
-                    } else {
-                      newExpanded.add(handNumber);
-                    }
-                    setExpandedHands(newExpanded);
-                  }}
-                >
-                  {isExpanded ? (
-                    <>
-                      <ChevronUp className="h-5 w-5 text-blue-600 mb-1" />
-                      <span className="text-xs text-gray-600 text-center">
-                        Hide Details
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown className="h-5 w-5 text-gray-600 mb-1" />
-                      <span className="text-xs text-gray-600 text-center">
-                        Show Details
-                      </span>
-                    </>
-                  )}
-                </button>
-              </div>
+              <button
+                className={cn(
+                  "w-10 h-10 rounded-full flex items-center justify-center transition-all",
+                  isExpanded
+                    ? "bg-blue-500 hover:bg-blue-600 text-white"
+                    : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                )}
+                onClick={() => {
+                  const newExpanded = new Set(expandedHands);
+                  if (isExpanded) {
+                    newExpanded.delete(handNumber);
+                  } else {
+                    newExpanded.add(handNumber);
+                  }
+                  setExpandedHands(newExpanded);
+                }}
+                title={isExpanded ? "Hide details" : "Show details"}
+              >
+                {isExpanded ? (
+                  <ChevronUp className="h-5 w-5" />
+                ) : (
+                  <ChevronDown className="h-5 w-5" />
+                )}
+              </button>
             </div>
           ) : (
             <div className="flex gap-4">
               {/* Left Column: Action Buttons (3/4 width) */}
               <div className="flex-1">
                 {'result' in hand && (
-                  <>
-                    {sharedHands.has(hand.handNumber) || SharedHandService.isHandShared(sessionId, hand.handNumber) ? (
-                      /* Show Unshare, Copy Link, Open Link when hand is shared */
-                      <div className="space-y-2">
-                        <button
-                          onClick={(e) => handleUnshare(hand as StoredHand, e)}
-                          className="flex items-center justify-center gap-2 px-3 py-3 rounded-md bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 transition-all text-xs h-12 w-full"
-                          title="Remove from your shared list"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                          <span>Unshare</span>
-                        </button>
-
-                        <button
-                          onClick={(e) => handleCreateLink(hand as StoredHand, e)}
-                          className={cn(
-                            "flex items-center justify-center gap-2 px-3 py-3 rounded-md border transition-all text-xs h-12 w-full",
-                            copiedHandId === hand.handNumber
-                              ? "bg-green-50 border-green-200 text-green-700"
-                              : "bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
-                          )}
-                          title="Copy share link to clipboard"
-                        >
-                          <Copy className="h-3 w-3" />
-                          <span>{copiedHandId === hand.handNumber ? 'Copied!' : 'Copy Link'}</span>
-                        </button>
-
-                        <button
-                          onClick={(e) => handleOpenLink(hand as StoredHand, e)}
-                          className="flex items-center justify-center gap-2 px-3 py-3 rounded-md bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 transition-all text-xs h-12 w-full"
-                          title="Open hand in shared view"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                          <span>Open</span>
-                        </button>
-                      </div>
-                    ) : (
-                      /* Show Share Hand when hand is not shared */
-                      <div className="space-y-2">
-                        <button
-                          onClick={(e) => handleShare(hand as StoredHand, e)}
-                          className="flex flex-col items-center justify-center px-3 py-2 rounded-md bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 transition-all text-xs h-12 w-full"
-                          title="Share hand for review and feedback"
-                        >
-                          <div className="flex items-center gap-1">
-                            <Share2 className="h-3 w-3" />
-                            <span>Share Hand</span>
-                          </div>
-                          <div className="text-xs text-gray-500 mt-0.5">Visible to All</div>
-                        </button>
-
-                        <button
-                          onClick={(e) => handleCreateLink(hand as StoredHand, e)}
-                          className={cn(
-                            "flex items-center justify-center gap-2 px-3 py-3 rounded-md border transition-all text-xs h-12 w-full",
-                            copiedHandId === hand.handNumber
-                              ? "bg-green-50 border-green-200 text-green-700"
-                              : "bg-green-50 hover:bg-green-100 border-green-200 text-green-700"
-                          )}
-                          title="Copy share link to clipboard"
-                        >
-                          <Copy className="h-3 w-3" />
-                          <span>{copiedHandId === hand.handNumber ? 'Copied!' : 'Copy Link'}</span>
-                        </button>
-
-                        <button
-                          onClick={(e) => handleOpenLink(hand as StoredHand, e)}
-                          className="flex items-center justify-center gap-2 px-3 py-3 rounded-md bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 transition-all text-xs h-12 w-full"
-                          title="Open hand in shared view"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                          <span>Open Link</span>
-                        </button>
-                      </div>
+                  <button
+                    onClick={(e) => handleCopyLink(hand as StoredHand, e)}
+                    className={cn(
+                      "flex items-center justify-center gap-2 px-3 py-3 rounded-md transition-all text-xs h-12 w-full",
+                      copiedHandId === hand.handNumber
+                        ? "bg-green-50 border-green-200 text-green-700"
+                        : "bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
                     )}
-                  </>
+                    title="Copy shareable link"
+                  >
+                    {copiedHandId === hand.handNumber ? (
+                      <>
+                        <Copy className="h-3 w-3" />
+                        <span>Link Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Link2 className="h-3 w-3" />
+                        <span>Copy Link</span>
+                      </>
+                    )}
+                  </button>
                 )}
               </div>
 
@@ -542,9 +417,14 @@ export function HandHistory({
               <div className="w-px bg-gray-200"></div>
 
               {/* Right Column: Dropdown Toggle (1/4 width) */}
-              <div className="w-24 flex flex-col items-center justify-center">
+              <div className="w-24 flex items-center justify-center">
                 <button
-                  className="flex flex-col items-center justify-center w-full bg-gray-50 hover:bg-gray-100 rounded-md transition-colors py-2"
+                  className={cn(
+                    "w-10 h-10 rounded-full flex items-center justify-center transition-all",
+                    isExpanded
+                      ? "bg-blue-500 hover:bg-blue-600 text-white"
+                      : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                  )}
                   onClick={() => {
                     const newExpanded = new Set(expandedHands);
                     if (isExpanded) {
@@ -554,21 +434,12 @@ export function HandHistory({
                     }
                     setExpandedHands(newExpanded);
                   }}
+                  title={isExpanded ? "Hide details" : "Show details"}
                 >
                   {isExpanded ? (
-                    <>
-                      <ChevronUp className="h-5 w-5 text-blue-600 mb-1" />
-                      <span className="text-xs text-gray-600 text-center">
-                        Hide Details
-                      </span>
-                    </>
+                    <ChevronUp className="h-5 w-5" />
                   ) : (
-                    <>
-                      <ChevronDown className="h-5 w-5 text-gray-600 mb-1" />
-                      <span className="text-xs text-gray-600 text-center">
-                        Show Details
-                      </span>
-                    </>
+                    <ChevronDown className="h-5 w-5" />
                   )}
                 </button>
               </div>
@@ -579,7 +450,7 @@ export function HandHistory({
         {/* Expandable Action Log */}
         {isExpanded && (
           <div className="border-t px-4 pb-4 pt-3">
-            {renderActionLog(hand)}
+            {renderActionLog(hand, handUserSeat)}
           </div>
         )}
       </div>

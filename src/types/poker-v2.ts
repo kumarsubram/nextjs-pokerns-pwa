@@ -85,6 +85,7 @@ export interface BettingRound {
 export interface StoredHand {
   handNumber: number;
   timestamp: string;
+  userSeat: Position;
   userCards: [string, string] | null;
   communityCards: {
     flop: [string, string, string] | null;

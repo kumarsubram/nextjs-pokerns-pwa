@@ -64,13 +64,13 @@ export function AppHeader({
               Sessions
             </Button>
             <Button
-              variant={isActive('/shared') || pathname.startsWith('/shared/') ? 'default' : 'ghost'}
+              variant={isActive('/tracked') || pathname.startsWith('/tracked/') ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => router.push('/shared')}
-              className={`flex items-center gap-2 ${isActive('/shared') || pathname.startsWith('/shared/') ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}`}
+              onClick={() => router.push('/tracked')}
+              className={`flex items-center gap-2 ${isActive('/tracked') || pathname.startsWith('/tracked/') ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}`}
             >
               <Share2 className="h-4 w-4" />
-              Shared
+              Tracked
             </Button>
             <Button
               variant={isActive('/account') ? 'default' : 'ghost'}

@@ -40,6 +40,7 @@ export class URLShareService {
       const hand: StoredHand = {
         handNumber: shareData.h,
         timestamp: new Date().toISOString(),
+        userSeat: shareData.p,
         userCards: shareData.u,
         communityCards: {
           flop: shareData.c.f,

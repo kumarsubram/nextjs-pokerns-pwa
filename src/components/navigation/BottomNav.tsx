@@ -22,9 +22,9 @@ export function BottomNav() {
     },
     {
       icon: Share2,
-      label: 'Shared',
-      path: '/shared',
-      active: pathname === '/shared' || pathname.startsWith('/shared/'),
+      label: 'Tracked',
+      path: '/tracked',
+      active: pathname === '/tracked' || pathname.startsWith('/tracked/'),
     },
     {
       icon: User,

@@ -13,6 +13,8 @@ export class URLShareService {
       },
       b: hand.bettingRounds,
       o: hand.result?.handOutcome, // Just the outcome, not full result
+      w: hand.result?.potWon, // Amount won/lost
+      a: hand.result?.stackAfter, // Stack after hand
       s: sessionMetadata.tableSeats, // Just table seats for action sequence
       p: sessionMetadata.userSeat // Just user position
     };
@@ -51,8 +53,8 @@ export class URLShareService {
         result: {
           handOutcome: shareData.o,
           winner: shareData.o === 'won' ? shareData.p : undefined,
-          potWon: undefined,
-          stackAfter: undefined
+          potWon: shareData.w,
+          stackAfter: shareData.a
         }
       };
 

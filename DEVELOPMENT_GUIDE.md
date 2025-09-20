@@ -3,7 +3,66 @@
 ## Project Overview
 A Progressive Web App for tracking poker sessions, hands, and statistics. Built with Next.js 15, TypeScript, and Tailwind CSS.
 
-## RECENT UPDATES (v2.9) ✅
+## RECENT UPDATES (v2.10) ✅
+
+### Session Page Refactoring Phase 2: Betting Logic Extraction - COMPLETED
+✅ **Betting Logic Modularization**
+- Successfully extracted betting logic into dedicated `useBettingLogic` hook
+- Reduced session page complexity by ~350 lines of betting-related code
+- Created `/src/hooks/useBettingLogic.ts` for centralized betting action management
+- Moved 8 critical betting functions from session page to reusable hook:
+  - `handleBettingAction` - Core betting action processing with auto-fold logic
+  - `handleConfirmedHeroFold` - Hero fold confirmation and hand completion
+  - `handleAdvanceToNextRound` - Betting round progression and showdown detection
+  - `getCurrentBettingRound` - Type-safe betting round info accessor
+  - `getCallAmount` - Call amount calculations considering blinds and stack limits
+  - `isCallAllIn` - All-in detection logic for hero position
+  - `canCheck` - Check availability logic with preflop/postflop rules
+  - `autoFoldPlayersBetween` - Auto-fold logic for skipped positions
+
+✅ **Advanced Poker Logic Preservation**
+- **Position-Aware Logic**: Maintains proper 6/9-handed action sequences
+- **Auto-Fold System**: Preserves complex logic for skipping positions in betting
+- **Hero Investment Tracking**: Accurate money tracking for stack management
+- **Blind Handling**: Proper preflop logic with BB check rules
+- **Showdown Detection**: Complex multi-player vs heads-up showdown logic
+- **All-In Logic**: Proper all-in detection and hand completion flows
+
+✅ **Architecture Benefits**
+- **Cleaner Session Page**: Reduced from ~1910 to ~1560 lines (18% reduction)
+- **Reusable Betting Logic**: Hook can be used across different poker components
+- **Type Safety**: Full TypeScript integration with proper interfaces
+- **Separation of Concerns**: UI coordination separate from betting business logic
+- **Testable in Isolation**: Betting logic can now be unit tested independently
+- **No Breaking Changes**: All existing poker functionality preserved
+
+✅ **Technical Implementation**
+```typescript
+// New betting logic hook structure
+const {
+  handleBettingAction,
+  handleConfirmedHeroFold,
+  handleAdvanceToNextRound,
+  getCurrentBettingRound,
+  getCallAmount,
+  isCallAllIn,
+  canCheck
+} = useBettingLogic({
+  session, currentHand, setCurrentHand, stack, heroMoneyInvested,
+  setHeroMoneyInvested, completeHand, // ... all necessary state and setters
+});
+
+// Clean betting action calls
+handleBettingAction('BTN', 'raise', 40); // Simple, reusable betting
+handleAdvanceToNextRound(); // Clean round progression
+```
+
+✅ **Phase 2 Completion**
+- Established pattern for future hook extractions
+- Session page now focuses purely on UI coordination and state management
+- Ready for Phase 3: Community card logic extraction
+
+## PREVIOUS UPDATES (v2.9) ✅
 
 ### Session Page Refactoring Phase 1: Hand Flow Logic Extraction - COMPLETED
 ✅ **Hand Flow Logic Modularization**

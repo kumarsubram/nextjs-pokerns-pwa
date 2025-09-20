@@ -24,13 +24,11 @@ import {
   NextToAct
 } from '@/components/session';
 import { useHandFlow } from '@/hooks/useHandFlow';
+import { useBettingLogic } from '@/hooks/useBettingLogic';
 import { SessionService } from '@/services/session.service';
-import { SessionMetadata, CurrentHand, Position, BettingAction, StoredHand } from '@/types/poker-v2';
+import { SessionMetadata, CurrentHand, Position, StoredHand } from '@/types/poker-v2';
 import {
-  processBettingAction,
-  advanceToNextRound,
   isBettingRoundComplete,
-  getNextToAct,
   getPreflopActionSequence,
   getPostflopActionSequence
 } from '@/utils/poker-logic';
@@ -130,6 +128,31 @@ export default function SessionPage() {
     setValidationErrorMessage,
     setPendingHandCompletion,
     opponentCards
+  });
+
+  // Initialize betting logic hook
+  const {
+    handleBettingAction,
+    handleConfirmedHeroFold,
+    handleAdvanceToNextRound,
+    getCurrentBettingRound,
+    getCallAmount,
+    isCallAllIn,
+    canCheck
+  } = useBettingLogic({
+    session,
+    currentHand,
+    setCurrentHand,
+    stack,
+    heroMoneyInvested,
+    setHeroMoneyInvested,
+    completeHand,
+    setShowAllFoldedDialog,
+    setShowOutcomeSelection,
+    setFoldPosition,
+    setShowFoldConfirmation,
+    setSelectedPosition,
+    setShowPositionActions
   });
 
   // Simplified dialog classes - no complex mobile keyboard detection
@@ -460,186 +483,6 @@ export default function SessionPage() {
     }
   };
 
-  // Handle betting actions for any position
-  const handleBettingAction = (position: Position, action: 'fold' | 'check' | 'call' | 'raise' | 'all-in', amount?: number) => {
-    if (!currentHand || !session) return;
-
-    // If hero is folding, show confirmation
-    if (action === 'fold' && position === session.userSeat) {
-      setFoldPosition(position);
-      setShowFoldConfirmation(true);
-      return;
-    }
-
-    // Check if this is the hero's action and if it will cause auto-actions
-    if (position === session.userSeat && currentHand.nextToAct && position !== currentHand.nextToAct) {
-      // Calculate which seats will be auto-actioned
-      const fullActionSequence = currentHand.currentBettingRound === 'preflop'
-        ? getPreflopActionSequence(session.tableSeats || 9)
-        : getPostflopActionSequence(session.tableSeats || 9);
-
-      const activePlayers = currentHand.playerStates.filter(p => p.status === 'active');
-      const activePositions = activePlayers.map(p => p.position);
-      const actionSequence = fullActionSequence.filter(pos => activePositions.includes(pos));
-
-      const nextIndex = actionSequence.indexOf(currentHand.nextToAct);
-      const heroIndex = actionSequence.indexOf(position);
-
-      const skippedPositions: Position[] = [];
-      if (nextIndex !== -1 && heroIndex !== -1 && heroIndex !== nextIndex) {
-        let currentIdx = nextIndex;
-        while (currentIdx !== heroIndex) {
-          skippedPositions.push(actionSequence[currentIdx]);
-          currentIdx = (currentIdx + 1) % actionSequence.length;
-        }
-      }
-    }
-
-    // Clear selected position after action
-    setSelectedPosition(null);
-    setShowPositionActions(false);
-
-    let updatedHand = { ...currentHand };
-
-    // If there are skipped positions, auto-fold/check them (user already sees hint)
-    if (currentHand.nextToAct && currentHand.nextToAct !== position) {
-      const fullActionSequence = currentHand.currentBettingRound === 'preflop'
-        ? getPreflopActionSequence(session?.tableSeats || 9)
-        : getPostflopActionSequence(session?.tableSeats || 9);
-      const activePlayers = currentHand.playerStates.filter(p => p.status === 'active');
-      const activePositions = activePlayers.map(p => p.position);
-      const actionSequence = fullActionSequence.filter(pos => activePositions.includes(pos));
-      const nextIndex = actionSequence.indexOf(currentHand.nextToAct);
-      const targetIndex = actionSequence.indexOf(position);
-
-      if (nextIndex !== -1 && targetIndex !== -1 && nextIndex !== targetIndex) {
-        updatedHand = autoFoldPlayersBetween(updatedHand, currentHand.nextToAct, position);
-      }
-    }
-
-    // Track hero's money investment
-    if (position === session.userSeat && amount) {
-      const currentBet = updatedHand.playerStates.find(p => p.position === position)?.currentBet || 0;
-      const additionalInvestment = amount - currentBet;
-      setHeroMoneyInvested(prev => prev + additionalInvestment);
-    }
-
-    const bettingAction: Omit<BettingAction, 'timestamp'> = {
-      position,
-      action,
-      amount
-    };
-
-    updatedHand = processBettingAction(updatedHand, bettingAction);
-
-    // Special case: When BB checks in preflop, the round should be complete
-    if (updatedHand.currentBettingRound === 'preflop' &&
-        position === 'BB' &&
-        action === 'check') {
-      const currentRound = updatedHand.bettingRounds.preflop;
-      if (currentRound) {
-        currentRound.isComplete = true;
-        updatedHand.canAdvanceToFlop = true;
-        // Clear nextToAct since round is complete
-        updatedHand.nextToAct = undefined;
-
-        // Auto-fold any remaining active players who haven't acted (like SB)
-        updatedHand.playerStates.forEach(playerState => {
-          if (playerState.status === 'active' && !playerState.hasActed && playerState.position !== 'BB') {
-            playerState.status = 'folded';
-            playerState.hasActed = true;
-
-            // Add fold action to betting round
-            currentRound.actions.push({
-              position: playerState.position,
-              action: 'fold',
-              timestamp: new Date().toISOString()
-            });
-          }
-        });
-      }
-    }
-
-    // Update nextToAct based on current betting round and player states
-    if (updatedHand.currentBettingRound !== 'showdown') {
-      const currentRound = updatedHand.bettingRounds[updatedHand.currentBettingRound];
-      if (currentRound) {
-        // Manual nextToAct calculation to handle auto-folded players correctly
-        const fullActionSequence = updatedHand.currentBettingRound === 'preflop'
-          ? getPreflopActionSequence(session.tableSeats)
-          : getPostflopActionSequence(session.tableSeats);
-
-        const activePlayers = updatedHand.playerStates.filter(p => p.status === 'active');
-        const activePositions = activePlayers.map(p => p.position);
-        const actionSequence = fullActionSequence.filter(pos => activePositions.includes(pos));
-        const currentBet = currentRound.currentBet;
-
-        // Find the next active player who needs to act
-        let nextPlayer: Position | null = null;
-
-        // For new betting rounds (flop/turn/river), start from beginning of sequence
-        // For continued rounds (raises), start from position after current actor
-        const isNewRound = currentBet === 0 && activePlayers.every(p => !p.hasActed || p.currentBet === 0);
-
-        let searchSequence: Position[];
-        if (isNewRound) {
-          // New betting round: start from the beginning of active action sequence
-          searchSequence = actionSequence;
-        } else {
-          // Continued round: start from position after current actor
-          const currentActorIndex = actionSequence.indexOf(position);
-          searchSequence = [
-            ...actionSequence.slice(currentActorIndex + 1),
-            ...actionSequence.slice(0, currentActorIndex + 1)
-          ];
-        }
-
-        for (const pos of searchSequence) {
-          const player = activePlayers.find(p => p.position === pos);
-          if (player && (!player.hasActed || player.currentBet < currentBet)) {
-            nextPlayer = pos;
-            break;
-          }
-        }
-
-        updatedHand.nextToAct = nextPlayer || undefined;
-
-        // Check if round is complete: all active players have acted AND matched current bet (or are all-in)
-        const allActivePlayersHaveActedAndMatched = activePlayers.every(player => {
-          // Player must have acted in this round
-          const hasActedThisRound = player.hasActed;
-          // Player must match current bet or be all-in
-          const matchesBetOrAllIn = player.currentBet === currentBet || player.status === 'all-in';
-
-          return hasActedThisRound && matchesBetOrAllIn;
-        });
-
-
-        if (allActivePlayersHaveActedAndMatched || activePlayers.length <= 1) {
-          currentRound.isComplete = true;
-          updatedHand.nextToAct = undefined;
-        }
-      }
-    }
-
-    // Check if hand ends (all others folded) BEFORE setting state
-    // Include both 'active' and 'all-in' players as they can still win the hand
-    const activePlayers = updatedHand.playerStates.filter(p => p.status === 'active' || p.status === 'all-in');
-    if (activePlayers.length === 1) {
-      if (activePlayers[0].position === session.userSeat) {
-        // Show "All Folded" dialog instead of directly completing
-        setCurrentHand(updatedHand);
-        setShowAllFoldedDialog(true);
-        return;
-      } else {
-        // Hero lost (already folded)
-        completeHand('lost', 0);
-        return; // Exit early, don't set currentHand
-      }
-    }
-
-    setCurrentHand(updatedHand);
-  };
 
 
 
@@ -650,101 +493,18 @@ export default function SessionPage() {
 
     setShowAutoActionConfirmation(false);
 
-    // Execute the pending action
+    // Execute the pending action via the betting logic hook
     const { position, action, amount } = pendingAction;
     setPendingAction(null);
     setAffectedSeats([]);
 
-    // Clear selected position after action
-    setSelectedPosition(null);
-    setShowPositionActions(false);
-
-    let updatedHand = { ...currentHand };
-
-    // Auto-fold players between current next-to-act and target position (when user skips positions)
-    if (currentHand.nextToAct && currentHand.nextToAct !== position) {
-      updatedHand = autoFoldPlayersBetween(updatedHand, currentHand.nextToAct, position);
-    }
-
-    // Process the betting action
-    const actionForProcessing: Omit<BettingAction, 'timestamp'> = {
-      position,
-      action,
-      amount
-    };
-
-    updatedHand = processBettingAction(updatedHand, actionForProcessing);
-
-    // Track hero's investment
-    if (position === session.userSeat && amount) {
-      const currentBet = updatedHand.playerStates.find(p => p.position === position)?.currentBet || 0;
-      const additionalInvestment = amount - currentBet;
-      setHeroMoneyInvested(prev => prev + additionalInvestment);
-    }
-
-    // Update pot - it's already updated by processBettingAction
-
-    // Special handling for BB preflop action
-    if (updatedHand.currentBettingRound === 'preflop' &&
-      position === 'BB' &&
-      ['call', 'check'].includes(action)) {
-
-      const activePlayers = updatedHand.playerStates.filter(p => p.status === 'active');
-      const currentRound = updatedHand.bettingRounds[updatedHand.currentBettingRound as 'preflop' | 'flop' | 'turn' | 'river'];
-      const allMatched = activePlayers.every(p => {
-        const playerBet = p.currentBet || 0;
-        return playerBet === (currentRound?.currentBet || 0);
-      });
-
-      if (allMatched) {
-        const bbPlayer = updatedHand.playerStates.find(p => p.position === 'BB');
-        if (bbPlayer && !bbPlayer.hasActed) {
-          bbPlayer.hasActed = true;
-        }
-      }
-    }
-
-    // Check if betting round is complete
-    const currentRound = updatedHand.bettingRounds[updatedHand.currentBettingRound as 'preflop' | 'flop' | 'turn' | 'river'];
-    const isComplete = currentRound ? isBettingRoundComplete(updatedHand.playerStates, currentRound) : false;
-
-    // Update nextToAct if betting is not complete
-    if (!isComplete && updatedHand.currentBettingRound !== 'showdown') {
-      const currentRound = updatedHand.bettingRounds[updatedHand.currentBettingRound as 'preflop' | 'flop' | 'turn' | 'river'];
-      if (currentRound) {
-        const nextPlayer = getNextToAct(
-          updatedHand.currentBettingRound,
-          session.tableSeats || 9,
-          updatedHand.playerStates,
-          currentRound
-        );
-        updatedHand.nextToAct = nextPlayer || undefined;
-      }
-    } else {
-      updatedHand.nextToAct = undefined;
-    }
-
-    // Check if the hand should end (only one player left)
-    const activePlayers = updatedHand.playerStates.filter(p => p.status === 'active' || p.status === 'all-in');
-    if (activePlayers.length === 1) {
-      if (activePlayers[0].position === session.userSeat) {
-        // Show "All Folded" dialog instead of directly completing
-        setCurrentHand(updatedHand);
-        setShowAllFoldedDialog(true);
-        return;
-      } else {
-        completeHand('lost', 0);
-        return;
-      }
-    }
-
-    setCurrentHand(updatedHand);
+    handleBettingAction(position, action, amount);
   };
 
   // Execute betting action without confirmation checks (removed - duplicate logic)
 
-  // Handle confirmed hero fold
-  const handleConfirmedHeroFold = () => {
+  // Handle confirmed hero fold with session-specific logic
+  const handleConfirmedHeroFoldWrapper = () => {
     if (!currentHand || !session || !foldPosition) return;
 
     // If Hero hasn't invested any money, don't track the hand - just start a new one
@@ -768,274 +528,16 @@ export default function SessionPage() {
       return;
     }
 
-    let updatedHand = { ...currentHand };
+    // Use the hook's fold logic for invested money cases
+    handleConfirmedHeroFold();
 
-    const bettingAction: Omit<BettingAction, 'timestamp'> = {
-      position: foldPosition,
-      action: 'fold'
-    };
-
-    updatedHand = processBettingAction(updatedHand, bettingAction);
-
-    // Update nextToAct
-    if (updatedHand.currentBettingRound !== 'showdown') {
-      const currentRound = updatedHand.bettingRounds[updatedHand.currentBettingRound];
-      if (currentRound) {
-        const nextPlayer = getNextToAct(
-          updatedHand.currentBettingRound,
-          session.tableSeats,
-          updatedHand.playerStates,
-          currentRound
-        );
-        updatedHand.nextToAct = nextPlayer || undefined;
-      }
-    }
-
-    setCurrentHand(updatedHand);
-
-    // Hero folded - complete hand immediately with loss
-    const outcome = heroMoneyInvested > 0 ? 'lost' : 'folded';
-    completeHand(outcome, 0);
-
+    // Reset dialog states
     setShowFoldConfirmation(false);
     setFoldPosition(null);
   };
 
 
-  // Auto-fold players between nextToAct and target position (when user skips positions)
-  //
-  // Scenarios this handles:
-  // 1. Simple call: UTG calls when UTG+1 was next -> auto-fold UTG+1 if they haven't matched current bet
-  // 2. Raise scenario: UTG raises to 40, UTG+1 calls 40, UTG+2 raises to 80, then Hero calls 80
-  //    -> auto-fold anyone between UTG+2 and Hero who hasn't matched the 80 bet
-  // 3. Multiple raises: Similar logic applies, always check against current bet amount
-  // 4. Protection: Never auto-fold the target position (the player who's actually acting)
-  const autoFoldPlayersBetween = (hand: CurrentHand, nextToAct: Position, targetPosition: Position): CurrentHand => {
-    const updatedHand = { ...hand };
-    const fullActionSequence = hand.currentBettingRound === 'preflop'
-      ? getPreflopActionSequence(session?.tableSeats || 9)
-      : getPostflopActionSequence(session?.tableSeats || 9);
 
-    // Filter to only include active players
-    const activePlayers = updatedHand.playerStates.filter(p => p.status === 'active');
-    const activePositions = activePlayers.map(p => p.position);
-    const actionSequence = fullActionSequence.filter(pos => activePositions.includes(pos));
-
-
-    const nextIndex = actionSequence.indexOf(nextToAct);
-    const targetIndex = actionSequence.indexOf(targetPosition);
-
-    if (nextIndex === -1 || targetIndex === -1 || nextIndex === targetIndex) {
-      return updatedHand;
-    }
-
-    // Find positions to fold between nextToAct and target (not including target)
-    const positionsToFold: Position[] = [];
-    let currentIndex = nextIndex;
-
-    while (currentIndex !== targetIndex) {
-      const position = actionSequence[currentIndex] as Position;
-      if (position !== targetPosition) {
-        positionsToFold.push(position);
-      }
-      currentIndex = (currentIndex + 1) % actionSequence.length;
-
-      // Safety check to prevent infinite loop
-      if (positionsToFold.length >= actionSequence.length) break;
-    }
-
-
-
-    // Fold the identified positions
-    for (const position of positionsToFold) {
-      const playerState = updatedHand.playerStates.find(p => p.position === position);
-      const currentRoundData = updatedHand.currentBettingRound !== 'showdown'
-        ? updatedHand.bettingRounds[updatedHand.currentBettingRound]
-        : null;
-
-      // Auto-fold/check players who we're skipping past
-      const currentBet = currentRoundData?.currentBet || 0;
-      const isPostFlop = updatedHand.currentBettingRound !== 'preflop';
-
-      // In post-flop with no betting (currentBet = 0), auto-check instead of auto-fold
-      const shouldAutoCheck = playerState &&
-        playerState.status === 'active' &&
-        currentRoundData &&
-        position !== targetPosition &&
-        isPostFlop &&
-        currentBet === 0 &&
-        !playerState.hasActed;
-
-      // Auto-fold players who haven't matched a bet > 0
-      const shouldAutoFold = playerState &&
-        playerState.status === 'active' &&
-        currentRoundData &&
-        position !== targetPosition &&
-        (
-          // Player hasn't matched the current bet when there is a bet to match
-          (currentBet > 0 && playerState.currentBet < currentBet)
-        );
-
-      if (shouldAutoFold) {
-        playerState.status = 'folded';
-        playerState.hasActed = true; // Mark as acted since we're folding them
-
-        // Add fold action to betting round
-        if (updatedHand.currentBettingRound !== 'showdown') {
-          const currentRound = updatedHand.bettingRounds[updatedHand.currentBettingRound];
-          if (currentRound) {
-            currentRound.actions.push({
-              position,
-              action: 'fold',
-              timestamp: new Date().toISOString()
-            });
-          }
-        }
-      } else if (shouldAutoCheck) {
-        playerState.hasActed = true; // Mark as acted since we're checking for them
-
-        // Add check action to betting round
-        if (updatedHand.currentBettingRound !== 'showdown') {
-          const currentRound = updatedHand.bettingRounds[updatedHand.currentBettingRound];
-          if (currentRound) {
-            currentRound.actions.push({
-              position,
-              action: 'check',
-              timestamp: new Date().toISOString()
-            });
-          }
-        }
-      }
-    }
-
-    return updatedHand;
-  };
-
-  // Handle advancing to next betting round
-  const handleAdvanceToNextRound = () => {
-    if (!currentHand || !session) return;
-
-    // Check if we're going to showdown (river betting complete)
-    if (currentHand.currentBettingRound === 'river') {
-      // Count active players (including hero if still active or all-in)
-      const activePlayers = currentHand.playerStates.filter(p => p.status === 'active' || p.status === 'all-in');
-      const heroStillActive = activePlayers.some(p => p.position === session.userSeat);
-
-      // True showdown: 2+ players reach the end
-      if (activePlayers.length >= 2) {
-        // Show outcome selection for true showdown (dialog will handle hero card validation)
-        setShowOutcomeSelection(true);
-        return;
-      } else {
-        // Not a showdown - only 1 player left, hand ends automatically
-        // If hero is the last player, they win. Otherwise they folded and lost.
-        if (heroStillActive) {
-          // Hero wins by everyone else folding
-          completeHand('won', currentHand.pot || 0);
-        } else {
-          // Hero folded earlier and someone else won
-          completeHand('lost', 0);
-        }
-        return;
-      }
-    }
-
-    const updatedHand = advanceToNextRound(currentHand);
-
-    // Set nextToAct for the new betting round
-    if (updatedHand.currentBettingRound !== 'showdown') {
-      const currentRound = updatedHand.bettingRounds[updatedHand.currentBettingRound];
-      if (currentRound) {
-        const nextPlayer = getNextToAct(
-          updatedHand.currentBettingRound,
-          session.tableSeats,
-          updatedHand.playerStates,
-          currentRound
-        );
-        updatedHand.nextToAct = nextPlayer || undefined;
-      }
-    }
-
-    setCurrentHand(updatedHand);
-  };
-
-  // Get current betting round info
-  const getCurrentBettingRound = () => {
-    if (!currentHand) return null;
-    const round = currentHand.currentBettingRound;
-    if (round === 'showdown') return null;
-
-    // Type-safe access to betting rounds
-    if (round === 'preflop') return currentHand.bettingRounds.preflop;
-    if (round === 'flop') return currentHand.bettingRounds.flop;
-    if (round === 'turn') return currentHand.bettingRounds.turn;
-    if (round === 'river') return currentHand.bettingRounds.river;
-
-    return null;
-  };
-
-  // Calculate the amount a player needs to add to call (considering blinds already posted)
-  const getCallAmount = (position: Position) => {
-    if (!currentHand) return 0;
-    const playerState = currentHand.playerStates.find(p => p.position === position);
-    const currentRound = getCurrentBettingRound();
-    if (!playerState || !currentRound) return 0;
-
-    const currentBet = currentRound.currentBet || 0;
-    const alreadyBet = playerState.currentBet || 0;
-    const requiredCallAmount = currentBet - alreadyBet;
-
-    // For hero position, limit call amount by remaining stack
-    if (position === session?.userSeat) {
-      const remainingStack = stack - heroMoneyInvested;
-      const maxCallAmount = Math.min(requiredCallAmount, remainingStack);
-      return Math.max(0, maxCallAmount);
-    }
-
-    return Math.max(0, requiredCallAmount);
-  };
-
-  // Check if a call would be an all-in for the hero
-  const isCallAllIn = (position: Position) => {
-    if (position !== session?.userSeat || !currentHand) return false;
-    const currentRound = getCurrentBettingRound();
-    if (!currentRound) return false;
-
-    const currentBet = currentRound.currentBet || 0;
-    const playerState = currentHand.playerStates.find(p => p.position === position);
-    const alreadyBet = playerState?.currentBet || 0;
-    const requiredCallAmount = currentBet - alreadyBet;
-    const remainingStack = stack - heroMoneyInvested;
-
-    return requiredCallAmount > 0 && remainingStack <= requiredCallAmount;
-  };
-
-  // Check if a player can check (already matches current bet)
-  const canCheck = (position: Position) => {
-    if (!currentHand) return false;
-    const playerState = currentHand.playerStates.find(p => p.position === position);
-    const currentRound = getCurrentBettingRound();
-    if (!playerState || !currentRound) return false;
-
-    const currentBet = currentRound.currentBet || 0;
-    const alreadyBet = playerState.currentBet || 0;
-    const bigBlindAmount = currentHand.bigBlind || 0;
-
-    // Special preflop logic
-    if (currentHand.currentBettingRound === 'preflop') {
-      // Only BB can check in preflop, and only if no one raised above the big blind
-      if (position === 'BB') {
-        const canBBCheck = currentBet === bigBlindAmount && alreadyBet === bigBlindAmount;
-        return canBBCheck;
-      } else {
-        // No one else can check in preflop (must call, raise, or fold)
-        return false;
-      }
-    }
-
-    // Post-flop: Can check if already matching the current bet
-    return alreadyBet >= currentBet;
-  };
 
   const currentBettingRound = getCurrentBettingRound();
   const isBettingComplete = currentBettingRound ? (currentBettingRound.isComplete || isBettingRoundComplete(currentHand?.playerStates || [], currentBettingRound)) : false;
@@ -1767,7 +1269,7 @@ export default function SessionPage() {
           selectedCard2={selectedCard2}
           opponentCards={opponentCards}
           onInlineCardSelect={handleInlineCardSelect}
-          onConfirmFold={handleConfirmedHeroFold}
+          onConfirmFold={handleConfirmedHeroFoldWrapper}
           onCancel={() => {
             setShowFoldConfirmation(false);
             setFoldPosition(null);

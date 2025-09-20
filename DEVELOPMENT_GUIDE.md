@@ -3,7 +3,73 @@
 ## Project Overview
 A Progressive Web App for tracking poker sessions, hands, and statistics. Built with Next.js 15, TypeScript, and Tailwind CSS.
 
-## RECENT UPDATES (v2.10) ✅
+## RECENT UPDATES (v2.11) ✅
+
+### Session Page Refactoring Phase 3: Community Card Logic Extraction - COMPLETED
+✅ **Community Card Logic Modularization**
+- Successfully extracted community card logic into dedicated `useCommunityCards` hook
+- Reduced session page complexity by ~190 lines of card management code
+- Created `/src/hooks/useCommunityCards.ts` for centralized community card management
+- Moved 10+ critical community card functions from session page to reusable hook:
+  - `handleCommunityCardClick` - Card click validation and selector opening logic
+  - `handleCommunityCardSelect` - Card selection with intelligent auto-progression
+  - `needsCommunityCards` - Auto-trigger detection for betting round completion
+  - `handHistoryCurrentHand` - Stable hand reference to prevent UI flickering
+  - `getCommunityCardSelectorTitle` - Dynamic title generation for card selection
+  - `getAdvanceRoundMessage` - Context-aware round completion messaging
+  - `getAdvanceRoundButtonText` - Smart button text based on game state
+  - Auto-progression logic for guided flop card selection
+  - Betting round validation and card placement rules
+  - Community card auto-trigger system for seamless gameplay
+
+✅ **Advanced Card Management Preservation**
+- **Auto-Trigger System**: Maintains complex logic for automatic card selection prompts
+- **Progression Logic**: Preserves guided flop card selection (card 1 → card 2 → card 3)
+- **Validation Rules**: Round-specific card selection restrictions (preflop→flop, flop→turn, turn→river)
+- **UI Stability**: Stable hand reference prevents layout shifts during card selection
+- **Context Awareness**: Dynamic titles and messages based on current betting round
+- **Seamless Integration**: Auto-triggers when betting rounds complete
+
+✅ **Architecture Benefits**
+- **Cleaner Session Page**: Reduced from ~1560 to ~1370 lines (12% reduction this phase)
+- **Cumulative Reduction**: Session page now 28% smaller than original (1910 → 1370 lines)
+- **Reusable Card Logic**: Hook can be used across different poker components
+- **Type Safety**: Full TypeScript integration with proper interfaces
+- **Testable Components**: Community card logic can now be unit tested independently
+- **UI Helper Functions**: Clean, testable functions for dynamic UI text generation
+- **No Breaking Changes**: All existing community card functionality preserved
+
+✅ **Technical Implementation**
+```typescript
+// New community cards hook structure
+const {
+  needsCommunityCards,
+  handHistoryCurrentHand,
+  handleCommunityCardClick,
+  handleCommunityCardSelect,
+  getCommunityCardSelectorTitle,
+  getAdvanceRoundMessage,
+  getAdvanceRoundButtonText
+} = useCommunityCards({
+  currentHand, setCurrentHand, isBettingComplete, showSeatSelection,
+  showCommunitySelector, setShowCommunitySelector,
+  selectingCommunityCard, setSelectingCommunityCard,
+  autoSelectingCommunityCards, setAutoSelectingCommunityCards
+});
+
+// Clean community card operations
+handleCommunityCardClick('flop', 0); // Simple card selection
+const title = getCommunityCardSelectorTitle(); // Dynamic UI text
+const message = getAdvanceRoundMessage(); // Context-aware messaging
+```
+
+✅ **Phase 3 Completion**
+- **Total Extracted**: ~740 lines across 3 phases (hand flow + betting + community cards)
+- **Session Page Reduction**: 28% smaller and significantly more maintainable
+- **Pattern Established**: Consistent hook-based architecture for future extractions
+- **Ready for Phase 4**: Hero card logic or dialog state management
+
+## PREVIOUS UPDATES (v2.10) ✅
 
 ### Session Page Refactoring Phase 2: Betting Logic Extraction - COMPLETED
 ✅ **Betting Logic Modularization**

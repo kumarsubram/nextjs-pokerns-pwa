@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { MousePointer2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SimplePokerTable } from '@/components/poker/SimplePokerTable';
 import { CardSelector } from '@/components/poker/CardSelector';
@@ -20,6 +19,8 @@ import {
 import {
   HeroCards,
   SessionHeader,
+  HandInfoHeader,
+  HandSettingsPanel,
   NextToAct
 } from '@/components/session';
 import { SessionService } from '@/services/session.service';
@@ -1349,181 +1350,31 @@ export default function SessionPage() {
             showKeepCurrentButton={handCount > 0 && session.userSeat !== undefined}
           />
         )}
-        {/* Hand Info - Top */}
+        {/* Hand Info Header */}
         {currentHand && !showSeatSelection && (
-          <div className="bg-white rounded-lg p-3 shadow-sm mb-3">
-            <div className="mb-2">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Hand #{currentHand.handNumber} - <span className="text-blue-600 capitalize">{currentHand.currentBettingRound}</span></h2>
-                {currentHand.currentBettingRound !== 'showdown' && (
-                  <div className="text-xs italic text-right">
-                    {currentHand.nextToAct === session.userSeat ? (
-                      <div className="text-blue-600 font-medium animate-pulse">Your turn to act</div>
-                    ) : (
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-1 justify-end text-gray-600">
-                          <MousePointer2 className="h-3 w-3" />
-                          <span>Tap any seat to record action</span>
-                        </div>
-                        {selectedPosition && selectedPosition !== session.userSeat && currentHand.nextToAct && !showPositionActions && !showCardSelector && (
-                          (() => {
-                            const currentRound = currentHand.bettingRounds[currentHand.currentBettingRound as 'preflop' | 'flop' | 'turn' | 'river'];
-                            const hasBet = currentRound?.currentBet && currentRound.currentBet > 0;
-                            const autoAction = hasBet ? 'fold' : 'check';
+          <HandInfoHeader
+            currentHand={currentHand}
+            session={session}
+            userSeat={session?.userSeat}
+            selectedPosition={selectedPosition}
+            showPositionActions={showPositionActions}
+            showCardSelector={showCardSelector}
+          />
+        )}
 
-                            // Get positions between nextToAct and selectedPosition
-                            const fullActionSequence = currentHand.currentBettingRound === 'preflop'
-                              ? getPreflopActionSequence(session.tableSeats || 9)
-                              : getPostflopActionSequence(session.tableSeats || 9);
-
-                            const activePlayers = currentHand.playerStates.filter(p => p.status === 'active');
-                            const activePositions = activePlayers.map(p => p.position);
-                            const actionSequence = fullActionSequence.filter(pos => activePositions.includes(pos));
-
-                            const nextIndex = actionSequence.indexOf(currentHand.nextToAct);
-                            const selectedIndex = actionSequence.indexOf(selectedPosition);
-
-                            let skippedCount = 0;
-                            if (nextIndex !== -1 && selectedIndex !== -1 && selectedIndex !== nextIndex) {
-                              if (selectedIndex > nextIndex) {
-                                skippedCount = selectedIndex - nextIndex - 1;
-                              } else {
-                                // Wraps around
-                                skippedCount = (actionSequence.length - nextIndex - 1) + selectedIndex;
-                              }
-                            }
-
-                            if (skippedCount > 0) {
-                              // Get the actual positions that will be skipped
-                              const skippedPositions: Position[] = [];
-                              let currentIdx = (nextIndex + 1) % actionSequence.length;
-                              while (currentIdx !== selectedIndex) {
-                                skippedPositions.push(actionSequence[currentIdx]);
-                                currentIdx = (currentIdx + 1) % actionSequence.length;
-                              }
-
-                              return (
-                                <div className="text-amber-600 text-xs">
-                                  {skippedPositions.length === 1
-                                    ? `${skippedPositions[0]} will auto-${autoAction}`
-                                    : `${skippedPositions.join(', ')} will auto-${autoAction}`
-                                  }
-                                </div>
-                              );
-                            }
-                            return null;
-                          })()
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Stack, Profit/Loss and Blinds */}
-            <div className="grid grid-cols-4 gap-2">
-              <div>
-                <label className="text-xs text-gray-500 block mb-1 text-center">Stack</label>
-                <input
-                  type="number"
-                  value={stack}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value === '') {
-                      setStack(0);
-                    } else {
-                      const numValue = parseInt(value, 10);
-                      if (!isNaN(numValue) && numValue >= 0) {
-                        setStack(numValue);
-                      }
-                    }
-                  }}
-                  onFocus={(e) => e.target.select()}
-                  className="w-full px-2 py-1 text-base border rounded text-center"
-                />
-                {/* Profit/Loss indicator */}
-                {session && session.buyIn && (
-                  <div className="text-xs text-center mt-1">
-                    {(() => {
-                      const profitLoss = stack - session.buyIn;
-                      const isProfit = profitLoss > 0;
-                      const isLoss = profitLoss < 0;
-                      return (
-                        <span className={
-                          isProfit ? 'text-green-600 font-medium' :
-                          isLoss ? 'text-red-600 font-medium' :
-                          'text-gray-500'
-                        }>
-                          {isProfit ? '+' : ''}{profitLoss}
-                        </span>
-                      );
-                    })()}
-                  </div>
-                )}
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1 text-center">SB</label>
-                <input
-                  type="number"
-                  value={smallBlind}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value === '') {
-                      setSmallBlind(0);
-                    } else {
-                      const numValue = parseInt(value, 10);
-                      if (!isNaN(numValue) && numValue >= 0) {
-                        setSmallBlind(numValue);
-                      }
-                    }
-                  }}
-                  onFocus={(e) => e.target.select()}
-                  className="w-full px-2 py-1 text-base border rounded text-center"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1 text-center">BB</label>
-                <input
-                  type="number"
-                  value={bigBlind}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value === '') {
-                      setBigBlind(0);
-                    } else {
-                      const numValue = parseInt(value, 10);
-                      if (!isNaN(numValue) && numValue >= 0) {
-                        setBigBlind(numValue);
-                      }
-                    }
-                  }}
-                  onFocus={(e) => e.target.select()}
-                  className="w-full px-2 py-1 text-base border rounded text-center"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1 text-center">Ante</label>
-                <input
-                  type="number"
-                  value={ante}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value === '') {
-                      setAnte(0);
-                    } else {
-                      const numValue = parseInt(value, 10);
-                      if (!isNaN(numValue) && numValue >= 0) {
-                        setAnte(numValue);
-                      }
-                    }
-                  }}
-                  onFocus={(e) => e.target.select()}
-                  className="w-full px-2 py-1 text-base border rounded text-center"
-                />
-              </div>
-            </div>
-          </div>
+        {/* Hand Settings Panel */}
+        {currentHand && !showSeatSelection && session && (
+          <HandSettingsPanel
+            session={session}
+            stack={stack}
+            smallBlind={smallBlind}
+            bigBlind={bigBlind}
+            ante={ante}
+            onStackChange={setStack}
+            onSmallBlindChange={setSmallBlind}
+            onBigBlindChange={setBigBlind}
+            onAnteChange={setAnte}
+          />
         )}
 
         {/* Table Display */}

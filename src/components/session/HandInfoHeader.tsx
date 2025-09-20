@@ -1,10 +1,12 @@
 'use client';
 
 import { MousePointer2 } from 'lucide-react';
-import { CurrentHand, Position } from '@/types/poker-v2';
+import { CurrentHand, Position, SessionMetadata } from '@/types/poker-v2';
+import { getPreflopActionSequence, getPostflopActionSequence } from '@/utils/poker-logic';
 
 interface HandInfoHeaderProps {
   currentHand: CurrentHand;
+  session: SessionMetadata | null;
   userSeat?: Position;
   selectedPosition?: Position | null;
   showPositionActions: boolean;
@@ -13,6 +15,7 @@ interface HandInfoHeaderProps {
 
 export function HandInfoHeader({
   currentHand,
+  session,
   userSeat,
   selectedPosition,
   showPositionActions,
@@ -36,9 +39,53 @@ export function HandInfoHeader({
                     <span>Tap any seat to record action</span>
                   </div>
                   {selectedPosition && selectedPosition !== userSeat && currentHand.nextToAct && !showPositionActions && !showCardSelector && (
-                    <div className="text-amber-600">
-                      {selectedPosition} selected
-                    </div>
+                    (() => {
+                      const currentRound = currentHand.bettingRounds[currentHand.currentBettingRound as 'preflop' | 'flop' | 'turn' | 'river'];
+                      const hasBet = currentRound?.currentBet && currentRound.currentBet > 0;
+                      const autoAction = hasBet ? 'fold' : 'check';
+
+                      // Get positions between nextToAct and selectedPosition
+                      const fullActionSequence = currentHand.currentBettingRound === 'preflop'
+                        ? getPreflopActionSequence(session?.tableSeats || 9)
+                        : getPostflopActionSequence(session?.tableSeats || 9);
+
+                      const activePlayers = currentHand.playerStates.filter(p => p.status === 'active');
+                      const activePositions = activePlayers.map(p => p.position);
+                      const actionSequence = fullActionSequence.filter(pos => activePositions.includes(pos));
+
+                      const nextIndex = actionSequence.indexOf(currentHand.nextToAct);
+                      const selectedIndex = actionSequence.indexOf(selectedPosition);
+
+                      let skippedCount = 0;
+                      if (nextIndex !== -1 && selectedIndex !== -1 && selectedIndex !== nextIndex) {
+                        if (selectedIndex > nextIndex) {
+                          skippedCount = selectedIndex - nextIndex - 1;
+                        } else {
+                          // Wraps around
+                          skippedCount = (actionSequence.length - nextIndex - 1) + selectedIndex;
+                        }
+                      }
+
+                      if (skippedCount > 0) {
+                        // Get the actual positions that will be skipped
+                        const skippedPositions: Position[] = [];
+                        let currentIdx = (nextIndex + 1) % actionSequence.length;
+                        while (currentIdx !== selectedIndex) {
+                          skippedPositions.push(actionSequence[currentIdx]);
+                          currentIdx = (currentIdx + 1) % actionSequence.length;
+                        }
+
+                        return (
+                          <div className="text-amber-600 text-xs">
+                            {skippedPositions.length === 1
+                              ? `${skippedPositions[0]} will auto-${autoAction}`
+                              : `${skippedPositions.join(', ')} will auto-${autoAction}`
+                            }
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()
                   )}
                 </div>
               )}

@@ -2,5 +2,5 @@ export { HeroCards } from './HeroCards';
 export { SessionHeader } from './SessionHeader';
 export { HandInfoHeader } from './HandInfoHeader';
 export { HandSettingsPanel } from './HandSettingsPanel';
-export { ActionButtons } from './ActionButtons';
+export { ActionButtonsSection } from './ActionButtonsSection';
 export { NextToAct } from './NextToAct';

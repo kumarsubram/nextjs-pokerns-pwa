@@ -21,7 +21,8 @@ import {
   SessionHeader,
   HandInfoHeader,
   HandSettingsPanel,
-  NextToAct
+  NextToAct,
+  ActionButtonsSection
 } from '@/components/session';
 import { useHandFlow } from '@/hooks/useHandFlow';
 import { useBettingLogic } from '@/hooks/useBettingLogic';
@@ -774,210 +775,34 @@ export default function SessionPage() {
           </div>
         )}
 
-        {/* Action Buttons */}
+        {/* Action Buttons Section */}
         {currentHand && !showCommunitySelector && !showPositionActions &&
-         !(showCardSelector && selectedPosition && selectedPosition !== session?.userSeat) &&
-         !needsCommunityCards && (
-          <div className="bg-white rounded-lg p-4 shadow-sm mb-4">
-            {isBettingComplete ? (
-              // Show advance button when betting round is complete
-              (() => {
-                const needsCommunityCards =
-                  (currentHand.currentBettingRound === 'preflop' && (!currentHand.communityCards.flop || currentHand.communityCards.flop.length < 3 || currentHand.communityCards.flop.some(card => !card))) ||
-                  (currentHand.currentBettingRound === 'flop' && !currentHand.communityCards.turn) ||
-                  (currentHand.currentBettingRound === 'turn' && !currentHand.communityCards.river);
-
-
-                return (
-                  <div className="text-center">
-                    <h3 className="text-md font-semibold mb-3">
-                      {getAdvanceRoundMessage()}
-                    </h3>
-                    <Button
-                      className="bg-green-600 hover:bg-green-700 text-white px-6 py-2"
-                      onClick={handleAdvanceToNextRound}
-                      disabled={needsCommunityCards}
-                    >
-                      {getAdvanceRoundButtonText()}
-                    </Button>
-                  </div>
-                );
-              })()
-            ) : (
-              // Show betting actions when hero can act
-              (() => {
-                // Check if hero has already acted in current round
-                const currentRound = currentHand.currentBettingRound === 'showdown'
-                  ? null
-                  : currentHand.bettingRounds[currentHand.currentBettingRound];
-                const heroHasActed = currentRound?.actions.some((action) => action.position === session.userSeat);
-                const isHerosTurn = currentHand.nextToAct === session.userSeat;
-
-                // Show actions if:
-                // 1. It's hero's turn OR
-                // 2. Hero hasn't acted yet (so they can act when it becomes their turn)
-                const shouldShowActions = isHerosTurn || !heroHasActed;
-
-                return shouldShowActions ? (
-                  <>
-                    <div className="mb-3 text-center">
-                      <h3 className="text-md font-semibold">
-                        {showPositionActions && selectedPosition
-                          ? `${selectedPosition} Actions`
-                          : <span className="text-blue-600">{`Hero Actions (${session.userSeat})`}</span>}
-                      </h3>
-                      {(() => {
-                        // Show auto-fold/check hint for any selected position
-                        const targetPosition = showPositionActions && selectedPosition ? selectedPosition : session.userSeat;
-                        if (!targetPosition || !currentHand?.nextToAct) return null;
-
-                        const currentRound = currentHand.bettingRounds[currentHand.currentBettingRound as 'preflop' | 'flop' | 'turn' | 'river'];
-                        const hasBet = currentRound?.currentBet && currentRound.currentBet > 0;
-                        const autoAction = hasBet ? 'fold' : 'check';
-
-                        // Get positions between nextToAct and targetPosition
-                        const fullActionSequence = currentHand.currentBettingRound === 'preflop'
-                          ? getPreflopActionSequence(session.tableSeats || 9)
-                          : getPostflopActionSequence(session.tableSeats || 9);
-                        const activePlayers = currentHand.playerStates.filter(p => p.status === 'active');
-                        const activePositions = activePlayers.map(p => p.position);
-                        const actionSequence = fullActionSequence.filter(pos => activePositions.includes(pos));
-
-                        const nextIndex = actionSequence.indexOf(currentHand.nextToAct);
-                        const targetIndex = actionSequence.indexOf(targetPosition);
-
-                        if (nextIndex === -1 || targetIndex === -1 || nextIndex === targetIndex) return null;
-
-                        // Get the actual positions that will be skipped
-                        const skippedPositions: Position[] = [];
-
-                        if (targetIndex > nextIndex) {
-                          // Forward direction - include nextToAct position
-                          for (let i = nextIndex; i < targetIndex; i++) {
-                            skippedPositions.push(actionSequence[i]);
-                          }
-                        } else {
-                          // Wraps around - include nextToAct position
-                          for (let i = nextIndex; i < actionSequence.length; i++) {
-                            skippedPositions.push(actionSequence[i]);
-                          }
-                          for (let i = 0; i < targetIndex; i++) {
-                            skippedPositions.push(actionSequence[i]);
-                          }
-                        }
-
-                        if (skippedPositions.length === 0) return null;
-
-                        return (
-                          <div className="text-amber-600 text-xs mt-1">
-                            {skippedPositions.length === 1
-                              ? `${skippedPositions[0]} will auto-${autoAction}`
-                              : `${skippedPositions.join(', ')} will auto-${autoAction}`
-                            }
-                          </div>
-                        );
-                      })()}
-                    </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {/* Left Column: Fold + All-In */}
-                  <Button
-                    className="bg-red-600 hover:bg-red-700 text-white"
-                    onClick={() => {
-                      const targetPosition = showPositionActions && selectedPosition ? selectedPosition : session.userSeat;
-                      if (targetPosition === session.userSeat) {
-                        setFoldPosition(session.userSeat || null);
-                        setShowFoldConfirmation(true);
-                      } else if (targetPosition) {
-                        handleBettingAction(targetPosition, 'fold');
-                      }
-                      setShowPositionActions(false);
-                      setSelectedPosition(null);
-                    }}
-                  >
-                    Fold
-                  </Button>
-
-                  {(() => {
-                    const targetPosition = showPositionActions && selectedPosition ? selectedPosition : session.userSeat;
-                    const callAmount = targetPosition ? getCallAmount(targetPosition) : 0;
-                    const canCheckHere = targetPosition && canCheck(targetPosition);
-
-                    if (canCheckHere) {
-                      return (
-                        <Button
-                          className="bg-orange-600 hover:bg-orange-700 text-white"
-                          onClick={() => {
-                            if (targetPosition) handleBettingAction(targetPosition, 'check');
-                            setShowPositionActions(false);
-                            setSelectedPosition(null);
-                          }}
-                        >
-                          Check
-                        </Button>
-                      );
-                    } else if (callAmount > 0) {
-                      return (
-                        <Button
-                          className="bg-blue-600 hover:bg-blue-700 text-white"
-                          onClick={() => {
-                            if (targetPosition) {
-                              handleBettingAction(targetPosition, 'call', currentBettingRound?.currentBet);
-                            }
-                            setShowPositionActions(false);
-                            setSelectedPosition(null);
-                          }}
-                        >
-                          {selectedPosition && isCallAllIn(selectedPosition) ? `Call All-In ${callAmount}` : `Call ${callAmount}`}
-                        </Button>
-                      );
-                    } else {
-                      return (
-                        <Button
-                          className="bg-gray-400 text-white cursor-not-allowed"
-                          disabled
-                        >
-                          No Action
-                        </Button>
-                      );
-                    }
-                  })()}
-
-                  <Button
-                    className="bg-purple-600 hover:bg-purple-700 text-white"
-                    onClick={() => {
-                      setAmountModalAction('all-in');
-                      setAmountModalPosition((showPositionActions && selectedPosition) ? selectedPosition : (session.userSeat || null));
-                      setAmountModalValue(stack);
-                      setShowAmountModal(true);
-                      setShowPositionActions(false);
-                    }}
-                  >
-                    All-In
-                  </Button>
-
-                  {/* Right Column: Call/Check + Raise */}
-                  <Button
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                    onClick={() => {
-                      setAmountModalAction('raise');
-                      setAmountModalPosition((showPositionActions && selectedPosition) ? selectedPosition : (session.userSeat || null));
-                      setAmountModalValue((currentBettingRound?.currentBet || 0) * 2);
-                      setShowAmountModal(true);
-                      setShowPositionActions(false);
-                    }}
-                  >
-                    Raise
-                  </Button>
-                </div>
-                  </>
-                ) : (
-                  <div className="text-center py-4">
-                    <p className="text-gray-600">Waiting for other players to act...</p>
-                  </div>
-                );
-              })()
-            )}
-          </div>
+         !(showCardSelector && selectedPosition && selectedPosition !== session?.userSeat) && (
+          <ActionButtonsSection
+            currentHand={currentHand}
+            session={session}
+            stack={stack}
+            isBettingComplete={isBettingComplete}
+            showPositionActions={showPositionActions}
+            selectedPosition={selectedPosition}
+            setSelectedPosition={setSelectedPosition}
+            setShowPositionActions={setShowPositionActions}
+            setFoldPosition={setFoldPosition}
+            setShowFoldConfirmation={setShowFoldConfirmation}
+            setAmountModalAction={setAmountModalAction}
+            setAmountModalPosition={setAmountModalPosition}
+            setAmountModalValue={setAmountModalValue}
+            setShowAmountModal={setShowAmountModal}
+            needsCommunityCards={needsCommunityCards}
+            getAdvanceRoundMessage={getAdvanceRoundMessage}
+            getAdvanceRoundButtonText={getAdvanceRoundButtonText}
+            handleAdvanceToNextRound={handleAdvanceToNextRound}
+            handleBettingAction={handleBettingAction}
+            getCurrentBettingRound={getCurrentBettingRound}
+            getCallAmount={getCallAmount}
+            canCheck={canCheck}
+            isCallAllIn={isCallAllIn}
+          />
         )}
 
         <AmountModal

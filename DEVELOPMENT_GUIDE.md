@@ -3,7 +3,54 @@
 ## Project Overview
 A Progressive Web App for tracking poker sessions, hands, and statistics. Built with Next.js 15, TypeScript, and Tailwind CSS.
 
-## RECENT UPDATES (v2.8) ✅
+## RECENT UPDATES (v2.9) ✅
+
+### Session Page Refactoring Phase 1: Hand Flow Logic Extraction - COMPLETED
+✅ **Hand Flow Logic Modularization**
+- Successfully extracted hand flow management into dedicated `useHandFlow` hook
+- Reduced session page complexity by ~200 lines of business logic
+- Created `/src/hooks/useHandFlow.ts` for centralized hand flow management
+- Moved 3 critical functions from session page to reusable hook:
+  - `startNewHandWithPosition` - Creates new hands with proper poker logic
+  - `startNewHand` - Wrapper for starting hands with current session seat
+  - `completeHand` - Handles hand completion, validation, and state cleanup
+- Extracted validation and calculation utilities:
+  - `validateHandRequirements` - Validates stack, blinds, and hero cards
+  - `calculateEffectivePotWinnings` - Handles pot distribution logic
+
+✅ **Architecture Improvements**
+- **Clean Separation**: Hand flow logic isolated from UI rendering logic
+- **Type Safety**: Full TypeScript integration with proper interfaces
+- **State Management**: Hook properly manages state setters and dependencies
+- **Error Handling**: Preserved validation error dialogs and user feedback
+- **No Breaking Changes**: All existing functionality preserved
+- **Build Success**: Zero compilation errors or runtime issues
+
+✅ **Benefits Achieved**
+- **Maintainability**: Hand flow logic now testable in isolation
+- **Reusability**: Hook can be used across different components
+- **Clarity**: Session page focused on UI, hook focused on business logic
+- **Foundation**: Established pattern for future refactoring phases
+
+✅ **Technical Implementation**
+```typescript
+// New hook structure
+const { startNewHandWithPosition, startNewHand, completeHand } = useHandFlow({
+  session, currentHand, setCurrentHand, stack, setStack,
+  // ... all necessary state and setters
+});
+
+// Replaced ~200 lines of inline logic with clean hook calls
+startNewHand(); // Simple, reusable hand creation
+completeHand('won', potAmount); // Clean hand completion
+```
+
+✅ **Next Phase Preparation**
+- Established foundation for extracting betting action logic
+- Identified patterns for future state management improvements
+- Ready for Phase 2: Betting Action Management extraction
+
+## PREVIOUS UPDATES (v2.8) ✅
 
 ### Session Page Modularization & Hero Cards UI Enhancement - COMPLETED
 ✅ **Hero Cards Display Improvements**

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { SimplePokerTable } from '@/components/poker/SimplePokerTable';
@@ -23,10 +23,10 @@ import {
   HandSettingsPanel,
   NextToAct
 } from '@/components/session';
+import { useHandFlow } from '@/hooks/useHandFlow';
 import { SessionService } from '@/services/session.service';
 import { SessionMetadata, CurrentHand, Position, BettingAction, StoredHand } from '@/types/poker-v2';
 import {
-  initializePlayerStates,
   processBettingAction,
   advanceToNextRound,
   isBettingRoundComplete,
@@ -94,6 +94,43 @@ export default function SessionPage() {
   const [showSeatSelection, setShowSeatSelection] = useState(false);
   const [handCount, setHandCount] = useState(0);
   const [completedHands, setCompletedHands] = useState<StoredHand[]>([]);
+  // Dialog state declarations
+  const [showValidationError, setShowValidationError] = useState(false);
+  const [validationErrorMessage, setValidationErrorMessage] = useState('');
+  const [pendingHandCompletion, setPendingHandCompletion] = useState<{ outcome: 'won' | 'lost' | 'folded', potWon?: number } | null>(null);
+  const [showAllFoldedDialog, setShowAllFoldedDialog] = useState(false);
+
+  // Initialize hand flow hook
+  const { startNewHandWithPosition, startNewHand, completeHand } = useHandFlow({
+    session,
+    currentHand,
+    setCurrentHand,
+    stack,
+    setStack,
+    smallBlind,
+    bigBlind,
+    ante,
+    heroMoneyInvested,
+    setHeroMoneyInvested,
+    setSelectedCard1,
+    setSelectedCard2,
+    setOpponentCards,
+    setHandCount,
+    handCount,
+    setCompletedHands,
+    setSession,
+    setShowSeatSelection,
+    setShowAllFoldedDialog,
+    setShowOutcomeSelection,
+    setShowFoldConfirmation,
+    setShowValidationError,
+    setShowCommunitySelector,
+    setSelectingCommunityCard,
+    setAutoSelectingCommunityCards,
+    setValidationErrorMessage,
+    setPendingHandCompletion,
+    opponentCards
+  });
 
   // Simplified dialog classes - no complex mobile keyboard detection
   const getDialogClasses = (baseClasses: string) => {
@@ -213,78 +250,6 @@ export default function SessionPage() {
     }
   }, [stack, session]);
 
-  // Function to start new hand with explicit session data
-  const startNewHandWithPosition = useCallback((sessionData: SessionMetadata, userSeat: Position) => {
-
-    const handNumber = SessionService.getCurrentHandNumber();
-
-    // Initialize player states with proper blinds and poker logic
-    const playerStates = initializePlayerStates(
-      sessionData.tableSeats,
-      smallBlind,
-      bigBlind
-    );
-
-    // Calculate hero's initial investment (if on blinds)
-    let initialHeroInvestment = 0;
-    if (userSeat === 'SB') {
-      initialHeroInvestment = smallBlind;
-    } else if (userSeat === 'BB') {
-      initialHeroInvestment = bigBlind;
-    }
-
-    const newHand: CurrentHand = {
-      handNumber,
-      userCards: null,
-      communityCards: {
-        flop: null,
-        turn: null,
-        river: null
-      },
-      currentBettingRound: 'preflop',
-      bettingRounds: {
-        preflop: {
-          actions: [],
-          pot: smallBlind + bigBlind + (ante * sessionData.tableSeats), // Initial pot from blinds and antes
-          currentBet: bigBlind, // BB is current bet to match
-          isComplete: false
-        }
-      },
-      playerStates,
-      pot: smallBlind + bigBlind + (ante * sessionData.tableSeats),
-      smallBlind,
-      bigBlind,
-      nextToAct: 'UTG', // First to act preflop
-      canAdvanceToFlop: false,
-      canAdvanceToTurn: false,
-      canAdvanceToRiver: false
-    };
-
-    setCurrentHand(newHand);
-    setSelectedCard1(null);
-    setSelectedCard2(null);
-    setHeroMoneyInvested(initialHeroInvestment);
-
-    // Reset community selector states to prevent auto-trigger
-    setShowCommunitySelector(false);
-    setSelectingCommunityCard(null);
-    setAutoSelectingCommunityCards(false);
-
-    // Deduct blinds from hero's stack if on blind position
-    if (userSeat === 'SB') {
-      setStack(prev => prev - smallBlind);
-    } else if (userSeat === 'BB') {
-      setStack(prev => prev - bigBlind);
-    }
-  }, [smallBlind, bigBlind, ante]);
-
-  const startNewHand = useCallback(() => {
-    if (!session || !session.userSeat) {
-      return;
-    }
-
-    startNewHandWithPosition(session, session.userSeat);
-  }, [session, startNewHandWithPosition]);
 
 
   // Auto-start Hand 1 when session loads
@@ -676,143 +641,8 @@ export default function SessionPage() {
     setCurrentHand(updatedHand);
   };
 
-  // Add state for validation error dialog
-  const [showValidationError, setShowValidationError] = useState(false);
-  const [validationErrorMessage, setValidationErrorMessage] = useState('');
-  const [pendingHandCompletion, setPendingHandCompletion] = useState<{ outcome: 'won' | 'lost' | 'folded', potWon?: number } | null>(null);
-  const [showAllFoldedDialog, setShowAllFoldedDialog] = useState(false);
 
-  // Validate required values before hand completion
-  const validateHandRequirements = (): { isValid: boolean; error?: string } => {
-    if (stack <= 0) {
-      return { isValid: false, error: 'Stack must be greater than 0' };
-    }
-    if (smallBlind <= 0) {
-      return { isValid: false, error: 'Small Blind must be greater than 0' };
-    }
-    if (bigBlind <= 0) {
-      return { isValid: false, error: 'Big Blind must be greater than 0' };
-    }
-    if (bigBlind <= smallBlind) {
-      return { isValid: false, error: 'Big Blind must be greater than Small Blind' };
-    }
 
-    // Only require Hero cards if Hero invested money
-    if (heroMoneyInvested > 0) {
-      if (!currentHand?.userCards || !currentHand.userCards[0] || !currentHand.userCards[1]) {
-        return { isValid: false, error: 'Please select your hole cards before completing the hand since you invested money.' };
-      }
-    }
-
-    return { isValid: true };
-  };
-
-  // Complete the current hand
-
-  // Calculate effective pot winnings - simplified to return actual pot for now
-  // Side pot logic is complex and should only apply in all-in scenarios
-  const calculateEffectivePotWinnings = (outcome: 'won' | 'lost' | 'folded', potWon?: number) => {
-    if (outcome !== 'won' || !currentHand || !potWon) {
-      return 0;
-    }
-
-    // For now, return the full pot won amount
-    // Side pot logic should only apply in complex all-in scenarios
-    // When everyone folds to hero, hero wins the entire pot regardless of investment
-    return potWon;
-  };
-
-  const completeHand = (outcome: 'won' | 'lost' | 'folded', potWon?: number) => {
-    if (!currentHand || !session) return;
-
-    // Validate requirements before completing hand
-    const validation = validateHandRequirements();
-    if (!validation.isValid) {
-      setValidationErrorMessage(validation.error || 'Validation error');
-      setShowValidationError(true);
-      // Store pending completion to retry after cards are selected
-      setPendingHandCompletion({ outcome, potWon });
-      return;
-    }
-
-    // Calculate effective winnings based on side pot logic
-    const effectivePotWon = calculateEffectivePotWinnings(outcome, potWon);
-
-    // Save hand to storage
-    const handData: StoredHand = {
-      handNumber: currentHand.handNumber,
-      timestamp: new Date().toISOString(),
-      userSeat: session.userSeat!,
-      userCards: currentHand.userCards,
-      communityCards: currentHand.communityCards,
-      bettingRounds: currentHand.bettingRounds,
-      result: {
-        winner: outcome === 'won' ? session.userSeat : undefined,
-        potWon: outcome === 'won' ? (effectivePotWon - heroMoneyInvested) : (outcome === 'lost' ? heroMoneyInvested : undefined),
-        stackAfter: stack + (outcome === 'won' ? effectivePotWon : 0) - heroMoneyInvested,
-        handOutcome: outcome,
-        opponentCards: Object.keys(opponentCards).length > 0 ? opponentCards : undefined
-      }
-    };
-
-    SessionService.saveHandToSession(handData);
-
-    // Clear current hand from storage since it's completed
-    SessionService.clearCurrentHand(session.sessionId);
-
-    // Update stack to the calculated stackAfter value
-    const stackBefore = stack;
-    const winnings = outcome === 'won' ? effectivePotWon : 0;
-    const newStackAmount = stackBefore + winnings - heroMoneyInvested;
-
-    console.log('Stack update:', {
-      stackBefore,
-      outcome,
-      winnings,
-      heroMoneyInvested,
-      newStackAmount,
-      calculation: `${stackBefore} + ${winnings} - ${heroMoneyInvested} = ${newStackAmount}`
-    });
-
-    setStack(newStackAmount);
-
-    // Immediately update session metadata with new stack
-    const updatedSession = { ...session, currentStack: newStackAmount };
-    SessionService.updateSessionMetadata(updatedSession);
-    setSession(updatedSession);
-
-    // Reset and prepare for next hand
-    const newHandCount = handCount + 1;
-    setHandCount(newHandCount);
-
-    // Load completed hands for history
-    const hands = SessionService.getSessionHands(session.sessionId);
-    setCompletedHands(hands);
-
-    // Reset hero money invested for next hand
-    setHeroMoneyInvested(0);
-
-    // Reset other states
-    setSelectedCard1(null);
-    setSelectedCard2(null);
-    setOpponentCards({} as Record<Position, [string, string] | null>);
-
-    // Close any open dialogs and reset selectors
-    setShowAllFoldedDialog(false);
-    setShowOutcomeSelection(false);
-    setShowFoldConfirmation(false);
-    setShowValidationError(false);
-    setShowCommunitySelector(false);
-    setSelectingCommunityCard(null);
-    setAutoSelectingCommunityCards(false);
-
-    // Reset current hand first, then show seat selection for every hand
-    setCurrentHand(null);
-    setShowSeatSelection(true);
-
-    // Scroll to top when showing seat selection
-    window.scrollTo(0, 0);
-  };
 
   // Handle confirmed auto-action
   const handleConfirmedAutoAction = () => {

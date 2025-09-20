@@ -26,6 +26,7 @@ import {
 import { useHandFlow } from '@/hooks/useHandFlow';
 import { useBettingLogic } from '@/hooks/useBettingLogic';
 import { useCommunityCards } from '@/hooks/useCommunityCards';
+import { useHeroCards } from '@/hooks/useHeroCards';
 import { SessionService } from '@/services/session.service';
 import { SessionMetadata, CurrentHand, Position, StoredHand } from '@/types/poker-v2';
 import {
@@ -183,6 +184,35 @@ export default function SessionPage() {
     setSelectingCommunityCard,
     autoSelectingCommunityCards,
     setAutoSelectingCommunityCards
+  });
+
+  // Initialize hero cards hook
+  const {
+    handleInlineCardSelect,
+    handleUserCardSelect,
+    getCardSelectorTitle,
+    getAllSelectedCards,
+    openHeroCardSelector
+  } = useHeroCards({
+    session,
+    currentHand,
+    setCurrentHand,
+    selectedCard1,
+    setSelectedCard1,
+    selectedCard2,
+    setSelectedCard2,
+    setShowCardSelector,
+    selectingCard,
+    setSelectingCard,
+    inlineCardSelection,
+    setInlineCardSelection,
+    opponentCards,
+    setOpponentCards,
+    selectedPosition,
+    setSelectedPosition,
+    showAllFoldedDialog,
+    pendingHandCompletion,
+    setShowAllFoldedDialog
   });
 
   // Simplified dialog classes - no complex mobile keyboard detection
@@ -351,101 +381,6 @@ export default function SessionPage() {
   }, [ante, currentHand, session, smallBlind, bigBlind]);
 
   // Inline card selection handler
-  const handleInlineCardSelect = (card: string) => {
-    const { position, cardIndex } = inlineCardSelection;
-
-    // Check if we're selecting opponent cards
-    if (position && position !== session?.userSeat) {
-      // Opponent card selection
-      const currentOpponentCards = opponentCards[position] || [null, null];
-      const newOpponentCards = [...currentOpponentCards] as [string | null, string | null];
-      newOpponentCards[cardIndex - 1] = card;
-
-      setOpponentCards(prev => ({
-        ...prev,
-        [position]: newOpponentCards as [string, string] | null
-      }));
-
-      setInlineCardSelection({ show: false, position: null, cardIndex: 1, title: '' });
-      return;
-    }
-
-    // Hero card selection
-    if (cardIndex === 1) {
-      setSelectedCard1(card);
-      // Update current hand immediately for card 1
-      if (currentHand) {
-        setCurrentHand({
-          ...currentHand,
-          userCards: [card, selectedCard2] as [string, string] | null
-        });
-      }
-    } else {
-      setSelectedCard2(card);
-      // Update current hand with both cards
-      if (currentHand) {
-        setCurrentHand({
-          ...currentHand,
-          userCards: [selectedCard1!, card] as [string, string]
-        });
-      }
-    }
-
-    setInlineCardSelection({ show: false, position: null, cardIndex: 1, title: '' });
-  };
-
-  const handleUserCardSelect = (card: string) => {
-    // Check if we're selecting opponent cards
-    if (selectedPosition && selectedPosition !== session?.userSeat) {
-      // Opponent card selection
-      const currentOpponentCards = opponentCards[selectedPosition] || [null, null];
-      const newOpponentCards = [...currentOpponentCards] as [string | null, string | null];
-      newOpponentCards[selectingCard - 1] = card;
-
-      setOpponentCards(prev => ({
-        ...prev,
-        [selectedPosition]: newOpponentCards as [string, string] | null
-      }));
-
-      setShowCardSelector(false);
-      setSelectedPosition(null);
-      return;
-    }
-
-    // Hero card selection
-    if (selectingCard === 1) {
-      setSelectedCard1(card);
-      // Update current hand immediately for card 1
-      if (currentHand) {
-        setCurrentHand({
-          ...currentHand,
-          userCards: [card, selectedCard2] as [string, string] | null
-        });
-      }
-    } else {
-      setSelectedCard2(card);
-      // Update current hand with both cards
-      if (currentHand) {
-        setCurrentHand({
-          ...currentHand,
-          userCards: [selectedCard1!, card] as [string, string]
-        });
-      }
-
-      // If we came from the All Folded dialog, return to it
-      if (showAllFoldedDialog || pendingHandCompletion) {
-        setShowCardSelector(false);
-        // Return to the All Folded dialog to show the selected cards
-        if (!showAllFoldedDialog) {
-          setShowAllFoldedDialog(true);
-        }
-        return;
-      }
-    }
-
-    // Reset states
-    setShowCardSelector(false);
-  };
 
 
 
@@ -657,8 +592,7 @@ export default function SessionPage() {
                 currentHand={currentHand}
                 userSeat={session?.userSeat}
                 onCardClick={(cardIndex) => {
-                  setSelectingCard(cardIndex);
-                  setShowCardSelector(true);
+                  openHeroCardSelector(cardIndex);
                 }}
               />
             </div>
@@ -674,17 +608,8 @@ export default function SessionPage() {
         {/* User Card Selector */}
         {showCardSelector && (
           <CardSelector
-            title={selectedPosition && selectedPosition !== session?.userSeat
-              ? `Select ${selectedPosition} Card ${selectingCard}`
-              : `Select Card ${selectingCard}`}
-            selectedCards={[
-              selectedCard1,
-              selectedCard2,
-              ...(currentHand?.communityCards.flop || []),
-              currentHand?.communityCards.turn,
-              currentHand?.communityCards.river,
-              ...Object.values(opponentCards).flat()
-            ].filter(Boolean) as string[]}
+            title={getCardSelectorTitle()}
+            selectedCards={getAllSelectedCards()}
             onCardSelect={handleUserCardSelect}
             onCancel={() => {
               setShowCardSelector(false);
@@ -1184,7 +1109,7 @@ export default function SessionPage() {
           open={showValidationError}
           onOpenChange={setShowValidationError}
           message={validationErrorMessage}
-          onSelectCards={() => setShowCardSelector(true)}
+          onSelectCards={() => openHeroCardSelector(1)}
           getDialogClasses={getDialogClasses}
         />
 

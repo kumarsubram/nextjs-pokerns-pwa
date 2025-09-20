@@ -46,7 +46,7 @@ export function AmountModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={getDialogClasses("sm:max-w-[425px] max-w-[90vw] w-full")}>
+      <DialogContent className={getDialogClasses("sm:max-w-[425px] max-w-[90vw] w-full max-sm:translate-y-[-69%]")}>
         <DialogHeader>
           <DialogTitle className="text-lg">
             {position} - {isRaise ? 'Raise Amount' : 'All-In'}

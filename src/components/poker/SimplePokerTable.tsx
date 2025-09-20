@@ -11,9 +11,6 @@ interface SimplePokerTableProps {
   highlightedPositions?: Position[];
   className?: string;
   showBlinkingSeats?: boolean;
-  userCards?: [string, string] | null;
-  onCardClick?: (cardIndex: 1 | 2) => void;
-  showCardButtons?: boolean;
   communityCards?: {
     flop: [string, string, string] | null;
     turn: string | null;
@@ -46,9 +43,6 @@ export function SimplePokerTable({
   highlightedPositions = [],
   className,
   showBlinkingSeats = false,
-  userCards = null,
-  onCardClick,
-  showCardButtons = false,
   communityCards,
   onCommunityCardClick,
   showCommunityCards = false,
@@ -290,65 +284,6 @@ export function SimplePokerTable({
         );
       })}
 
-      {/* User Cards - Position adjusted based on seat */}
-      {showCardButtons && userSeat && userSeat !== 'DEALER' && (
-        (() => {
-          const userIndex = positions.findIndex(pos => pos === userSeat);
-          if (userIndex === -1) return null;
-          const { x, y } = getSeatPosition(userIndex);
-          const xPercent = parseInt(x as string);
-
-          // Determine if seat is on left or right side
-          // Left side seats have x < 30%, right side seats have x > 70%
-          const isLeftSide = xPercent < 30;
-          const isRightSide = xPercent > 70;
-
-          // Only apply offset for side seats on mobile
-          // Top and bottom seats remain unchanged
-
-          return (
-            <div
-              className="absolute -translate-x-1/2"
-              style={{
-                left: x,
-                top: `${parseInt(y as string) - 15}%`
-              }}
-            >
-              {/* Apply mobile-specific positioning with media query classes */}
-              <div className={cn(
-                "flex gap-1",
-                isLeftSide && "sm:translate-x-0 translate-x-2",
-                isRightSide && "sm:translate-x-0 -translate-x-2"
-              )}>
-                {/* Card 1 */}
-                <button
-                  onClick={() => onCardClick?.(1)}
-                  className={cn(
-                    "w-8 h-12 rounded border-2 text-xs font-bold flex items-center justify-center",
-                    userCards?.[0]
-                      ? `bg-white border-gray-800 ${getCardColor(userCards[0])}`
-                      : "bg-gray-200 border-gray-400 text-gray-600 hover:bg-gray-300"
-                  )}
-                >
-                  {userCards?.[0] || "?"}
-                </button>
-                {/* Card 2 */}
-                <button
-                  onClick={() => onCardClick?.(2)}
-                  className={cn(
-                    "w-8 h-12 rounded border-2 text-xs font-bold flex items-center justify-center",
-                    userCards?.[1]
-                      ? `bg-white border-gray-800 ${getCardColor(userCards[1])}`
-                      : "bg-gray-200 border-gray-400 text-gray-600 hover:bg-gray-300"
-                  )}
-                >
-                  {userCards?.[1] || "?"}
-                </button>
-              </div>
-            </div>
-          );
-        })()
-      )}
     </div>
   );
 }

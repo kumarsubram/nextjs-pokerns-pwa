@@ -3,7 +3,45 @@
 ## Project Overview
 A Progressive Web App for tracking poker sessions, hands, and statistics. Built with Next.js 15, TypeScript, and Tailwind CSS.
 
-## RECENT UPDATES (v2.7) ✅
+## RECENT UPDATES (v2.8) ✅
+
+### Session Page Modularization & Hero Cards UI Enhancement - COMPLETED
+✅ **Hero Cards Display Improvements**
+- Moved hero card selection from SimplePokerTable component to dedicated section
+- Created larger, more prominent card buttons (16x24 size) for better mobile UX
+- Positioned hero cards section below poker table and above action buttons
+- Clear visual hierarchy with "Your Cards" header and centered layout
+- Proper color coding for suits (red for hearts/diamonds, black for clubs/spades)
+- Hover effects and smooth transitions for better interaction feedback
+
+✅ **Session Page Component Modularization**
+- Extracted session page functionality into 5 reusable components
+- Reduced main session page file by ~300+ lines of code
+- Created `/src/components/session/` folder for session-specific components
+- Each component has proper TypeScript interfaces and focused responsibility
+- Centralized exports via index.ts for clean imports
+
+✅ **New Session Components Created**
+- **HeroCards**: Displays hero's card selection with improved UX
+- **SessionHeader**: Top navigation bar with session name and end session button
+- **HandInfoHeader**: Shows current hand number, betting round, and turn indicators
+- **HandSettingsPanel**: Controls for stack, blinds, and ante with profit/loss display
+- **ActionButtons**: Comprehensive betting action interface with contextual buttons
+
+✅ **SimplePokerTable Component Cleanup**
+- Removed hero card display logic from table component
+- Eliminated unnecessary props (userCards, onCardClick, showCardButtons)
+- Component now focused solely on table visualization and seat interactions
+- Cleaner separation of concerns between table display and card management
+
+✅ **Code Organization Benefits**
+- Better maintainability with single-responsibility components
+- Easier testing with isolated component logic
+- Improved reusability across different parts of the application
+- Enhanced readability of main session page
+- Type-safe interfaces for all component props
+
+## PREVIOUS UPDATES (v2.7) ✅
 
 ### HandHistory Hero Position Fix - COMPLETED
 ✅ **Fixed Action Logging Display Bug**
@@ -760,10 +798,10 @@ if (position === session.userSeat && amount) {
 src/
 ├── app/
 │   ├── create-session/page.tsx    # Session creation (uses SeatSelector)
-│   ├── session/[id]/page.tsx      # Main game screen
+│   ├── session/[id]/page.tsx      # Main game screen (modularized)
 │   └── layout.tsx                 # Root layout
 ├── components/
-│   ├── dialog/                    # ✅ NEW: Modular dialog components
+│   ├── dialog/                    # Modular dialog components
 │   │   ├── AllFoldedDialog.tsx    # Hand won - all opponents folded
 │   │   ├── ShowdownDialog.tsx     # Showdown outcome selection
 │   │   ├── AmountModal.tsx        # Raise/all-in amount input
@@ -772,11 +810,18 @@ src/
 │   │   ├── AutoActionConfirmDialog.tsx # Auto-fold confirmation
 │   │   ├── ValidationErrorDialog.tsx # Validation errors
 │   │   └── index.ts               # Centralized exports
+│   ├── session/                   # ✅ NEW: Session page components
+│   │   ├── HeroCards.tsx         # Hero card selection display
+│   │   ├── SessionHeader.tsx     # Session navigation header
+│   │   ├── HandInfoHeader.tsx    # Hand information display
+│   │   ├── HandSettingsPanel.tsx # Stack/blinds controls
+│   │   ├── ActionButtons.tsx     # Betting action interface
+│   │   └── index.ts              # Centralized exports
 │   └── poker/
-│       ├── SimplePokerTable.tsx   # Fixed position table
+│       ├── SimplePokerTable.tsx   # Fixed position table (cleaned up)
 │       ├── SeatSelector.tsx       # Reusable seat selection
 │       ├── CardSelector.tsx       # Card selection modal
-│       └── HandTracker.tsx        # Hand history display
+│       └── HandHistory.tsx        # Hand history display
 ├── services/
 │   └── session.service.ts         # Session data management
 ├── types/

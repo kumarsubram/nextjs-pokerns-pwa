@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, MousePointer2 } from 'lucide-react';
+import { MousePointer2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SimplePokerTable } from '@/components/poker/SimplePokerTable';
 import { CardSelector } from '@/components/poker/CardSelector';
@@ -17,6 +17,11 @@ import {
   AutoActionConfirmDialog,
   ValidationErrorDialog
 } from '@/components/dialog';
+import {
+  HeroCards,
+  SessionHeader,
+  NextToAct
+} from '@/components/session';
 import { SessionService } from '@/services/session.service';
 import { SessionMetadata, CurrentHand, Position, BettingAction, StoredHand } from '@/types/poker-v2';
 import {
@@ -1304,29 +1309,11 @@ export default function SessionPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b px-3 py-2">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push('/')}
-              className="p-1 flex-shrink-0"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <h1 className="text-base font-semibold truncate">{session.sessionName}</h1>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={endSession}
-            className="text-red-600 text-sm px-3 py-1.5 flex-shrink-0 font-medium"
-          >
-            End Session
-          </Button>
-        </div>
-      </div>
+      <SessionHeader
+        session={session}
+        onBack={() => router.push('/')}
+        onEndSession={endSession}
+      />
 
       {/* Main Content */}
       <div className="p-2 max-w-lg mx-auto">
@@ -1545,11 +1532,6 @@ export default function SessionPage() {
             <SimplePokerTable
             seats={session.tableSeats}
             userSeat={session.userSeat}
-            userCards={currentHand?.userCards || null}
-            onCardClick={(cardIndex) => {
-              setSelectingCard(cardIndex);
-              setShowCardSelector(true);
-            }}
             onSeatClick={(position) => {
               if (position !== 'DEALER') {
                 // Check if user is trying to act after hero when hero hasn't acted yet
@@ -1582,11 +1564,16 @@ export default function SessionPage() {
                   }
                 }
 
-                setSelectedPosition(position);
-                setShowPositionActions(true);
+                if (position === session?.userSeat) {
+                  // Clear states when clicking hero's seat to show default "Hero Actions" display
+                  setSelectedPosition(null);
+                  setShowPositionActions(false);
+                } else {
+                  setSelectedPosition(position);
+                  setShowPositionActions(true);
+                }
               }
             }}
-            showCardButtons={!!currentHand}
             communityCards={currentHand?.communityCards}
             onCommunityCardClick={handleCommunityCardClick}
             showCommunityCards={!!currentHand}
@@ -1602,6 +1589,28 @@ export default function SessionPage() {
             highlightedPositions={selectedPosition ? [selectedPosition] : []}
           />
         </div>
+        )}
+
+        {/* Hero Cards and Next to Act Section - Below table, above action buttons */}
+        {!showSeatSelection && currentHand && (
+          <div className="flex gap-2 mb-2">
+            <div className="flex-1">
+              <HeroCards
+                currentHand={currentHand}
+                userSeat={session?.userSeat}
+                onCardClick={(cardIndex) => {
+                  setSelectingCard(cardIndex);
+                  setShowCardSelector(true);
+                }}
+              />
+            </div>
+            <div className="flex-1">
+              <NextToAct
+                currentHand={currentHand}
+                userSeat={session?.userSeat}
+              />
+            </div>
+          </div>
         )}
 
         {/* User Card Selector */}
@@ -2043,14 +2052,7 @@ export default function SessionPage() {
           onValueChange={setAmountModalValue}
           onConfirm={() => {
             if (amountModalPosition) {
-              const minRaise = (currentBettingRound?.currentBet || 0) * 2;
               const amount = Math.floor(amountModalValue);
-
-              // Validate minimum raise amount
-              if (amountModalAction === 'raise' && amount < minRaise) {
-                setAmountModalError(`Minimum raise is $${minRaise}`);
-                return;
-              }
 
               handleBettingAction(
                 amountModalPosition,
@@ -2097,6 +2099,7 @@ export default function SessionPage() {
           onOpenChange={setShowOutcomeSelection}
           currentHand={currentHand}
           userSeat={session?.userSeat}
+          heroMoneyInvested={heroMoneyInvested}
           inlineCardSelection={inlineCardSelection}
           onSetInlineCardSelection={setInlineCardSelection}
           selectedCard1={selectedCard1}
@@ -2150,6 +2153,7 @@ export default function SessionPage() {
           }}
           currentHand={currentHand}
           userSeat={session?.userSeat}
+          heroMoneyInvested={heroMoneyInvested}
           inlineCardSelection={inlineCardSelection}
           onSetInlineCardSelection={setInlineCardSelection}
           selectedCard1={selectedCard1}

@@ -3,7 +3,60 @@
 ## Project Overview
 A Progressive Web App for tracking poker sessions, hands, and statistics. Built with Next.js 15, TypeScript, and Tailwind CSS.
 
-## RECENT UPDATES (v2.15) ✅
+## RECENT UPDATES (v2.16) ✅
+
+### Enhanced Community Card Selection Flow & UI Improvements - COMPLETED
+✅ **Auto-Advance Community Card Selection**
+- After selecting the last required community card, game automatically advances to next betting round
+- Eliminates need to click "Proceed" button, reducing clicks and improving flow
+- Maintains all existing community card validation and progression logic
+
+✅ **Contextual Community Card Editing**
+- **After preflop**: Can select/edit flop cards only (not turn/river)
+- **During flop betting**: Can edit flop cards anytime, select turn only when betting completes
+- **During turn betting**: Can edit flop/turn cards anytime, select river only when betting completes
+- **During river betting**: Can edit all community cards anytime
+- Smart validation prevents selecting future cards while allowing editing of previous selections
+
+✅ **Enhanced Card Selector UI**
+- Moved cancel button from bottom to top-right of title for better accessibility
+- Improved card selector titles to show specific card being edited (e.g., "Select First Flop Card")
+- Better visual feedback with hover effects and proper disabled states
+- Context-aware titles based on actual card position rather than betting round
+
+✅ **Technical Implementation**
+- Updated `useCommunityCards` hook with auto-advance logic and contextual validation
+- Enhanced `SimplePokerTable` component with round-aware card editability
+- Modified `ActionButtonsSection` to conditionally show proceed button
+- Improved `CardSelector` component layout and user experience
+
+```typescript
+// Enhanced community card validation logic
+if (currentRound === 'flop') {
+  // During flop: can edit previously selected flop cards OR select turn when betting complete
+  if (cardIndex <= 2) {
+    canEditCard = true; // Can always edit flop cards during flop round
+  } else if (cardIndex === 3) {
+    canEditCard = isBettingComplete; // Can only select turn when betting complete
+  }
+}
+
+// Auto-advance after card selection
+if (shouldAutoAdvance && areRequiredCardsComplete(updatedHand)) {
+  setTimeout(() => {
+    handleAdvanceToNextRound();
+  }, 100);
+}
+```
+
+✅ **User Experience Benefits**
+- **Reduced Clicks**: No manual "Proceed" button clicks needed after card selection
+- **Better Flow**: Seamless progression from card selection to betting
+- **Flexible Editing**: Can modify previous cards during appropriate rounds
+- **Clear Context**: Titles show exactly which card is being selected/edited
+- **Intuitive UI**: Cancel button positioned for better mobile accessibility
+
+## PREVIOUS UPDATES (v2.15) ✅
 
 ### Hero Stack Reduction Fix & UI Enhancements - COMPLETED
 ✅ **Hero Stack Reduction Bug Fix**

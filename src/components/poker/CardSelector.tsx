@@ -33,9 +33,19 @@ export function CardSelector({ title, selectedCards, onCardSelect, onCancel }: C
 
   return (
     <div className="bg-white rounded-lg p-4 shadow-sm mb-4">
-      <h3 className="text-md font-semibold mb-3 text-center">
-        {title}
-      </h3>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-md font-semibold flex-1 text-center">
+          {title}
+        </h3>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onCancel}
+          className="ml-2"
+        >
+          Cancel
+        </Button>
+      </div>
 
       {/* Suit Selection Container - Only shows when rank is selected */}
       {selectedRank && (
@@ -86,16 +96,6 @@ export function CardSelector({ title, selectedCards, onCardSelect, onCancel }: C
             </button>
           ))}
         </div>
-      </div>
-
-      <div className="mt-3 text-center">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onCancel}
-        >
-          Cancel
-        </Button>
       </div>
     </div>
   );

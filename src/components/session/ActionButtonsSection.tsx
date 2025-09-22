@@ -23,7 +23,7 @@ interface ActionButtonsSectionProps {
   // Functions from hooks
   needsCommunityCards: boolean | null;
   getAdvanceRoundMessage: () => string;
-  getAdvanceRoundButtonText: () => string;
+  getAdvanceRoundButtonText: () => string | null;
   handleAdvanceToNextRound: () => void;
   handleBettingAction: (position: Position, action: 'fold' | 'check' | 'call' | 'raise' | 'all-in', amount?: number) => void;
   getCurrentBettingRound: () => BettingRound | null | undefined;
@@ -133,13 +133,15 @@ export function ActionButtonsSection({
           <h3 className="text-md font-semibold mb-3">
             {getAdvanceRoundMessage()}
           </h3>
-          <Button
-            className="bg-green-600 hover:bg-green-700 text-white px-6 py-2"
-            onClick={handleAdvanceToNextRound}
-            disabled={needsCommunityCards || false}
-          >
-            {getAdvanceRoundButtonText()}
-          </Button>
+          {getAdvanceRoundButtonText() && (
+            <Button
+              className="bg-green-600 hover:bg-green-700 text-white px-6 py-2"
+              onClick={handleAdvanceToNextRound}
+              disabled={needsCommunityCards || false}
+            >
+              {getAdvanceRoundButtonText()}
+            </Button>
+          )}
         </div>
       ) : shouldShowActions ? (
         // Show betting actions when hero can act

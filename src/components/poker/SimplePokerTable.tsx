@@ -116,16 +116,26 @@ export function SimplePokerTable({
                 {[0, 1, 2].map((index) => {
                   const hasCard = communityCards?.flop?.[index];
                   const shouldBlink = isBettingComplete && !hasCard;
+
+                  // Determine if this flop card is editable based on current round and betting status
+                  let isEditable = false;
+                  if (currentBettingRoundName === 'preflop') {
+                    // During preflop: can only edit flop cards when betting is complete
+                    isEditable = isBettingComplete;
+                  } else if (currentBettingRoundName === 'flop' || currentBettingRoundName === 'turn' || currentBettingRoundName === 'river') {
+                    // During flop/turn/river: can always edit flop cards
+                    isEditable = true;
+                  }
                   return (
                     <button
                       key={`flop-${index}`}
                       onClick={() => onCommunityCardClick?.('flop', index)}
-                      disabled={!isBettingComplete}
+                      disabled={!isEditable}
                       className={cn(
                         "w-8 h-12 rounded border text-sm font-bold flex items-center justify-center",
                         hasCard
                           ? `bg-white border-gray-800 ${getCardColor(hasCard)}`
-                          : isBettingComplete
+                          : isEditable
                           ? "bg-gray-200 border-gray-400 text-gray-600 hover:bg-gray-300 cursor-pointer"
                           : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-50",
                         showFlopSelectionPrompt && !hasCard ? "animate-pulse bg-yellow-200 border-yellow-400" : "",
@@ -139,12 +149,12 @@ export function SimplePokerTable({
                 {/* Turn Card */}
                 <button
                   onClick={() => onCommunityCardClick?.('flop', 3)}
-                  disabled={!isBettingComplete || (currentBettingRoundName === 'preflop')}
+                  disabled={currentBettingRoundName === 'preflop' || (currentBettingRoundName === 'flop' && !isBettingComplete)}
                   className={cn(
                     "w-8 h-12 rounded border text-sm font-bold flex items-center justify-center ml-1",
                     communityCards?.turn
                       ? `bg-white border-gray-800 ${getCardColor(communityCards.turn)}`
-                      : isBettingComplete && currentBettingRoundName !== 'preflop'
+                      : (currentBettingRoundName === 'flop' && isBettingComplete) || currentBettingRoundName === 'turn' || currentBettingRoundName === 'river'
                       ? "bg-gray-200 border-gray-400 text-gray-600 hover:bg-gray-300 cursor-pointer"
                       : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-50",
                     showTurnSelectionPrompt && "animate-pulse bg-yellow-200 border-yellow-400"
@@ -155,12 +165,12 @@ export function SimplePokerTable({
                 {/* River Card */}
                 <button
                   onClick={() => onCommunityCardClick?.('flop', 4)}
-                  disabled={!isBettingComplete || (currentBettingRoundName === 'preflop' || currentBettingRoundName === 'flop')}
+                  disabled={currentBettingRoundName === 'preflop' || currentBettingRoundName === 'flop' || (currentBettingRoundName === 'turn' && !isBettingComplete)}
                   className={cn(
                     "w-8 h-12 rounded border text-sm font-bold flex items-center justify-center",
                     communityCards?.river
                       ? `bg-white border-gray-800 ${getCardColor(communityCards.river)}`
-                      : isBettingComplete && currentBettingRoundName !== 'preflop' && currentBettingRoundName !== 'flop'
+                      : (currentBettingRoundName === 'turn' && isBettingComplete) || currentBettingRoundName === 'river'
                       ? "bg-gray-200 border-gray-400 text-gray-600 hover:bg-gray-300 cursor-pointer"
                       : "bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-50",
                     showRiverSelectionPrompt && "animate-pulse bg-yellow-200 border-yellow-400"

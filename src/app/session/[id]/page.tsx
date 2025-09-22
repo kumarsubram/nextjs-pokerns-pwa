@@ -210,7 +210,8 @@ export default function SessionPage() {
     selectingCommunityCard,
     setSelectingCommunityCard,
     autoSelectingCommunityCards,
-    setAutoSelectingCommunityCards
+    setAutoSelectingCommunityCards,
+    handleAdvanceToNextRound
   });
 
   // Initialize hero cards hook

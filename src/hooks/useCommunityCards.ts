@@ -15,6 +15,8 @@ interface UseCommunityCardsProps {
   setSelectingCommunityCard: (card: { type: 'flop'; index: number } | null) => void;
   autoSelectingCommunityCards: boolean;
   setAutoSelectingCommunityCards: (auto: boolean) => void;
+  // New props for auto-advance logic
+  handleAdvanceToNextRound: () => void;
 }
 
 export function useCommunityCards({
@@ -27,7 +29,8 @@ export function useCommunityCards({
   selectingCommunityCard,
   setSelectingCommunityCard,
   autoSelectingCommunityCards,
-  setAutoSelectingCommunityCards
+  setAutoSelectingCommunityCards,
+  handleAdvanceToNextRound
 }: UseCommunityCardsProps) {
 
   // Stable currentHand for HandHistory - freeze during community card selection to prevent blink
@@ -65,36 +68,68 @@ export function useCommunityCards({
     currentHand?.currentBettingRound === 'turn' &&
     !currentHand?.communityCards.river;
 
-  // Handle community card click
+  // Handle community card click - allows editing based on current round and betting status
   const handleCommunityCardClick = useCallback((cardType: 'flop', cardIndex: number) => {
-    // Only allow community card selection when betting round is complete
-    if (!isBettingComplete || !currentHand) {
-      return; // Don't allow community card selection during active betting
-    }
+    if (!currentHand) return;
 
-    // Validate which cards can be selected based on current betting round
     const currentRound = currentHand.currentBettingRound;
 
+    // Determine which cards are editable based on current round and betting completion
+    let canEditCard = false;
+
     if (currentRound === 'preflop') {
-      // After preflop, only flop cards (0, 1, 2) can be selected
-      if (cardIndex > 2) {
-        return; // Prevent turn and river selection after preflop
-      }
+      // During preflop: can only select/edit flop cards (0, 1, 2) WHEN betting is complete
+      canEditCard = cardIndex <= 2 && isBettingComplete;
     } else if (currentRound === 'flop') {
-      // After flop, only turn card (3) can be selected (and flop cards if not set)
-      if (cardIndex === 4) {
-        return; // Prevent river selection after flop
+      // During flop: can edit previously selected flop cards (0, 1, 2) OR select turn (3) when betting complete
+      if (cardIndex <= 2) {
+        // Can always edit previously selected flop cards during flop round
+        canEditCard = true;
+      } else if (cardIndex === 3) {
+        // Can only select turn card when flop betting is complete
+        canEditCard = isBettingComplete;
       }
     } else if (currentRound === 'turn') {
-      // After turn, only river card (4) can be selected (and previous cards if not set)
-      // All cards are allowed at this point
+      // During turn: can edit flop (0, 1, 2) and turn (3) cards OR select river (4) when betting complete
+      if (cardIndex <= 3) {
+        // Can always edit previously selected flop/turn cards during turn round
+        canEditCard = true;
+      } else if (cardIndex === 4) {
+        // Can only select river card when turn betting is complete
+        canEditCard = isBettingComplete;
+      }
+    } else if (currentRound === 'river') {
+      // During river: can edit all previously selected cards (0, 1, 2, 3, 4)
+      canEditCard = cardIndex <= 4;
+    }
+
+    if (!canEditCard) {
+      return; // Prevent editing cards not yet accessible in current round
     }
 
     setSelectingCommunityCard({ type: cardType, index: cardIndex });
     setShowCommunitySelector(true);
-  }, [isBettingComplete, currentHand, setSelectingCommunityCard, setShowCommunitySelector]);
+  }, [currentHand, isBettingComplete, setSelectingCommunityCard, setShowCommunitySelector]);
 
-  // Handle community card selection
+  // Check if all required cards are selected for current round
+  const areRequiredCardsComplete = useCallback((hand: CurrentHand) => {
+    const currentRound = hand.currentBettingRound;
+
+    if (currentRound === 'preflop') {
+      // Need all 3 flop cards
+      const flopCards = hand.communityCards.flop;
+      return flopCards && flopCards.length === 3 && flopCards.every(card => card && card !== '');
+    } else if (currentRound === 'flop') {
+      // Need turn card (flop already required to reach this point)
+      return !!hand.communityCards.turn;
+    } else if (currentRound === 'turn') {
+      // Need river card (flop and turn already required)
+      return !!hand.communityCards.river;
+    }
+    return true; // River and beyond don't need more cards
+  }, []);
+
+  // Handle community card selection with auto-advance logic
   const handleCommunityCardSelect = useCallback((card: string) => {
     if (!selectingCommunityCard || !currentHand) return;
 
@@ -118,15 +153,29 @@ export function useCommunityCards({
 
     setCurrentHand(updatedHand);
 
-    // Auto-progress to next card if in guided mode
+    // Auto-progress to next card if in guided initial selection mode
     if (autoSelectingCommunityCards && currentHand.currentBettingRound === 'preflop' && index < 2) {
       // Continue to next flop card immediately without closing selector
       setSelectingCommunityCard({ type: 'flop', index: index + 1 });
       // Keep showCommunitySelector true - don't close and reopen
     } else {
-      // Close selector only when we're done with auto-progression
+      // Close selector
       setShowCommunitySelector(false);
       setSelectingCommunityCard(null);
+
+      // Check if we should auto-advance to next betting round
+      const shouldAutoAdvance = (
+        autoSelectingCommunityCards || // Initial card selection
+        isBettingComplete // Editing cards after betting complete
+      ) && areRequiredCardsComplete(updatedHand);
+
+      if (shouldAutoAdvance) {
+        // Auto-advance to next betting round
+        setTimeout(() => {
+          handleAdvanceToNextRound();
+        }, 100); // Small delay to ensure state updates
+      }
+
       if (autoSelectingCommunityCards) {
         setAutoSelectingCommunityCards(false);
       }
@@ -135,10 +184,13 @@ export function useCommunityCards({
     selectingCommunityCard,
     currentHand,
     autoSelectingCommunityCards,
+    isBettingComplete,
     setCurrentHand,
     setSelectingCommunityCard,
     setShowCommunitySelector,
-    setAutoSelectingCommunityCards
+    setAutoSelectingCommunityCards,
+    areRequiredCardsComplete,
+    handleAdvanceToNextRound
   ]);
 
   // Get next card to select for auto-trigger
@@ -195,24 +247,23 @@ export function useCommunityCards({
     setAutoSelectingCommunityCards
   ]);
 
-  // Get community card selector title
+  // Get community card selector title based on which card is being selected
   const getCommunityCardSelectorTitle = useCallback(() => {
     if (!selectingCommunityCard || !currentHand) return 'Select Community Card';
 
     const { index } = selectingCommunityCard;
-    if (currentHand.currentBettingRound === 'preflop') {
-      if (index === 0) return 'Select First Flop Card';
-      if (index === 1) return 'Select Second Flop Card';
-      if (index === 2) return 'Select Third Flop Card';
-    } else if (currentHand.currentBettingRound === 'flop') {
-      return 'Select Turn Card';
-    } else if (currentHand.currentBettingRound === 'turn') {
-      return 'Select River Card';
-    }
+
+    // Title based on which card position is being selected, not current round
+    if (index === 0) return 'Select First Flop Card';
+    if (index === 1) return 'Select Second Flop Card';
+    if (index === 2) return 'Select Third Flop Card';
+    if (index === 3) return 'Select Turn Card';
+    if (index === 4) return 'Select River Card';
+
     return 'Select Community Card';
   }, [selectingCommunityCard, currentHand]);
 
-  // Get advance round message based on current round
+  // Get advance round message based on current round - updated for auto-advance
   const getAdvanceRoundMessage = useCallback(() => {
     if (!currentHand) return 'Betting Round Complete';
 
@@ -221,21 +272,21 @@ export function useCommunityCards({
 
     if (needsCards) {
       if (currentRound === 'preflop') {
-        return 'Select Flop Community Cards to continue';
+        return 'Select Flop Community Cards (auto-advances)';
       } else if (currentRound === 'flop') {
-        return 'Select Turn Card to continue';
+        return 'Select Turn Card (auto-advances)';
       } else if (currentRound === 'turn') {
-        return 'Select River Card to continue';
+        return 'Select River Card (auto-advances)';
       }
-      return 'Select community cards to continue';
+      return 'Select community cards (auto-advances)';
     } else {
       // Show specific message based on current round
       if (currentRound === 'preflop') {
-        return 'Flop cards selected';
+        return 'Flop cards ready - advancing to betting';
       } else if (currentRound === 'flop') {
-        return 'Turn card selected';
+        return 'Turn card ready - advancing to betting';
       } else if (currentRound === 'turn') {
-        return 'River card selected';
+        return 'River card ready - advancing to betting';
       } else if (currentRound === 'river') {
         return 'All cards dealt';
       } else {
@@ -244,12 +295,13 @@ export function useCommunityCards({
     }
   }, [currentHand, needsCommunityCards]);
 
-  // Get advance round button text
+  // Get advance round button text - only shown when manual advance needed
   const getAdvanceRoundButtonText = useCallback(() => {
     if (!currentHand) return 'Proceed';
 
     const needsCards = needsCommunityCards;
-    if (needsCards) return 'Proceed';
+    // Don't show button text when auto-advance is available
+    if (needsCards) return null; // No button needed - auto-advances
 
     const currentRound = currentHand.currentBettingRound;
     if (currentRound === 'preflop') return 'Proceed to Flop Betting';
@@ -274,6 +326,7 @@ export function useCommunityCards({
     // Helper functions
     getCommunityCardSelectorTitle,
     getAdvanceRoundMessage,
-    getAdvanceRoundButtonText
+    getAdvanceRoundButtonText,
+    areRequiredCardsComplete
   };
 }

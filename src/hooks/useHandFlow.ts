@@ -246,17 +246,6 @@ export function useHandFlow({
     // Clear current hand from storage since it's completed
     SessionService.clearCurrentHand(session.sessionId);
 
-    console.log('Stack update:', {
-      stackBefore,
-      outcome,
-      effectivePotWon,
-      heroMoneyInvested,
-      newStackAmount,
-      potWonDisplay: outcome === 'won' ? (effectivePotWon - heroMoneyInvested) : (outcome === 'lost' ? heroMoneyInvested : 0),
-      calculation: outcome === 'won'
-        ? `Win: ${stackBefore} + ${effectivePotWon} = ${newStackAmount} (net profit: ${effectivePotWon - heroMoneyInvested})`
-        : `Loss: ${stackBefore} remains ${newStackAmount} (lost: ${heroMoneyInvested})`
-    });
 
     setStack(newStackAmount);
 

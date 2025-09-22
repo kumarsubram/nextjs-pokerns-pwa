@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, usePathname } from 'next/navigation';
-import { Home, Calendar, User, Share2 } from 'lucide-react';
+import { Home, Calendar, User, Share2, Users } from 'lucide-react';
 
 export function BottomNav() {
   const router = useRouter();
@@ -13,6 +13,12 @@ export function BottomNav() {
       label: 'Home',
       path: '/',
       active: pathname === '/',
+    },
+    {
+      icon: Users,
+      label: 'Shared',
+      path: '/shared',
+      active: pathname === '/shared' || pathname.startsWith('/shared/'),
     },
     {
       icon: Calendar,
@@ -36,7 +42,7 @@ export function BottomNav() {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 sm:hidden">
-      <div className="grid grid-cols-4 h-16">
+      <div className="grid grid-cols-5 h-16">
         {navItems.map((item) => {
           const Icon = item.icon;
           return (

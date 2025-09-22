@@ -3,7 +3,7 @@
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { OnlineStatusIndicator } from '@/components/OnlineStatusIndicator';
-import { Calendar, Share2, User, ArrowLeft, Home } from 'lucide-react';
+import { Calendar, Share2, User, ArrowLeft, Home, Users } from 'lucide-react';
 
 interface AppHeaderProps {
   title?: string;
@@ -37,9 +37,6 @@ export function AppHeader({
             </Button>
           ) : null}
           <h1 className="text-xl font-bold">{title}</h1>
-          <div className="hidden sm:block">
-            <OnlineStatusIndicator />
-          </div>
         </div>
 
         {/* Desktop Navigation */}
@@ -53,6 +50,15 @@ export function AppHeader({
             >
               <Home className="h-4 w-4" />
               Home
+            </Button>
+            <Button
+              variant={isActive('/shared') || pathname.startsWith('/shared/') ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => router.push('/shared')}
+              className={`flex items-center gap-2 ${isActive('/shared') || pathname.startsWith('/shared/') ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}`}
+            >
+              <Users className="h-4 w-4" />
+              Shared
             </Button>
             <Button
               variant={isActive('/sessions') ? 'default' : 'ghost'}
@@ -85,9 +91,7 @@ export function AppHeader({
         )}
         
         <div className="flex items-center gap-2">
-          <div className="block sm:hidden">
-            <OnlineStatusIndicator />
-          </div>
+          <OnlineStatusIndicator />
         </div>
       </div>
     </header>

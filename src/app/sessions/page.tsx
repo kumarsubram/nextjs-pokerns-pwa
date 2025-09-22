@@ -148,20 +148,25 @@ export default function SessionsPage() {
     <div className="container max-w-7xl mx-auto px-4 py-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Sessions</h1>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {sessions.length > 0 && (
             <Button
               variant="outline"
               onClick={handleDeleteAllSessions}
-              className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
+              className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 px-2 sm:px-4"
+              size="sm"
             >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete All
+              <Trash2 className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Delete All</span>
             </Button>
           )}
-          <Button onClick={() => router.push('/create-session')} className="bg-emerald-500 hover:bg-emerald-600">
-            <Plus className="h-4 w-4 mr-2" />
-            New Session
+          <Button
+            onClick={() => router.push('/create-session')}
+            className="bg-emerald-500 hover:bg-emerald-600 px-2 sm:px-4"
+            size="sm"
+          >
+            <Plus className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">New Session</span>
           </Button>
         </div>
       </div>

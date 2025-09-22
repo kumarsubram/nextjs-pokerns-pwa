@@ -2,132 +2,156 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Eye } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { HandHistory } from '@/components/poker/HandHistory';
-import { SharedHandService } from '@/services/shared-hand.service';
-import { SharedHand } from '@/types/poker-v2';
+import { TrackedHandService, TrackedHand } from '@/services/tracked-hand.service';
+import { Card, CardContent } from '@/components/ui/card';
+import { ArrowLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
-export default function TrackedHandPage() {
-  const router = useRouter();
+export default function TrackedHandDetail() {
   const params = useParams();
-  const handId = params.id as string;
-
-  const [trackedHand, setTrackedHand] = useState<SharedHand | null>(null);
-  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const trackId = params?.id as string;
+  const [trackedHand, setTrackedHand] = useState<TrackedHand | null>(null);
 
   useEffect(() => {
-    if (!handId) return;
+    if (!trackId) {
+      router.push('/tracked');
+      return;
+    }
 
-    // Load tracked hand
-    const loadTrackedHand = () => {
-      const hand = SharedHandService.getSharedHand(handId);
-      if (!hand) {
+    // Load the specific tracked hand
+    const hands = TrackedHandService.getTrackedHands();
+    const hand = hands.find(h => h.trackId === trackId);
+
+    if (!hand) {
+      // Try to find by sessionId_handNumber format for backward compatibility
+      const [sessionId, , handNumberStr] = trackId.split('_');
+      const handNumber = parseInt(handNumberStr);
+      const foundHand = hands.find(h => h.sessionId === sessionId && h.handNumber === handNumber);
+
+      if (foundHand) {
+        setTrackedHand(foundHand);
+      } else {
         router.push('/tracked');
-        return;
       }
-
-      // Increment view count
-      SharedHandService.incrementViews(handId);
+    } else {
       setTrackedHand(hand);
-      setLoading(false);
-    };
-
-    loadTrackedHand();
-  }, [handId, router]);
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit'
-    });
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-500">Loading hand...</div>
-      </div>
-    );
-  }
+    }
+  }, [trackId, router]);
 
   if (!trackedHand) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-gray-500 mb-4">Hand not found</div>
-          <Button onClick={() => router.push('/tracked')}>
-            Back to Tracked Hands
-          </Button>
+      <div className="min-h-screen bg-gray-50 pb-20 sm:pb-0">
+        <div className="bg-white border-b px-4 py-4">
+          <h1 className="text-xl font-bold">Loading...</h1>
+        </div>
+        <div className="p-4">
+          <Card>
+            <CardContent className="text-center py-12">
+              <p className="text-gray-500">Loading hand details...</p>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
   }
 
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b px-4 py-3">
+    <div className="min-h-screen bg-gray-50 pb-20 sm:pb-0">
+      {/* Page Header */}
+      <div className="bg-white border-b px-4 py-4">
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => router.push('/tracked')}
+            className="p-2"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-5 w-5" />
+            <span className="ml-2">Back</span>
           </Button>
-          <div className="flex-1">
-            <h1 className="text-lg font-semibold">Tracked Hand by {trackedHand.username}</h1>
-            <div className="flex items-center gap-4 text-sm text-gray-600">
-              <span>{trackedHand.sessionMetadata.sessionName}</span>
-              <div className="flex items-center gap-1">
-                <Eye className="h-3 w-3" />
-                {trackedHand.views} views
-              </div>
-            </div>
-          </div>
+          <h1 className="text-xl font-bold">Hand #{trackedHand.handNumber}</h1>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="p-4 max-w-4xl mx-auto space-y-4">
-        {/* Hand Metadata */}
-        <Card>
+      <main className="container max-w-4xl mx-auto px-4 py-6">
+        {/* Hand Info Header */}
+        <Card className="mb-4">
           <CardContent className="p-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div className="flex justify-between items-start mb-3">
               <div>
-                <div className="text-gray-500">Game Type</div>
-                <span className="font-medium">{trackedHand.sessionMetadata.gameType}</span>
+                <h2 className="text-lg font-semibold mb-1">
+                  {trackedHand.sessionName}
+                </h2>
+                <div className="text-sm text-gray-600 space-y-1">
+                  <div>Hand #{trackedHand.handNumber}</div>
+                  <div>{trackedHand.tableSeats} handed • Position: {trackedHand.userSeat}</div>
+                  <div className="text-xs text-gray-500">
+                    Tracked on {formatDate(trackedHand.trackedAt)}
+                  </div>
+                </div>
               </div>
-              <div>
-                <div className="text-gray-500">Table Size</div>
-                <span className="font-medium">{trackedHand.sessionMetadata.tableSeats}-handed</span>
-              </div>
-              <div>
-                <div className="text-gray-500">Hero Position</div>
-                <span className="font-medium">{trackedHand.sessionMetadata.userSeat}</span>
-              </div>
-              <div>
-                <div className="text-gray-500">Tracked</div>
-                <span className="font-medium">{formatDate(trackedHand.sharedAt)}</span>
-              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push('/tracked')}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Tracked
+              </Button>
             </div>
           </CardContent>
         </Card>
 
-        {/* Hand Details */}
-        <HandHistory
-          completedHands={[trackedHand.handData]}
-          userSeat={trackedHand.sessionMetadata.userSeat}
-          className="space-y-3"
-          defaultExpanded={true}
-          hideShareButtons={true}
-        />
-      </div>
+        {/* Hand Details using HandHistory Component */}
+        <div className="bg-white rounded-lg shadow-sm">
+          <HandHistory
+            completedHands={[trackedHand]}
+            userSeat={trackedHand.userSeat}
+            defaultExpanded={true}
+            hideShareButtons={true}
+          />
+        </div>
+
+        {/* Navigation Options */}
+        <Card className="mt-4">
+          <CardContent className="p-4">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => router.push(`/session/${trackedHand.sessionId}`)}
+              >
+                View Full Session
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+                onClick={() => {
+                  TrackedHandService.removeTrackedHand(trackedHand.sessionId, trackedHand.handNumber);
+                  router.push('/tracked');
+                }}
+              >
+                Remove from Tracked
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </main>
     </div>
   );
 }

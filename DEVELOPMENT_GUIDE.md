@@ -3,7 +3,61 @@
 ## Project Overview
 A Progressive Web App for tracking poker sessions, hands, and statistics. Built with Next.js 15, TypeScript, and Tailwind CSS.
 
-## RECENT UPDATES (v2.16) ✅
+## RECENT UPDATES (v2.17) ✅
+
+### Hand Tracking & Sharing System - COMPLETED
+✅ **Track & Share Functionality**
+- Replaced "Copy Link" button with separate "Track" and "Share" buttons in HandHistory
+- Track button saves hands to localStorage for offline viewing
+- Share button (placeholder) for future community sharing functionality
+- Tracked hands persist across sessions and can be viewed offline
+
+✅ **TrackedHandService Implementation**
+- Complete service for managing tracked hands in localStorage
+- Methods for tracking, removing, and checking tracked status
+- Unique track IDs for each tracked hand
+- Support for tracking metadata (session name, table size, position)
+
+✅ **Tracked Hands Page**
+- Dedicated `/tracked` page showing all tracked hands
+- Shows hand cards, community cards, outcome, and session info
+- Individual trash icons to remove tracked hands
+- Click on tracked hand to view detailed information
+
+✅ **Tracked Hand Detail View**
+- New `/tracked/[id]` dynamic route for individual hand details
+- Full action logs displayed using HandHistory component
+- Automatic expansion of betting rounds and actions
+- Navigation options: Back to Tracked, View Full Session, Remove from Tracked
+- Complete hand replay with all betting actions and community cards
+
+✅ **Navigation Enhancements**
+- Added "Shared" section to both bottom and top navigation bars
+- Reordered navigation: Home → Shared → Sessions → Tracked → Account
+- Fixed duplicate header issue - single AppHeader in root layout
+- Removed duplicate OnlineStatusIndicator displays
+
+✅ **UI/UX Improvements**
+- Mobile-responsive button sizing on Sessions page (icon-only on mobile)
+- Fixed hydration errors with proper client-side state initialization
+- Consistent navigation across all pages
+- Proper page titles without duplicate headers
+
+✅ **Technical Fixes**
+- Fixed hydration mismatch in OnlineStatusIndicator component
+- Added mounted state to prevent server/client render differences
+- Improved useOnlineStatus hook with typeof window checks
+- Mobile button overflow fixed with responsive sizing
+
+```typescript
+// TrackedHandService methods
+static trackHand(hand, sessionId, sessionName, userSeat, tableSeats)
+static removeTrackedHand(sessionId, handNumber)
+static isHandTracked(sessionId, handNumber)
+static getTrackedHands()
+```
+
+## PREVIOUS UPDATES (v2.16) ✅
 
 ### Enhanced Community Card Selection Flow & UI Improvements - COMPLETED
 ✅ **Auto-Advance Community Card Selection**

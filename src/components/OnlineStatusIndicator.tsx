@@ -8,8 +8,11 @@ import { db } from '@/lib/db';
 export function OnlineStatusIndicator() {
   const isOnline = useOnlineStatus();
   const [unsyncedCount, setUnsyncedCount] = useState(0);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
+
     // Check for unsynced items
     const checkUnsyncedItems = async () => {
       const count = await db.getUnsyncedCount();
@@ -17,12 +20,22 @@ export function OnlineStatusIndicator() {
     };
 
     checkUnsyncedItems();
-    
+
     // Check periodically
     const interval = setInterval(checkUnsyncedItems, 10000); // Every 10 seconds
-    
+
     return () => clearInterval(interval);
   }, []);
+
+  // Avoid hydration mismatch by not rendering until mounted
+  if (!mounted) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted">
+        <Wifi className="h-4 w-4 text-green-600" />
+        <span className="text-sm font-medium text-green-600">Online</span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted">

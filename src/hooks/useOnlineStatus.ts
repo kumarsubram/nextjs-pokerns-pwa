@@ -3,11 +3,17 @@
 import { useState, useEffect } from 'react';
 
 export function useOnlineStatus() {
-  const [isOnline, setIsOnline] = useState(true);
+  // Initialize with undefined to avoid hydration mismatch
+  // Server will render as if online, client will update after mount
+  const [isOnline, setIsOnline] = useState(
+    typeof window !== 'undefined' ? navigator.onLine : true
+  );
 
   useEffect(() => {
-    // Check initial status
-    setIsOnline(navigator.onLine);
+    // Check initial status after mount
+    if (typeof window !== 'undefined') {
+      setIsOnline(navigator.onLine);
+    }
 
     // Event handlers
     const handleOnline = () => setIsOnline(true);

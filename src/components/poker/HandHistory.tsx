@@ -2,11 +2,10 @@
 
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { ChevronDown, ChevronUp, Link2, Copy } from 'lucide-react';
+import { ChevronDown, ChevronUp, Share2, Users } from 'lucide-react';
 import { CurrentHand, StoredHand, Position } from '@/types/poker-v2';
-import { SharedHandService } from '@/services/shared-hand.service';
+import { TrackedHandService } from '@/services/tracked-hand.service';
 import { SessionService } from '@/services/session.service';
-import { URLShareService } from '@/services/url-share.service';
 import { useParams } from 'next/navigation';
 
 interface HandHistoryProps {
@@ -37,8 +36,23 @@ export function HandHistory({
     return new Set();
   });
   const [copiedHandId, setCopiedHandId] = useState<number | null>(null);
+  const [trackedHandId, setTrackedHandId] = useState<number | null>(null);
+  const [trackedHands, setTrackedHands] = useState<Set<string>>(new Set());
   const params = useParams();
   const sessionId = params?.id as string;
+
+  // Load tracked status on mount
+  React.useEffect(() => {
+    if (!sessionId) return;
+
+    const tracked = new Set<string>();
+    completedHands.forEach(hand => {
+      if (TrackedHandService.isHandTracked(sessionId, hand.handNumber)) {
+        tracked.add(`${sessionId}_${hand.handNumber}`);
+      }
+    });
+    setTrackedHands(tracked);
+  }, [sessionId, completedHands]);
 
   // Helper function to get card color
   const getCardColor = (card: string) => {
@@ -70,32 +84,58 @@ export function HandHistory({
 
 
 
-  // Handle copy link - creates a shareable URL with encoded hand data
-  const handleCopyLink = async (hand: StoredHand, e: React.MouseEvent) => {
+  // Handle track - saves the hand for offline viewing
+  const handleTrack = async (hand: StoredHand, e: React.MouseEvent) => {
     e.stopPropagation();
 
     if (!sessionId) return;
 
+    // Get session metadata
     const sessionMetadata = SessionService.getSessionMetadata(sessionId);
     if (!sessionMetadata) return;
 
-    // Generate URL with encoded hand data (works for anyone)
-    const username = SharedHandService.getCurrentUsername();
-    const shareUrl = URLShareService.generateShareableURL(hand, {
-      ...sessionMetadata,
-      username
-    });
+    const handKey = `${sessionId}_${hand.handNumber}`;
+    const isCurrentlyTracked = trackedHands.has(handKey);
 
-    // Copy to clipboard and show feedback
-    if (navigator.clipboard) {
-      try {
-        await navigator.clipboard.writeText(shareUrl);
-        setCopiedHandId(hand.handNumber);
-        setTimeout(() => setCopiedHandId(null), 2000);
-      } catch {
-        // Silently handle clipboard errors
+    if (isCurrentlyTracked) {
+      // Remove from tracked
+      const removed = TrackedHandService.removeTrackedHand(sessionId, hand.handNumber);
+
+      if (removed) {
+        const newTracked = new Set(trackedHands);
+        newTracked.delete(handKey);
+        setTrackedHands(newTracked);
+      }
+    } else {
+      // Track the hand
+      const success = TrackedHandService.trackHand(
+        hand,
+        sessionId,
+        sessionMetadata.sessionName,
+        hand.userSeat || sessionMetadata.userSeat,
+        sessionMetadata.tableSeats
+      );
+
+      if (success) {
+        const newTracked = new Set(trackedHands);
+        newTracked.add(handKey);
+        setTrackedHands(newTracked);
+
+        // Show visual feedback
+        setTrackedHandId(hand.handNumber);
+        setTimeout(() => setTrackedHandId(null), 2000);
       }
     }
+  };
+
+  // Handle share - shares the hand publicly
+  const handleShare = async (hand: StoredHand, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    // TODO: Implement share functionality
+    // For now, just show visual feedback
+    setCopiedHandId(hand.handNumber);
+    setTimeout(() => setCopiedHandId(null), 2000);
   };
 
   // Group actions for better display readability
@@ -298,6 +338,8 @@ export function HandHistory({
     const hasCards = hand.userCards && hand.userCards[0] && hand.userCards[1];
     const outcome = 'result' in hand ? hand.result.handOutcome : null;
     const potWon = 'result' in hand ? hand.result.potWon : null;
+    const handKey = `${sessionId}_${handNumber}`;
+    const isTracked = trackedHands.has(handKey);
 
     // Use the hand's stored userSeat for completed hands, fallback to current userSeat for current hands
     const handUserSeat = 'userSeat' in hand ? hand.userSeat : userSeat;
@@ -386,30 +428,64 @@ export function HandHistory({
           ) : (
             <div className="flex gap-4">
               {/* Left Column: Action Buttons (3/4 width) */}
-              <div className="flex-1">
+              <div className="flex-1 space-y-2">
                 {'result' in hand && (
-                  <button
-                    onClick={(e) => handleCopyLink(hand as StoredHand, e)}
-                    className={cn(
-                      "flex items-center justify-center gap-2 px-3 py-3 rounded-md transition-all text-xs h-12 w-full",
-                      copiedHandId === hand.handNumber
-                        ? "bg-green-50 border-green-200 text-green-700"
-                        : "bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
-                    )}
-                    title="Copy shareable link"
-                  >
-                    {copiedHandId === hand.handNumber ? (
-                      <>
-                        <Copy className="h-3 w-3" />
-                        <span>Link Copied!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Link2 className="h-3 w-3" />
-                        <span>Copy Link</span>
-                      </>
-                    )}
-                  </button>
+                  <>
+                    {/* Track Button */}
+                    <button
+                      onClick={(e) => handleTrack(hand as StoredHand, e)}
+                      className={cn(
+                        "flex items-center justify-center gap-2 px-3 py-3 rounded-md transition-all text-sm h-12 w-full border",
+                        isTracked
+                          ? "bg-emerald-50 border-emerald-300 text-emerald-700"
+                          : trackedHandId === hand.handNumber
+                          ? "bg-green-50 border-green-300 text-green-700"
+                          : "bg-white hover:bg-gray-50 border-gray-300 text-gray-700"
+                      )}
+                      title={isTracked ? "Remove from tracked hands" : "Track this hand for offline viewing"}
+                    >
+                      {trackedHandId === hand.handNumber ? (
+                        <>
+                          <Share2 className="h-4 w-4" />
+                          <span>Tracked!</span>
+                        </>
+                      ) : isTracked ? (
+                        <>
+                          <Share2 className="h-4 w-4" />
+                          <span>Tracked</span>
+                        </>
+                      ) : (
+                        <>
+                          <Share2 className="h-4 w-4" />
+                          <span>Track</span>
+                        </>
+                      )}
+                    </button>
+
+                    {/* Share Button */}
+                    <button
+                      onClick={(e) => handleShare(hand as StoredHand, e)}
+                      className={cn(
+                        "flex items-center justify-center gap-2 px-3 py-3 rounded-md transition-all text-sm h-12 w-full border",
+                        copiedHandId === hand.handNumber
+                          ? "bg-blue-50 border-blue-300 text-blue-700"
+                          : "bg-white hover:bg-gray-50 border-gray-300 text-gray-700"
+                      )}
+                      title="Share this hand publicly"
+                    >
+                      {copiedHandId === hand.handNumber ? (
+                        <>
+                          <Users className="h-4 w-4" />
+                          <span>Shared!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Users className="h-4 w-4" />
+                          <span>Share</span>
+                        </>
+                      )}
+                    </button>
+                  </>
                 )}
               </div>
 

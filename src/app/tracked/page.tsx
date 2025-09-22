@@ -4,12 +4,15 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Share2, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { DeleteAllTrackedDialog } from '@/components/dialog/DeleteAllTrackedDialog';
 import { TrackedHandService, TrackedHand } from '@/services/tracked-hand.service';
 import { cn } from '@/lib/utils';
 
 export default function TrackedHandsList() {
   const router = useRouter();
   const [trackedHands, setTrackedHands] = useState<TrackedHand[]>([]);
+  const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false);
 
   useEffect(() => {
     loadTrackedHands();
@@ -28,6 +31,15 @@ export default function TrackedHandsList() {
     if (removed) {
       loadTrackedHands();
     }
+  };
+
+  const handleDeleteAll = () => {
+    setDeleteAllDialogOpen(true);
+  };
+
+  const confirmDeleteAll = () => {
+    TrackedHandService.clearAllTrackedHands();
+    setTrackedHands([]);
   };
 
   const formatDate = (dateString: string) => {
@@ -58,7 +70,20 @@ export default function TrackedHandsList() {
     <div className="min-h-screen bg-gray-50 pb-20 sm:pb-0">
       {/* Page Title */}
       <div className="bg-white border-b px-4 py-4">
-        <h1 className="text-xl font-bold">Tracked Hands</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold">Tracked Hands</h1>
+          {trackedHands.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDeleteAll}
+              className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete All
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Hands List */}
@@ -194,6 +219,14 @@ export default function TrackedHandsList() {
           </div>
         )}
       </div>
+
+      {/* Delete All Dialog */}
+      <DeleteAllTrackedDialog
+        open={deleteAllDialogOpen}
+        onOpenChange={setDeleteAllDialogOpen}
+        onConfirm={confirmDeleteAll}
+        count={trackedHands.length}
+      />
     </div>
   );
 }

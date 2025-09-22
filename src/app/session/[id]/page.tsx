@@ -549,8 +549,81 @@ export default function SessionPage() {
             bigBlind={bigBlind}
             ante={ante}
             onStackChange={setStack}
-            onSmallBlindChange={setSmallBlind}
-            onBigBlindChange={setBigBlind}
+            onSmallBlindChange={(value) => {
+              setSmallBlind(value);
+              // Update current hand's blind values if hand is in progress
+              if (currentHand && currentHand.currentBettingRound === 'preflop') {
+                // Update SB player's current bet
+                const updatedPlayerStates = currentHand.playerStates.map(player => {
+                  if (player.position === 'SB') {
+                    return { ...player, currentBet: value };
+                  }
+                  return player;
+                });
+
+                // Update hero money invested if hero is SB and hasn't acted yet
+                if (session.userSeat === 'SB') {
+                  const currentRound = currentHand.bettingRounds.preflop;
+                  const heroHasActed = currentRound?.actions.some(action => action.position === 'SB');
+                  if (!heroHasActed) {
+                    setHeroMoneyInvested(value);
+                  }
+                }
+
+                setCurrentHand({
+                  ...currentHand,
+                  smallBlind: value,
+                  playerStates: updatedPlayerStates,
+                  // Also update pot calculation for preflop
+                  pot: value + bigBlind + (ante * session.tableSeats),
+                  bettingRounds: {
+                    ...currentHand.bettingRounds,
+                    preflop: {
+                      ...currentHand.bettingRounds.preflop,
+                      pot: value + bigBlind + (ante * session.tableSeats)
+                    }
+                  }
+                });
+              }
+            }}
+            onBigBlindChange={(value) => {
+              setBigBlind(value);
+              // Update current hand's blind values if hand is in progress
+              if (currentHand && currentHand.currentBettingRound === 'preflop') {
+                // Update BB player's current bet
+                const updatedPlayerStates = currentHand.playerStates.map(player => {
+                  if (player.position === 'BB') {
+                    return { ...player, currentBet: value };
+                  }
+                  return player;
+                });
+
+                // Update hero money invested if hero is BB and hasn't acted yet
+                if (session.userSeat === 'BB') {
+                  const currentRound = currentHand.bettingRounds.preflop;
+                  const heroHasActed = currentRound?.actions.some(action => action.position === 'BB');
+                  if (!heroHasActed) {
+                    setHeroMoneyInvested(value);
+                  }
+                }
+
+                setCurrentHand({
+                  ...currentHand,
+                  bigBlind: value,
+                  playerStates: updatedPlayerStates,
+                  // Also update pot calculation for preflop
+                  pot: smallBlind + value + (ante * session.tableSeats),
+                  bettingRounds: {
+                    ...currentHand.bettingRounds,
+                    preflop: {
+                      ...currentHand.bettingRounds.preflop,
+                      pot: smallBlind + value + (ante * session.tableSeats),
+                      currentBet: value // BB is the current bet to match
+                    }
+                  }
+                });
+              }
+            }}
             onAnteChange={setAnte}
           />
         )}

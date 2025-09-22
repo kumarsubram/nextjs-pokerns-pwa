@@ -15,6 +15,7 @@ interface HandHistoryProps {
   className?: string;
   defaultExpanded?: boolean;
   hideShareButtons?: boolean;
+  showCustomShareInTracked?: boolean;
 }
 
 export function HandHistory({
@@ -23,7 +24,8 @@ export function HandHistory({
   userSeat,
   className,
   defaultExpanded = false,
-  hideShareButtons = false
+  hideShareButtons = false,
+  showCustomShareInTracked = false
 }: HandHistoryProps) {
   const [expandedHands, setExpandedHands] = useState<Set<number>>(() => {
     if (defaultExpanded) {
@@ -400,6 +402,45 @@ export function HandHistory({
           {hideShareButtons ? (
             /* When share buttons are hidden, show only the toggle button centered */
             <div className="flex justify-center">
+              <button
+                className={cn(
+                  "w-10 h-10 rounded-full flex items-center justify-center transition-all",
+                  isExpanded
+                    ? "bg-blue-500 hover:bg-blue-600 text-white"
+                    : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                )}
+                onClick={() => {
+                  const newExpanded = new Set(expandedHands);
+                  if (isExpanded) {
+                    newExpanded.delete(handNumber);
+                  } else {
+                    newExpanded.add(handNumber);
+                  }
+                  setExpandedHands(newExpanded);
+                }}
+                title={isExpanded ? "Hide details" : "Show details"}
+              >
+                {isExpanded ? (
+                  <ChevronUp className="h-5 w-5" />
+                ) : (
+                  <ChevronDown className="h-5 w-5" />
+                )}
+              </button>
+            </div>
+          ) : showCustomShareInTracked ? (
+            /* Custom layout for tracked page: Share button on left, dropdown on right */
+            <div className="flex justify-between items-center">
+              <button
+                onClick={() => {
+                  // TODO: Implement share functionality
+                }}
+                className="flex items-center justify-center gap-2 px-4 py-2 rounded-md border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-sm h-10"
+                title="Share this hand"
+              >
+                <Share2 className="h-4 w-4" />
+                <span>Share</span>
+              </button>
+
               <button
                 className={cn(
                   "w-10 h-10 rounded-full flex items-center justify-center transition-all",

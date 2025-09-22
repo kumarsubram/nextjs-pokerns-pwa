@@ -267,7 +267,7 @@ export function HandReplay({ trackedHand, onClose }: HandReplayProps) {
   const currentAction = getCurrentAction();
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {/* Header with Close Button */}
       <div className="flex justify-between items-center">
         <h2 className="text-lg font-semibold">Hand Replay</h2>
@@ -278,7 +278,7 @@ export function HandReplay({ trackedHand, onClose }: HandReplayProps) {
 
       {/* Poker Table */}
       <Card>
-        <CardContent className="p-6">
+        <CardContent className="p-4 sm:p-6">
           <SimplePokerTable
             seats={trackedHand.tableSeats}
             userSeat={trackedHand.userSeat}
@@ -296,35 +296,17 @@ export function HandReplay({ trackedHand, onClose }: HandReplayProps) {
         </CardContent>
       </Card>
 
-
-      {/* Replay Controls */}
+      {/* Replay Controls - Reduced vertical spacing */}
       <Card>
-        <CardContent className="p-4 space-y-4">
-          {/* Current Action Display */}
-          <div className="text-center">
-            <div className="text-sm text-gray-600 mb-2">
-              Round: <span className="font-semibold capitalize">{replayState.currentRound}</span>
-              {currentAction && (
-                <span className="ml-4">
-                  Action: <span className="font-semibold">
-                    {currentAction.position === trackedHand.userSeat ? 'Hero' : currentAction.position} {currentAction.action}
-                    {currentAction.amount && ` $${currentAction.amount}`}
-                  </span>
-                </span>
-              )}
-            </div>
-            <div className="text-xs text-gray-500">
-              Action {Math.max(0, replayState.currentActionIndex + 1)} of {replayState.allActions.length}
-            </div>
-          </div>
-
-          {/* Playback Controls */}
-          <div className="flex justify-center items-center gap-2">
+        <CardContent className="py-1 px-3">
+          {/* Playback Controls Row */}
+          <div className="flex justify-center items-center gap-2 mb-0">
             <Button
               variant="outline"
               size="sm"
               onClick={handleReset}
               disabled={replayState.currentActionIndex === -1}
+              className="h-8 w-8 p-0"
             >
               <RotateCcw className="h-4 w-4" />
             </Button>
@@ -334,6 +316,7 @@ export function HandReplay({ trackedHand, onClose }: HandReplayProps) {
               size="sm"
               onClick={handleStepBackward}
               disabled={replayState.currentActionIndex === -1}
+              className="h-8 w-8 p-0"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -342,6 +325,7 @@ export function HandReplay({ trackedHand, onClose }: HandReplayProps) {
               variant="outline"
               size="sm"
               onClick={handlePlayPause}
+              className="h-8 w-8 p-0"
             >
               {replayState.isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
             </Button>
@@ -351,6 +335,7 @@ export function HandReplay({ trackedHand, onClose }: HandReplayProps) {
               size="sm"
               onClick={handleStepForward}
               disabled={replayState.currentActionIndex >= replayState.allActions.length - 1}
+              className="h-8 w-8 p-0"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -364,12 +349,13 @@ export function HandReplay({ trackedHand, onClose }: HandReplayProps) {
                 isPlaying: false
               }))}
               disabled={replayState.currentActionIndex >= replayState.allActions.length - 1}
+              className="h-8 w-8 p-0"
             >
               <SkipForward className="h-4 w-4" />
             </Button>
           </div>
 
-          {/* Speed Control */}
+          {/* Speed Control Row */}
           <div className="flex justify-center items-center gap-2">
             <span className="text-sm text-gray-600">Speed:</span>
             {[0.5, 1, 2].map(speed => (
@@ -378,10 +364,48 @@ export function HandReplay({ trackedHand, onClose }: HandReplayProps) {
                 variant={replayState.playbackSpeed === 1000 / speed ? "default" : "outline"}
                 size="sm"
                 onClick={() => setReplayState(prev => ({ ...prev, playbackSpeed: 1000 / speed }))}
+                className="h-7 px-3 min-w-[45px]"
               >
                 {speed}x
               </Button>
             ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Current Action Display - Minimal padding */}
+      <Card>
+        <CardContent className="py-2 px-3">
+          <div className="text-center">
+            <div className="text-sm text-gray-600">
+              <span className="font-medium">Round:</span>{' '}
+              <span className="font-semibold capitalize text-gray-900">{replayState.currentRound}</span>
+              <span className="mx-2">•</span>
+              <span className="text-xs text-gray-500">
+                Action {Math.max(0, replayState.currentActionIndex + 1)} of {replayState.allActions.length}
+              </span>
+            </div>
+            {currentAction && (
+              <div className="text-base mt-1">
+                <span className="font-semibold">
+                  {currentAction.position === trackedHand.userSeat ? 'Hero' : currentAction.position}
+                </span>
+                {' '}
+                <span className={`font-bold ${
+                  currentAction.action === 'fold' ? 'text-red-600' :
+                  currentAction.action === 'check' ? 'text-blue-600' :
+                  currentAction.action === 'call' ? 'text-blue-600' :
+                  currentAction.action === 'raise' ? 'text-green-600' :
+                  currentAction.action === 'all-in' ? 'text-purple-600' :
+                  'text-gray-900'
+                }`}>
+                  {currentAction.action.toUpperCase()}
+                </span>
+                {currentAction.amount && (
+                  <span className="font-semibold text-gray-900"> ${currentAction.amount}</span>
+                )}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

@@ -6,7 +6,7 @@ import { HandHistory } from '@/components/poker/HandHistory';
 import { HandReplay } from '@/components/poker/HandReplay';
 import { TrackedHandService, TrackedHand } from '@/services/tracked-hand.service';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft, Play } from 'lucide-react';
+import { ArrowLeft, Play, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function TrackedHandDetail() {
@@ -15,6 +15,7 @@ export default function TrackedHandDetail() {
   const trackId = params?.id as string;
   const [trackedHand, setTrackedHand] = useState<TrackedHand | null>(null);
   const [showReplay, setShowReplay] = useState(false);
+  const [showSessionDetails, setShowSessionDetails] = useState(false);
 
   useEffect(() => {
     if (!trackId) {
@@ -75,62 +76,74 @@ export default function TrackedHandDetail() {
       <main className="container max-w-4xl mx-auto px-4 py-6">
         {/* Hand Info Header */}
         <Card className="mb-4">
-          <CardContent className="p-4">
-            {/* Top Row - Navigation Buttons */}
-            <div className="flex flex-col sm:flex-row gap-2 mb-4">
+          <CardContent className="p-0">
+            {/* Top Row - Navigation Buttons - Always in same row */}
+            <div className="flex flex-row gap-2 px-3">
               <Button
                 variant="outline"
-                size="sm"
                 onClick={() => router.push('/tracked')}
-                className="flex items-center justify-center gap-1 text-xs px-3 py-2 h-8 flex-1 sm:flex-none"
+                className="flex items-center justify-center gap-2 text-sm px-4 py-3 h-12 flex-1"
               >
-                <ArrowLeft className="h-3 w-3" />
-                <span className="hidden xs:inline">Back to Tracked</span>
-                <span className="xs:hidden">Back</span>
+                <ArrowLeft className="h-4 w-4" />
+                <span>Back</span>
               </Button>
 
               {!showReplay && (
                 <Button
                   variant="default"
-                  size="sm"
-                  className="bg-blue-600 hover:bg-blue-700 flex items-center justify-center gap-1 text-xs px-3 py-2 h-8 flex-1 sm:flex-none"
+                  className="bg-blue-600 hover:bg-blue-700 flex items-center justify-center gap-2 text-sm px-4 py-3 h-12 flex-1"
                   onClick={() => setShowReplay(true)}
                 >
-                  <Play className="h-3 w-3" />
-                  <span className="hidden xs:inline">Replay Hand</span>
-                  <span className="xs:hidden">Replay</span>
+                  <Play className="h-4 w-4" />
+                  <span>Replay</span>
                 </Button>
               )}
 
               <Button
                 variant="outline"
-                size="sm"
-                className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-300 hover:border-red-400 flex items-center justify-center gap-1 text-xs px-3 py-2 h-8 flex-1 sm:flex-none"
+                className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-300 hover:border-red-400 flex items-center justify-center gap-2 text-sm px-4 py-3 h-12 flex-1"
                 onClick={() => {
                   TrackedHandService.removeTrackedHand(trackedHand.sessionId, trackedHand.handNumber);
                   router.push('/tracked');
                 }}
               >
-                <span className="hidden xs:inline">Remove from Tracked</span>
-                <span className="xs:hidden">Remove tracked hand</span>
+                <span>Remove</span>
               </Button>
             </div>
 
-            {/* Session Details */}
-            <div className="space-y-2">
-              <div className="text-sm text-gray-600">
-                <span className="font-bold">Session Name:</span> {trackedHand.sessionName}
-              </div>
-              <div className="text-sm text-gray-600">
-                <span className="font-bold">Game Type:</span> {trackedHand.tableSeats} handed
-              </div>
-              <div className="text-sm text-gray-600">
-                <span className="font-bold">Position:</span> {trackedHand.userSeat}
-              </div>
-              <div className="text-sm text-gray-600">
-                <span className="font-bold">Tracked Time:</span> {formatDate(trackedHand.trackedAt)}
-              </div>
+            {/* Session Details Dropdown */}
+            <div className={`flex items-center justify-between px-3 mt-2 ${showSessionDetails ? '' : 'pb-0'}`}>
+              <span className="text-base font-medium text-gray-700">Session Details</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowSessionDetails(!showSessionDetails)}
+                className="h-7 w-7 p-0 rounded-full"
+              >
+                {showSessionDetails ? (
+                  <ChevronUp className="h-5 w-5" />
+                ) : (
+                  <ChevronDown className="h-5 w-5" />
+                )}
+              </Button>
             </div>
+
+            {showSessionDetails && (
+              <div className="px-3 space-y-1">
+                <div className="text-sm text-gray-600">
+                  <span className="font-bold">Session Name:</span> {trackedHand.sessionName}
+                </div>
+                <div className="text-sm text-gray-600">
+                  <span className="font-bold">Game Type:</span> {trackedHand.tableSeats} handed
+                </div>
+                <div className="text-sm text-gray-600">
+                  <span className="font-bold">Position:</span> {trackedHand.userSeat}
+                </div>
+                <div className="text-sm text-gray-600">
+                  <span className="font-bold">Tracked Time:</span> {formatDate(trackedHand.trackedAt)}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -148,7 +161,8 @@ export default function TrackedHandDetail() {
                 completedHands={[trackedHand]}
                 userSeat={trackedHand.userSeat}
                 defaultExpanded={true}
-                hideShareButtons={true}
+                hideShareButtons={false}
+                showCustomShareInTracked={true}
               />
             </div>
 

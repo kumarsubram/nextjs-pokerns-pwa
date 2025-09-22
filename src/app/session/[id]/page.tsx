@@ -526,7 +526,6 @@ export default function SessionPage() {
             }}
             title={`Hand #${SessionService.getCurrentHandNumber()} - Select your Seat`}
             showKeepCurrentButton={handCount > 0 && session.userSeat !== undefined}
-            onEndSession={endSession}
           />
         )}
         {/* Hand Info Header */}

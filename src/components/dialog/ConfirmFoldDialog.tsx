@@ -73,10 +73,8 @@ export function ConfirmFoldDialog({
               <div className="font-medium mb-3 text-blue-800">
                 Select Your Hole Cards (Required since you invested money)
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
+              <div className="flex gap-3 justify-center">
+                <button
                   onClick={() => {
                     onSetInlineCardSelection({
                       show: true,
@@ -85,13 +83,19 @@ export function ConfirmFoldDialog({
                       title: 'Select Your Card 1'
                     });
                   }}
-                  className="text-xs border-blue-300 hover:bg-blue-100"
+                  className={`w-12 h-16 rounded-lg border-2 text-sm font-bold flex items-center justify-center transition-all hover:scale-105 shadow-md ${
+                    currentHand?.userCards?.[0]
+                      ? `bg-white border-gray-800 ${
+                          currentHand.userCards[0].includes('♥') || currentHand.userCards[0].includes('♦')
+                            ? 'text-red-600'
+                            : 'text-gray-800'
+                        }`
+                      : 'bg-gray-100 border-gray-400 text-gray-500 hover:bg-gray-200'
+                  }`}
                 >
-                  {currentHand?.userCards?.[0] || 'Card 1'}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
+                  {currentHand?.userCards?.[0] || '?'}
+                </button>
+                <button
                   onClick={() => {
                     onSetInlineCardSelection({
                       show: true,
@@ -100,10 +104,21 @@ export function ConfirmFoldDialog({
                       title: 'Select Your Card 2'
                     });
                   }}
-                  className="text-xs border-blue-300 hover:bg-blue-100"
+                  className={`w-12 h-16 rounded-lg border-2 text-sm font-bold flex items-center justify-center transition-all hover:scale-105 shadow-md ${
+                    currentHand?.userCards?.[1]
+                      ? `bg-white border-gray-800 ${
+                          currentHand.userCards[1].includes('♥') || currentHand.userCards[1].includes('♦')
+                            ? 'text-red-600'
+                            : 'text-gray-800'
+                        }`
+                      : 'bg-gray-100 border-gray-400 text-gray-500 hover:bg-gray-200'
+                  }`}
                 >
-                  {currentHand?.userCards?.[1] || 'Card 2'}
-                </Button>
+                  {currentHand?.userCards?.[1] || '?'}
+                </button>
+              </div>
+              <div className="text-xs text-gray-600 mt-2 text-center">
+                Recording your cards helps with hand history tracking
               </div>
             </div>
           )}

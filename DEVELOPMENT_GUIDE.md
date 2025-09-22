@@ -3,7 +3,56 @@
 ## Project Overview
 A Progressive Web App for tracking poker sessions, hands, and statistics. Built with Next.js 15, TypeScript, and Tailwind CSS.
 
-## RECENT UPDATES (v2.17) ✅
+## RECENT UPDATES (v2.18) ✅
+
+### Hand Replay System - COMPLETED
+✅ **Interactive Hand Replay Feature**
+- Complete hand replay functionality for tracked hands only
+- Step-by-step action visualization with automatic playback
+- Real-time poker table updates showing betting actions and community cards
+- Variable speed controls (0.5x, 1x, 2x) for customized replay experience
+- Accurate pot calculation including blinds and progressive betting
+
+✅ **Replay UI Components**
+- Clean, focused layout with poker table as primary visual element
+- Integrated playback controls (play/pause, step forward/backward, reset)
+- Current action display showing round, position, and action details
+- Complete hand history action log at bottom for reference
+- Mobile-responsive design maintaining poker table clarity
+
+✅ **Technical Implementation**
+- New HandReplay component with state management for action sequencing
+- Proper pot calculation logic accounting for blinds and additional bets
+- Auto-start functionality beginning replay immediately at 1x speed
+- Integration with existing TrackedHand data structure and SimplePokerTable
+- Clean component architecture with proper TypeScript interfaces
+
+✅ **User Experience**
+- Accessible via "Replay Hand" button on tracked hand detail pages
+- Seamless toggle between hand history view and interactive replay
+- Auto-restart functionality for easy hand review
+- No data dependencies - uses existing tracked hand information
+
+```typescript
+// Core replay state management
+interface ReplayState {
+  currentRound: 'preflop' | 'flop' | 'turn' | 'river' | 'showdown';
+  currentActionIndex: number;
+  isPlaying: boolean;
+  playbackSpeed: number;
+  playerStates: PlayerState[];
+  communityCards: CommunityCards;
+  currentPot: number;
+  allActions: (BettingAction & { round: string })[];
+}
+
+// Accurate pot calculation with blinds
+let currentPot = 7; // Initial blinds (SB: 2, BB: 5)
+// Then add additional amounts from each action
+currentPot += additionalAmount;
+```
+
+## PREVIOUS UPDATES (v2.17) ✅
 
 ### Hand Tracking & Sharing System - COMPLETED
 ✅ **Track & Share Functionality**

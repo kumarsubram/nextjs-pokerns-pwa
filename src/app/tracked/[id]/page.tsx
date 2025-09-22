@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { HandHistory } from '@/components/poker/HandHistory';
+import { HandReplay } from '@/components/poker/HandReplay';
 import { TrackedHandService, TrackedHand } from '@/services/tracked-hand.service';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function TrackedHandDetail() {
@@ -13,6 +14,7 @@ export default function TrackedHandDetail() {
   const router = useRouter();
   const trackId = params?.id as string;
   const [trackedHand, setTrackedHand] = useState<TrackedHand | null>(null);
+  const [showReplay, setShowReplay] = useState(false);
 
   useEffect(() => {
     if (!trackId) {
@@ -75,27 +77,42 @@ export default function TrackedHandDetail() {
         <Card className="mb-4">
           <CardContent className="p-4">
             {/* Top Row - Navigation Buttons */}
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex flex-col sm:flex-row gap-2 mb-4">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => router.push('/tracked')}
-                className="flex items-center gap-2"
+                className="flex items-center justify-center gap-1 text-xs px-3 py-2 h-8 flex-1 sm:flex-none"
               >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Tracked
+                <ArrowLeft className="h-3 w-3" />
+                <span className="hidden xs:inline">Back to Tracked</span>
+                <span className="xs:hidden">Back</span>
               </Button>
+
+              {!showReplay && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700 flex items-center justify-center gap-1 text-xs px-3 py-2 h-8 flex-1 sm:flex-none"
+                  onClick={() => setShowReplay(true)}
+                >
+                  <Play className="h-3 w-3" />
+                  <span className="hidden xs:inline">Replay Hand</span>
+                  <span className="xs:hidden">Replay</span>
+                </Button>
+              )}
 
               <Button
                 variant="outline"
                 size="sm"
-                className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-300 hover:border-red-400"
+                className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-300 hover:border-red-400 flex items-center justify-center gap-1 text-xs px-3 py-2 h-8 flex-1 sm:flex-none"
                 onClick={() => {
                   TrackedHandService.removeTrackedHand(trackedHand.sessionId, trackedHand.handNumber);
                   router.push('/tracked');
                 }}
               >
-                Remove from Tracked
+                <span className="hidden xs:inline">Remove from Tracked</span>
+                <span className="xs:hidden">Remove tracked hand</span>
               </Button>
             </div>
 
@@ -117,30 +134,40 @@ export default function TrackedHandDetail() {
           </CardContent>
         </Card>
 
-        {/* Hand Details using HandHistory Component */}
-        <div className="bg-white rounded-lg shadow-sm">
-          <HandHistory
-            completedHands={[trackedHand]}
-            userSeat={trackedHand.userSeat}
-            defaultExpanded={true}
-            hideShareButtons={true}
+        {/* Conditional Content: Show either Hand History or Replay */}
+        {showReplay ? (
+          <HandReplay
+            trackedHand={trackedHand}
+            onClose={() => setShowReplay(false)}
           />
-        </div>
-
-        {/* Navigation Options */}
-        <Card className="mt-4">
-          <CardContent className="p-4">
-            <div className="text-center">
-              <Button
-                variant="outline"
-                className="w-full sm:w-auto text-base h-14"
-                onClick={() => router.push(`/session/${trackedHand.sessionId}/history`)}
-              >
-                View Full Session
-              </Button>
+        ) : (
+          <>
+            {/* Hand Details using HandHistory Component */}
+            <div className="bg-white rounded-lg shadow-sm">
+              <HandHistory
+                completedHands={[trackedHand]}
+                userSeat={trackedHand.userSeat}
+                defaultExpanded={true}
+                hideShareButtons={true}
+              />
             </div>
-          </CardContent>
-        </Card>
+
+            {/* Navigation Options */}
+            <Card className="mt-4">
+              <CardContent className="p-4">
+                <div className="text-center">
+                  <Button
+                    variant="outline"
+                    className="w-full sm:w-auto text-base h-14"
+                    onClick={() => router.push(`/session/${trackedHand.sessionId}/history`)}
+                  >
+                    View Full Session
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </main>
     </div>
   );

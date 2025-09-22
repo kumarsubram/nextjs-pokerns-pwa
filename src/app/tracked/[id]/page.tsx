@@ -70,40 +70,12 @@ export default function TrackedHandDetail() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20 sm:pb-0">
-      {/* Page Header */}
-      <div className="bg-white border-b px-4 py-4">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push('/tracked')}
-            className="p-2"
-          >
-            <ArrowLeft className="h-5 w-5" />
-            <span className="ml-2">Back</span>
-          </Button>
-          <h1 className="text-xl font-bold">Hand #{trackedHand.handNumber}</h1>
-        </div>
-      </div>
-
       <main className="container max-w-4xl mx-auto px-4 py-6">
         {/* Hand Info Header */}
         <Card className="mb-4">
           <CardContent className="p-4">
-            <div className="flex justify-between items-start mb-3">
-              <div>
-                <h2 className="text-lg font-semibold mb-1">
-                  {trackedHand.sessionName}
-                </h2>
-                <div className="text-sm text-gray-600 space-y-1">
-                  <div>Hand #{trackedHand.handNumber}</div>
-                  <div>{trackedHand.tableSeats} handed • Position: {trackedHand.userSeat}</div>
-                  <div className="text-xs text-gray-500">
-                    Tracked on {formatDate(trackedHand.trackedAt)}
-                  </div>
-                </div>
-              </div>
-
+            {/* Top Row - Navigation Buttons */}
+            <div className="flex justify-between items-center mb-4">
               <Button
                 variant="outline"
                 size="sm"
@@ -113,6 +85,34 @@ export default function TrackedHandDetail() {
                 <ArrowLeft className="h-4 w-4" />
                 Back to Tracked
               </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-300 hover:border-red-400"
+                onClick={() => {
+                  TrackedHandService.removeTrackedHand(trackedHand.sessionId, trackedHand.handNumber);
+                  router.push('/tracked');
+                }}
+              >
+                Remove from Tracked
+              </Button>
+            </div>
+
+            {/* Session Details */}
+            <div className="space-y-2">
+              <div className="text-sm text-gray-600">
+                <span className="font-bold">Session Name:</span> {trackedHand.sessionName}
+              </div>
+              <div className="text-sm text-gray-600">
+                <span className="font-bold">Game Type:</span> {trackedHand.tableSeats} handed
+              </div>
+              <div className="text-sm text-gray-600">
+                <span className="font-bold">Position:</span> {trackedHand.userSeat}
+              </div>
+              <div className="text-sm text-gray-600">
+                <span className="font-bold">Tracked Time:</span> {formatDate(trackedHand.trackedAt)}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -130,23 +130,13 @@ export default function TrackedHandDetail() {
         {/* Navigation Options */}
         <Card className="mt-4">
           <CardContent className="p-4">
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="text-center">
               <Button
                 variant="outline"
-                className="flex-1"
-                onClick={() => router.push(`/session/${trackedHand.sessionId}`)}
+                className="w-full sm:w-auto text-base h-14"
+                onClick={() => router.push(`/session/${trackedHand.sessionId}/history`)}
               >
                 View Full Session
-              </Button>
-              <Button
-                variant="outline"
-                className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
-                onClick={() => {
-                  TrackedHandService.removeTrackedHand(trackedHand.sessionId, trackedHand.handNumber);
-                  router.push('/tracked');
-                }}
-              >
-                Remove from Tracked
               </Button>
             </div>
           </CardContent>

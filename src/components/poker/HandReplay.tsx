@@ -278,7 +278,7 @@ export function HandReplay({ trackedHand, onClose }: HandReplayProps) {
 
       {/* Poker Table */}
       <Card>
-        <CardContent className="p-4 sm:p-6">
+        <CardContent className="p-4">
           <SimplePokerTable
             seats={trackedHand.tableSeats}
             userSeat={trackedHand.userSeat}
@@ -296,119 +296,99 @@ export function HandReplay({ trackedHand, onClose }: HandReplayProps) {
         </CardContent>
       </Card>
 
-      {/* Replay Controls - Reduced vertical spacing */}
-      <Card>
-        <CardContent className="py-1 px-3">
-          {/* Playback Controls Row */}
-          <div className="flex justify-center items-center gap-2 mb-0">
+      {/* Replay Controls - Compact div */}
+      <div className="bg-white rounded-lg border p-1">
+        <div className="flex justify-center items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleReset}
+            disabled={replayState.currentActionIndex === -1}
+            className="h-8 w-8 p-0"
+          >
+            <RotateCcw className="h-4 w-4" />
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleStepBackward}
+            disabled={replayState.currentActionIndex === -1}
+            className="h-8 w-8 p-0"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePlayPause}
+            className="h-8 w-8 p-0"
+          >
+            {replayState.isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleStepForward}
+            disabled={replayState.currentActionIndex >= replayState.allActions.length - 1}
+            className="h-8 w-8 p-0"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+
+          {/* Speed controls on same row with divider */}
+          <div className="h-6 w-px bg-gray-300 mx-1"></div>
+
+          {[0.5, 1, 2].map(speed => (
             <Button
-              variant="outline"
+              key={speed}
+              variant={replayState.playbackSpeed === 1000 / speed ? "default" : "outline"}
               size="sm"
-              onClick={handleReset}
-              disabled={replayState.currentActionIndex === -1}
-              className="h-8 w-8 p-0"
+              onClick={() => setReplayState(prev => ({ ...prev, playbackSpeed: 1000 / speed }))}
+              className="h-7 px-2 min-w-[40px]"
             >
-              <RotateCcw className="h-4 w-4" />
+              {speed}x
             </Button>
+          ))}
+        </div>
+      </div>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleStepBackward}
-              disabled={replayState.currentActionIndex === -1}
-              className="h-8 w-8 p-0"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handlePlayPause}
-              className="h-8 w-8 p-0"
-            >
-              {replayState.isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-            </Button>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleStepForward}
-              disabled={replayState.currentActionIndex >= replayState.allActions.length - 1}
-              className="h-8 w-8 p-0"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setReplayState(prev => ({
-                ...prev,
-                currentActionIndex: prev.allActions.length - 1,
-                isPlaying: false
-              }))}
-              disabled={replayState.currentActionIndex >= replayState.allActions.length - 1}
-              className="h-8 w-8 p-0"
-            >
-              <SkipForward className="h-4 w-4" />
-            </Button>
-          </div>
-
-          {/* Speed Control Row */}
-          <div className="flex justify-center items-center gap-2">
-            <span className="text-sm text-gray-600">Speed:</span>
-            {[0.5, 1, 2].map(speed => (
-              <Button
-                key={speed}
-                variant={replayState.playbackSpeed === 1000 / speed ? "default" : "outline"}
-                size="sm"
-                onClick={() => setReplayState(prev => ({ ...prev, playbackSpeed: 1000 / speed }))}
-                className="h-7 px-3 min-w-[45px]"
-              >
-                {speed}x
-              </Button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Current Action Display - Minimal padding */}
-      <Card>
-        <CardContent className="py-2 px-3">
-          <div className="text-center">
-            <div className="text-sm text-gray-600">
-              <span className="font-medium">Round:</span>{' '}
-              <span className="font-semibold capitalize text-gray-900">{replayState.currentRound}</span>
-              <span className="mx-2">•</span>
-              <span className="text-xs text-gray-500">
-                Action {Math.max(0, replayState.currentActionIndex + 1)} of {replayState.allActions.length}
+      {/* Current Action Display - Compact div */}
+      <div className="bg-white rounded-lg border p-2">
+        <div className="text-center">
+          {currentAction && (
+            <div className="text-base mb-1">
+              <span className="font-semibold">
+                {currentAction.position === trackedHand.userSeat ? 'Hero' : currentAction.position}
               </span>
+              {' '}
+              <span className={`font-bold ${
+                currentAction.action === 'fold' ? 'text-red-600' :
+                currentAction.action === 'check' ? 'text-blue-600' :
+                currentAction.action === 'call' ? 'text-blue-600' :
+                currentAction.action === 'raise' ? 'text-green-600' :
+                currentAction.action === 'all-in' ? 'text-purple-600' :
+                'text-gray-900'
+              }`}>
+                {currentAction.action.toUpperCase()}
+              </span>
+              {currentAction.amount && (
+                <span className="font-semibold text-gray-900"> ${currentAction.amount}</span>
+              )}
             </div>
-            {currentAction && (
-              <div className="text-base mt-1">
-                <span className="font-semibold">
-                  {currentAction.position === trackedHand.userSeat ? 'Hero' : currentAction.position}
-                </span>
-                {' '}
-                <span className={`font-bold ${
-                  currentAction.action === 'fold' ? 'text-red-600' :
-                  currentAction.action === 'check' ? 'text-blue-600' :
-                  currentAction.action === 'call' ? 'text-blue-600' :
-                  currentAction.action === 'raise' ? 'text-green-600' :
-                  currentAction.action === 'all-in' ? 'text-purple-600' :
-                  'text-gray-900'
-                }`}>
-                  {currentAction.action.toUpperCase()}
-                </span>
-                {currentAction.amount && (
-                  <span className="font-semibold text-gray-900"> ${currentAction.amount}</span>
-                )}
-              </div>
-            )}
+          )}
+          <div className="text-sm text-gray-600">
+            <span className="font-medium">Round:</span>{' '}
+            <span className="font-semibold capitalize text-gray-900">{replayState.currentRound}</span>
+            <span className="mx-2">•</span>
+            <span className="text-xs text-gray-500">
+              Action {Math.max(0, replayState.currentActionIndex + 1)} of {replayState.allActions.length}
+            </span>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Hand History Action Log */}
       <Card>

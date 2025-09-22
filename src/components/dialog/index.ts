@@ -6,3 +6,4 @@ export { HeroMustActFirstDialog } from './HeroMustActFirstDialog';
 export { AutoActionConfirmDialog } from './AutoActionConfirmDialog';
 export { ValidationErrorDialog } from './ValidationErrorDialog';
 export { UnshareDialog } from './UnshareDialog';
+export { EndHandDialog } from './EndHandDialog';

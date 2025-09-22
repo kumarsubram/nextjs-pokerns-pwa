@@ -8,6 +8,7 @@ import { TableSeats, Position } from '@/types/poker-v2';
 interface SeatSelectorProps {
   tableSeats: TableSeats;
   currentSeat?: Position;
+  suggestedSeat?: Position;
   onSeatSelect: (position: Position) => void;
   onKeepCurrentSeat?: () => void;
   title: string;
@@ -17,6 +18,7 @@ interface SeatSelectorProps {
 export function SeatSelector({
   tableSeats,
   currentSeat,
+  suggestedSeat,
   onSeatSelect,
   onKeepCurrentSeat,
   title,
@@ -40,13 +42,13 @@ export function SeatSelector({
           />
         </div>
 
-        {showKeepCurrentButton && currentSeat && onKeepCurrentSeat && (
+        {showKeepCurrentButton && suggestedSeat && onKeepCurrentSeat && (
           <div className="text-center">
             <Button
               variant="outline"
               onClick={onKeepCurrentSeat}
             >
-              Keep Current Seat ({currentSeat})
+              Choose Seat {suggestedSeat}
             </Button>
           </div>
         )}

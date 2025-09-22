@@ -20,6 +20,7 @@ interface UseBettingLogicProps {
   currentHand: CurrentHand | null;
   setCurrentHand: (hand: CurrentHand | null) => void;
   stack: number;
+  setStack: (stack: number | ((prev: number) => number)) => void;
   heroMoneyInvested: number;
   setHeroMoneyInvested: (amount: number | ((prev: number) => number)) => void;
   completeHand: (outcome: 'won' | 'lost' | 'folded', potWon?: number) => void;
@@ -37,6 +38,7 @@ export function useBettingLogic({
   currentHand,
   setCurrentHand,
   stack,
+  setStack,
   heroMoneyInvested,
   setHeroMoneyInvested,
   completeHand,
@@ -169,11 +171,13 @@ export function useBettingLogic({
       updatedHand = autoFoldPlayersBetween(updatedHand, currentHand.nextToAct, position);
     }
 
-    // Track hero's money investment
+    // Track hero's money investment and reduce stack
     if (position === session.userSeat && amount) {
       const currentBet = updatedHand.playerStates.find(p => p.position === position)?.currentBet || 0;
       const additionalInvestment = amount - currentBet;
       setHeroMoneyInvested(prev => prev + additionalInvestment);
+      // Reduce stack by the additional investment
+      setStack(prev => prev - additionalInvestment);
     }
 
     const bettingAction: Omit<BettingAction, 'timestamp'> = {
@@ -298,6 +302,7 @@ export function useBettingLogic({
     setSelectedPosition,
     setShowPositionActions,
     setHeroMoneyInvested,
+    setStack,
     autoFoldPlayersBetween,
     setCurrentHand,
     setShowAllFoldedDialog,

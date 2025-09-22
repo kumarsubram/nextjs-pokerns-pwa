@@ -254,12 +254,12 @@ export function SimplePokerTable({
                   position === 'DEALER' && "bg-gray-900 border-2 border-gray-700 text-white cursor-default",
                   // Action-based styling takes priority
                   position !== 'DEALER' && actionColor && actionColor,
-                  // Next to act styling with dashed border - only if no action taken
-                  position !== 'DEALER' && isNextToAct && !actionColor && "bg-green-600 border-2 border-dashed border-green-300 text-white shadow-lg",
-                  // User seat styling - only if no action taken
-                  position !== 'DEALER' && isUserSeat && !actionColor && !isNextToAct && "bg-blue-600 border-2 border-blue-400 text-white shadow-lg ring-2 ring-blue-300",
-                  // Other highlighted positions - only if no action taken
-                  position !== 'DEALER' && !isUserSeat && !actionColor && !isNextToAct && isHighlighted && "bg-yellow-500 border-2 border-yellow-400 text-gray-900",
+                  // Manually highlighted positions (yellow) - takes priority over next-to-act
+                  position !== 'DEALER' && !actionColor && isHighlighted && "bg-yellow-500 border-2 border-yellow-400 text-gray-900",
+                  // Next to act styling with dashed border - only if no action taken and not highlighted
+                  position !== 'DEALER' && isNextToAct && !actionColor && !isHighlighted && "bg-green-600 border-2 border-dashed border-green-300 text-white shadow-lg",
+                  // User seat styling - only if no action taken and not highlighted
+                  position !== 'DEALER' && isUserSeat && !actionColor && !isNextToAct && !isHighlighted && "bg-blue-600 border-2 border-blue-400 text-white shadow-lg ring-2 ring-blue-300",
                   // Default active player styling - only if no action taken
                   position !== 'DEALER' && !isUserSeat && !actionColor && !isNextToAct && !isHighlighted && "bg-gray-700 border-2 border-gray-600 text-gray-300",
                   // Hover effects - only for active players

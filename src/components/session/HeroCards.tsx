@@ -14,14 +14,17 @@ export function HeroCards({ currentHand, userSeat, onCardClick }: HeroCardsProps
   }
 
   return (
-    <div className="bg-white rounded-lg px-3 py-2 shadow-sm mb-2 h-16 flex items-center">
-      <div className="flex items-center gap-3 w-full">
-        <span className="text-sm font-medium text-gray-600">Your Cards:</span>
+    <div className="bg-white rounded-lg px-4 py-2 shadow-sm mb-2 h-16 flex items-center">
+      <div className="flex items-center justify-between w-full">
+        <div className="flex flex-col">
+          <div className="text-xs text-gray-500 leading-tight">Your</div>
+          <div className="text-xs text-gray-500 leading-tight">Cards</div>
+        </div>
         <div className="flex gap-2">
           {/* Card 1 */}
           <button
             onClick={() => onCardClick(1)}
-            className={`w-10 h-12 rounded border text-sm font-bold flex items-center justify-center transition-all hover:scale-105 ${
+            className={`w-11 h-11 rounded border text-sm font-bold flex items-center justify-center transition-all hover:scale-105 ${
               currentHand.userCards?.[0]
                 ? `bg-white border-gray-700 ${
                     currentHand.userCards[0].includes('♥') || currentHand.userCards[0].includes('♦')
@@ -36,7 +39,7 @@ export function HeroCards({ currentHand, userSeat, onCardClick }: HeroCardsProps
           {/* Card 2 */}
           <button
             onClick={() => onCardClick(2)}
-            className={`w-10 h-12 rounded border text-sm font-bold flex items-center justify-center transition-all hover:scale-105 ${
+            className={`w-11 h-11 rounded border text-sm font-bold flex items-center justify-center transition-all hover:scale-105 ${
               currentHand.userCards?.[1]
                 ? `bg-white border-gray-700 ${
                     currentHand.userCards[1].includes('♥') || currentHand.userCards[1].includes('♦')

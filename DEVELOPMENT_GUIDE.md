@@ -3,7 +3,87 @@
 ## Project Overview
 A Progressive Web App for tracking poker sessions, hands, and statistics. Built with Next.js 15, TypeScript, and Tailwind CSS.
 
-## RECENT UPDATES (v2.14) ✅
+## RECENT UPDATES (v2.15) ✅
+
+### Hero Stack Reduction Fix & UI Enhancements - COMPLETED
+✅ **Hero Stack Reduction Bug Fix**
+- Fixed critical issue where hero's stack wasn't reducing during betting actions (calls, raises, all-ins)
+- Updated `useBettingLogic` hook to include `setStack` parameter and logic
+- Hero's stack now properly decreases by the amount invested during each betting action
+- Stack reduction works correctly for all hero actions: call, raise, and all-in
+- Maintains proper poker flow: blinds deducted at start → additional bets deducted during play → winnings added at completion
+
+✅ **Enhanced Seat Selection Features**
+- **Auto-Advance Seat Rotation**: After each hand, seat selector automatically suggests the next position in rotation
+  - 6-handed: BTN → SB → BB → UTG → LJ → CO (wraps back to BTN)
+  - 9-handed: BTN → SB → BB → UTG → UTG+1 → UTG+2 → LJ → HJ → CO (wraps back to BTN)
+- **Updated Button Text**: Changed from "Keep Current Seat" to "Choose Seat [position]" (e.g., "Choose Seat UTG+1")
+- **Yellow Seat Highlighting**: Manually selected seats now show yellow highlight with proper visual priority
+- **Improved Seat Selection UX**: Clicking same seat twice deselects it, hero seat click clears selection
+
+✅ **End Hand Dialog Implementation**
+- **New End Hand Button**: Added red "End Hand" button next to Next to Act section
+- **Hand Abandonment Logic**: Clicking "End Hand" → "OK" abandons current hand without tracking
+- **Seat Selection Flow**: After abandoning hand, user proceeds directly to seat selection for next hand
+- **No Data Tracking**: Abandoned hands are not saved to session history
+
+✅ **Visual Styling Improvements**
+- **HeroCards Component Redesign**:
+  - Text "Your Cards" moved to left side as two lines
+  - Cards positioned on right side of component
+  - Increased card size (11x11) for better visibility
+  - Horizontal layout with proper spacing
+- **Layout Optimization**:
+  - Your Cards: Takes maximum space (`flex-grow`)
+  - Next to Act: Reduced to compact size (`w-24`)
+  - End Hand: Auto-sized button matching header style
+- **Button Styling Consistency**: End Hand button styled to match End Session button (white background, red text, gray border)
+
+✅ **Visual Priority System Enhancement**
+- **Fixed Seat Highlighting Priority**: Yellow manual selection now overrides green next-to-act indicator
+- **Clear Visual Feedback**:
+  - Green (dashed border): Next to Act position
+  - Yellow: Manually selected position (takes priority)
+  - Blue (with ring): Hero seat when not selected
+  - Gray: Default for other seats
+- **Improved User Experience**: Clear distinction between automatic indicators and manual selections
+
+✅ **Technical Implementation Details**
+```typescript
+// Enhanced stack reduction in useBettingLogic
+if (position === session.userSeat && amount) {
+  const currentBet = updatedHand.playerStates.find(p => p.position === position)?.currentBet || 0;
+  const additionalInvestment = amount - currentBet;
+  setHeroMoneyInvested(prev => prev + additionalInvestment);
+  // NEW: Reduce stack by the additional investment
+  setStack(prev => prev - additionalInvestment);
+}
+
+// Auto-advance seat selection
+function getNextSeatPosition(currentSeat: Position, tableSeats: TableSeats): Position {
+  const positions = tableSeats === 6
+    ? ['BTN', 'SB', 'BB', 'UTG', 'LJ', 'CO'] as Position[]
+    : ['BTN', 'SB', 'BB', 'UTG', 'UTG+1', 'UTG+2', 'LJ', 'HJ', 'CO'] as Position[];
+  const currentIndex = positions.indexOf(currentSeat);
+  const nextIndex = (currentIndex + 1) % positions.length;
+  return positions[nextIndex];
+}
+
+// Enhanced visual priority in SimplePokerTable
+// Manually highlighted positions (yellow) - takes priority over next-to-act
+position !== 'DEALER' && !actionColor && isHighlighted && "bg-yellow-500 border-2 border-yellow-400 text-gray-900",
+// Next to act styling - only if not highlighted
+position !== 'DEALER' && isNextToAct && !actionColor && !isHighlighted && "bg-green-600 border-2 border-dashed border-green-300 text-white shadow-lg",
+```
+
+✅ **User Experience Improvements**
+- **Streamlined Hand Flow**: End Hand → Abandon → Seat Selection → New Hand
+- **Accurate Stack Tracking**: Real-time stack updates during betting actions
+- **Enhanced Visual Feedback**: Clear seat selection and next-to-act indicators
+- **Consistent UI Design**: Matching button styles across components
+- **Improved Layout**: Optimized space distribution for better mobile UX
+
+## PREVIOUS UPDATES (v2.14) ✅
 
 ### Session Page Refactoring Phase 6A: PositionActionSelector Component - COMPLETED
 ✅ **Position Action Selector Component Extraction**

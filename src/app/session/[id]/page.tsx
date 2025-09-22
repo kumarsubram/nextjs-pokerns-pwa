@@ -13,7 +13,8 @@ import {
   ConfirmFoldDialog,
   HeroMustActFirstDialog,
   AutoActionConfirmDialog,
-  ValidationErrorDialog
+  ValidationErrorDialog,
+  EndHandDialog
 } from '@/components/dialog';
 import {
   HeroCards,
@@ -29,12 +30,26 @@ import { useBettingLogic } from '@/hooks/useBettingLogic';
 import { useCommunityCards } from '@/hooks/useCommunityCards';
 import { useHeroCards } from '@/hooks/useHeroCards';
 import { SessionService } from '@/services/session.service';
-import { SessionMetadata, CurrentHand, Position, StoredHand } from '@/types/poker-v2';
+import { SessionMetadata, CurrentHand, Position, StoredHand, TableSeats } from '@/types/poker-v2';
 import {
   isBettingRoundComplete,
   getPreflopActionSequence,
   getPostflopActionSequence
 } from '@/utils/poker-logic';
+
+// Helper function to get the next seat position in the rotation
+function getNextSeatPosition(currentSeat: Position, tableSeats: TableSeats): Position {
+  const positions = tableSeats === 6
+    ? ['BTN', 'SB', 'BB', 'UTG', 'LJ', 'CO'] as Position[]
+    : ['BTN', 'SB', 'BB', 'UTG', 'UTG+1', 'UTG+2', 'LJ', 'HJ', 'CO'] as Position[];
+
+  const currentIndex = positions.indexOf(currentSeat);
+  if (currentIndex === -1) return currentSeat; // fallback
+
+  // Move to next position (wrap around)
+  const nextIndex = (currentIndex + 1) % positions.length;
+  return positions[nextIndex];
+}
 
 export default function SessionPage() {
   const router = useRouter();
@@ -95,14 +110,24 @@ export default function SessionPage() {
   const [showSeatSelection, setShowSeatSelection] = useState(false);
   const [handCount, setHandCount] = useState(0);
   const [completedHands, setCompletedHands] = useState<StoredHand[]>([]);
+  const [suggestedNextSeat, setSuggestedNextSeat] = useState<Position | null>(null);
   // Dialog state declarations
   const [showValidationError, setShowValidationError] = useState(false);
   const [validationErrorMessage, setValidationErrorMessage] = useState('');
   const [pendingHandCompletion, setPendingHandCompletion] = useState<{ outcome: 'won' | 'lost' | 'folded', potWon?: number } | null>(null);
   const [showAllFoldedDialog, setShowAllFoldedDialog] = useState(false);
+  // End hand dialog
+  const [showEndHandDialog, setShowEndHandDialog] = useState(false);
+
+  // Calculate suggested next seat when showing seat selection
+  useEffect(() => {
+    if (showSeatSelection && session && session.userSeat && handCount > 0) {
+      setSuggestedNextSeat(getNextSeatPosition(session.userSeat, session.tableSeats));
+    }
+  }, [showSeatSelection, session, handCount]);
 
   // Initialize hand flow hook
-  const { startNewHandWithPosition, startNewHand, completeHand } = useHandFlow({
+  const { startNewHandWithPosition, completeHand } = useHandFlow({
     session,
     currentHand,
     setCurrentHand,
@@ -147,6 +172,7 @@ export default function SessionPage() {
     currentHand,
     setCurrentHand,
     stack,
+    setStack,
     heroMoneyInvested,
     setHeroMoneyInvested,
     completeHand,
@@ -466,6 +492,7 @@ export default function SessionPage() {
           <SeatSelector
             tableSeats={session.tableSeats}
             currentSeat={session.userSeat}
+            suggestedSeat={suggestedNextSeat || (session.userSeat ? getNextSeatPosition(session.userSeat, session.tableSeats) : undefined)}
             onSeatSelect={(position) => {
               if (position !== 'DEALER') {
                 // Prevent seat selection during active hands
@@ -485,9 +512,16 @@ export default function SessionPage() {
               }
             }}
             onKeepCurrentSeat={() => {
-              setShowSeatSelection(false);
-              // Keep current seat and start new hand
-              startNewHand();
+              const nextSeat = suggestedNextSeat || (session.userSeat ? getNextSeatPosition(session.userSeat, session.tableSeats) : session.userSeat);
+              if (nextSeat) {
+                setShowSeatSelection(false);
+                // Update session with suggested next seat
+                const updatedSession = { ...session, userSeat: nextSeat };
+                setSession(updatedSession);
+                SessionService.updateSessionMetadata(updatedSession);
+                // Start new hand with the suggested seat
+                startNewHandWithPosition(updatedSession, nextSeat);
+              }
             }}
             title={`Hand #${SessionService.getCurrentHandNumber()} - Select your Seat`}
             showKeepCurrentButton={handCount > 0 && session.userSeat !== undefined}
@@ -562,6 +596,10 @@ export default function SessionPage() {
                   // Clear states when clicking hero's seat to show default "Hero Actions" display
                   setSelectedPosition(null);
                   setShowPositionActions(false);
+                } else if (position === selectedPosition) {
+                  // Clicking the same position again deselects it
+                  setSelectedPosition(null);
+                  setShowPositionActions(false);
                 } else {
                   setSelectedPosition(position);
                   setShowPositionActions(true);
@@ -585,10 +623,10 @@ export default function SessionPage() {
         </div>
         )}
 
-        {/* Hero Cards and Next to Act Section - Below table, above action buttons */}
+        {/* Hero Cards, Next to Act, and End Hand Section - Below table, above action buttons */}
         {!showSeatSelection && currentHand && (
-          <div className="flex gap-2 mb-2">
-            <div className="flex-1">
+          <div className="flex gap-2 mb-2 items-stretch">
+            <div className="flex-grow">
               <HeroCards
                 currentHand={currentHand}
                 userSeat={session?.userSeat}
@@ -597,11 +635,19 @@ export default function SessionPage() {
                 }}
               />
             </div>
-            <div className="flex-1">
+            <div className="w-24">
               <NextToAct
                 currentHand={currentHand}
                 userSeat={session?.userSeat}
               />
+            </div>
+            <div className="flex items-center">
+              <button
+                onClick={() => setShowEndHandDialog(true)}
+                className="bg-white hover:bg-gray-50 text-red-600 border border-gray-300 rounded-md px-3 py-1.5 text-sm font-medium transition-colors"
+              >
+                End Hand
+              </button>
             </div>
           </div>
         )}
@@ -805,6 +851,49 @@ export default function SessionPage() {
           message={validationErrorMessage}
           onSelectCards={() => openHeroCardSelector(1)}
           getDialogClasses={getDialogClasses}
+        />
+
+        {/* End Hand Dialog */}
+        <EndHandDialog
+          open={showEndHandDialog}
+          onOpenChange={setShowEndHandDialog}
+          onConfirm={() => {
+            // Reset all hand-related state without tracking
+            setCurrentHand(null);
+            setSelectedCard1(null);
+            setSelectedCard2(null);
+            setShowCardSelector(false);
+            setSelectingCard(1);
+            setShowCommunitySelector(false);
+            setSelectingCommunityCard(null);
+            setSelectedPosition(null);
+            setShowPositionActions(false);
+            setShowAmountModal(false);
+            setAmountModalError(null);
+            setShowFoldConfirmation(false);
+            setFoldPosition(null);
+            setShowAutoActionConfirmation(false);
+            setPendingAction(null);
+            setAffectedSeats([]);
+            setShowHeroMustActFirst(false);
+            setHeroMoneyInvested(0);
+            setShowOutcomeSelection(false);
+            setOpponentCards({} as Record<Position, [string, string] | null>);
+            setInlineCardSelection({
+              show: false,
+              position: null,
+              cardIndex: 1,
+              title: ''
+            });
+            setAutoSelectingCommunityCards(false);
+            setShowValidationError(false);
+            setValidationErrorMessage('');
+            setPendingHandCompletion(null);
+            setShowAllFoldedDialog(false);
+
+            // Show seat selection instead of starting new hand immediately
+            setShowSeatSelection(true);
+          }}
         />
 
         {/* Community Card Selector Space - Reserve space to prevent layout shift */}

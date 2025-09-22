@@ -212,6 +212,18 @@ export function useHandFlow({
     // Calculate effective winnings based on side pot logic
     const effectivePotWon = calculateEffectivePotWinnings(outcome, potWon);
 
+    // Calculate new stack amount (stack was already reduced during betting)
+    const stackBefore = stack;
+    let newStackAmount: number;
+
+    if (outcome === 'won') {
+      // Win: Add the full pot to current stack (investment already deducted during betting)
+      newStackAmount = stackBefore + effectivePotWon;
+    } else {
+      // Loss/Fold: Stack stays at current amount (investment already deducted during betting)
+      newStackAmount = stackBefore;
+    }
+
     // Save hand to storage
     const handData: StoredHand = {
       handNumber: currentHand.handNumber,
@@ -223,7 +235,7 @@ export function useHandFlow({
       result: {
         winner: outcome === 'won' ? session.userSeat : undefined,
         potWon: outcome === 'won' ? (effectivePotWon - heroMoneyInvested) : (outcome === 'lost' ? heroMoneyInvested : undefined),
-        stackAfter: stack + (outcome === 'won' ? effectivePotWon : 0) - heroMoneyInvested,
+        stackAfter: newStackAmount,
         handOutcome: outcome,
         opponentCards: Object.keys(opponentCards).length > 0 ? opponentCards : undefined
       }
@@ -234,18 +246,16 @@ export function useHandFlow({
     // Clear current hand from storage since it's completed
     SessionService.clearCurrentHand(session.sessionId);
 
-    // Update stack to the calculated stackAfter value
-    const stackBefore = stack;
-    const winnings = outcome === 'won' ? effectivePotWon : 0;
-    const newStackAmount = stackBefore + winnings - heroMoneyInvested;
-
     console.log('Stack update:', {
       stackBefore,
       outcome,
-      winnings,
+      effectivePotWon,
       heroMoneyInvested,
       newStackAmount,
-      calculation: `${stackBefore} + ${winnings} - ${heroMoneyInvested} = ${newStackAmount}`
+      potWonDisplay: outcome === 'won' ? (effectivePotWon - heroMoneyInvested) : (outcome === 'lost' ? heroMoneyInvested : 0),
+      calculation: outcome === 'won'
+        ? `Win: ${stackBefore} + ${effectivePotWon} = ${newStackAmount} (net profit: ${effectivePotWon - heroMoneyInvested})`
+        : `Loss: ${stackBefore} remains ${newStackAmount} (lost: ${heroMoneyInvested})`
     });
 
     setStack(newStackAmount);

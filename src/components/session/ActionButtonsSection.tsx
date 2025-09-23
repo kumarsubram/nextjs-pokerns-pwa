@@ -72,8 +72,9 @@ export function ActionButtonsSection({
 
   // Show actions if:
   // 1. It's hero's turn OR
-  // 2. Hero hasn't acted yet (so they can act when it becomes their turn)
-  const shouldShowActions = isHerosTurn || !heroHasActed;
+  // 2. Hero hasn't acted yet (so they can act when it becomes their turn) OR
+  // 3. We're showing position actions for a selected position
+  const shouldShowActions = isHerosTurn || !heroHasActed || (showPositionActions && selectedPosition);
 
   // Render auto-action hint for position skipping
   const renderAutoActionHint = () => {
@@ -160,11 +161,36 @@ export function ActionButtonsSection({
           {/* Determine if straddle is available */}
           {(() => {
             const targetPosition = showPositionActions && selectedPosition ? selectedPosition : session.userSeat;
+
             const canStraddle =
               session.gameType === 'Cash Game' &&
               currentHand.currentBettingRound === 'preflop' &&
               (targetPosition === 'UTG' || targetPosition === 'BTN') &&
-              currentBettingRound?.actions.length === 0;
+              (!currentBettingRound?.actions || currentBettingRound.actions.length === 0);
+
+            // Special case: BTN can ONLY straddle when clicked before hero acts
+            const isBtnStraddleOnly =
+              targetPosition === 'BTN' &&
+              canStraddle &&
+              targetPosition !== session.userSeat &&
+              !currentRound?.actions.some(action => action.position === session.userSeat);
+
+            // If BTN straddle only, show only the straddle button
+            if (isBtnStraddleOnly) {
+              return (
+                <div>
+                  <Button
+                    className="bg-orange-600 hover:bg-orange-700 text-white w-full"
+                    onClick={() => {
+                      handleStraddleClick(targetPosition);
+                      setShowPositionActions(false);
+                    }}
+                  >
+                    Straddle (BTN)
+                  </Button>
+                </div>
+              );
+            }
 
             return (
               <div className={canStraddle ? "grid grid-cols-2 gap-3" : "grid grid-cols-2 gap-3"}>

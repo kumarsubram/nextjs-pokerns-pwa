@@ -169,7 +169,8 @@ export function useBettingLogic({
     let updatedHand = { ...currentHand };
 
     // If there are skipped positions, auto-fold/check them
-    if (currentHand.nextToAct && currentHand.nextToAct !== position) {
+    // BUT NOT for straddle - straddle doesn't cause auto-folds
+    if (currentHand.nextToAct && currentHand.nextToAct !== position && action !== 'straddle') {
       updatedHand = autoFoldPlayersBetween(updatedHand, currentHand.nextToAct, position);
     }
 
@@ -536,14 +537,23 @@ export function useBettingLogic({
 
     // Special preflop logic
     if (currentHand.currentBettingRound === 'preflop') {
-      // Only BB can check in preflop, and only if no one raised above the big blind
-      if (position === 'BB') {
+      // Check if this position has straddled
+      const straddlePosition = getStraddlePosition(currentHand);
+
+      // BB can check if no one raised above the big blind
+      if (position === 'BB' && !straddlePosition) {
         const canBBCheck = currentBet === bigBlindAmount && alreadyBet === bigBlindAmount;
         return canBBCheck;
-      } else {
-        // No one else can check in preflop (must call, raise, or fold)
-        return false;
       }
+
+      // Straddler can check if no one raised above their straddle
+      if (position === straddlePosition) {
+        const canStraddlerCheck = currentBet === alreadyBet && alreadyBet > bigBlindAmount;
+        return canStraddlerCheck;
+      }
+
+      // No one else can check in preflop (must call, raise, or fold)
+      return false;
     }
 
     // Post-flop: Can check if already matching the current bet

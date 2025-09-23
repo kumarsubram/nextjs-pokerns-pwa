@@ -24,6 +24,7 @@ interface PositionActionSelectorProps {
   getCallAmount: (position: Position) => number;
   canCheck: (position: Position) => boolean;
   isCallAllIn: (position: Position) => boolean;
+  handleStraddleClick?: (position: Position) => void;
 
   // State setters
   onClose: () => void;
@@ -41,6 +42,7 @@ export function PositionActionSelector({
   getCallAmount,
   canCheck,
   isCallAllIn,
+  handleStraddleClick,
   onClose,
   onOpenAmountModal
 }: PositionActionSelectorProps) {
@@ -49,6 +51,15 @@ export function PositionActionSelector({
   // Calculate auto-fold/check hint
   const getAutoActionHint = () => {
     if (!currentHand?.nextToAct) return null;
+
+    // Don't show auto-fold hint for straddle positions
+    const isStraddlePosition =
+      session.gameType === 'Cash Game' &&
+      currentHand.currentBettingRound === 'preflop' &&
+      (selectedPosition === 'UTG' || selectedPosition === 'BTN') &&
+      (!currentBettingRound?.actions || currentBettingRound.actions.length === 0);
+
+    if (isStraddlePosition) return null;
 
     const currentRound = currentHand.bettingRounds[currentHand.currentBettingRound as 'preflop' | 'flop' | 'turn' | 'river'];
     const hasBet = currentRound?.currentBet && currentRound.currentBet > 0;
@@ -152,9 +163,43 @@ export function PositionActionSelector({
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        {/* Left Column: Fold + All-In */}
-        <Button
+      {/* Check if straddle is available */}
+      {(() => {
+        const canStraddle =
+          session.gameType === 'Cash Game' &&
+          currentHand.currentBettingRound === 'preflop' &&
+          (selectedPosition === 'UTG' || selectedPosition === 'BTN') &&
+          (!currentBettingRound?.actions || currentBettingRound.actions.length === 0);
+
+        // Special case: BTN can ONLY straddle when clicked before hero acts
+        const isBtnStraddleOnly =
+          selectedPosition === 'BTN' &&
+          canStraddle &&
+          selectedPosition !== session.userSeat;
+
+        // If BTN straddle only, show only the straddle button
+        if (isBtnStraddleOnly) {
+          return (
+            <div>
+              <Button
+                className="bg-orange-600 hover:bg-orange-700 text-white w-full"
+                onClick={() => {
+                  if (handleStraddleClick && selectedPosition) {
+                    handleStraddleClick(selectedPosition);
+                  }
+                  onClose();
+                }}
+              >
+                Straddle (BTN)
+              </Button>
+            </div>
+          );
+        }
+
+        return (
+          <div className={canStraddle ? "grid grid-cols-2 gap-3" : "grid grid-cols-2 gap-3"}>
+            {/* Left Column: Fold + All-In */}
+            <Button
           className="bg-red-600 hover:bg-red-700 text-white"
           onClick={() => {
             handleBettingAction(selectedPosition, 'fold');
@@ -186,7 +231,24 @@ export function PositionActionSelector({
         >
           Raise
         </Button>
+
+        {/* Straddle Button - only for UTG/BTN in preflop before any actions */}
+        {canStraddle && !isBtnStraddleOnly && (
+          <Button
+            className="bg-orange-600 hover:bg-orange-700 text-white col-span-2"
+            onClick={() => {
+              if (handleStraddleClick && selectedPosition) {
+                handleStraddleClick(selectedPosition);
+              }
+              onClose();
+            }}
+          >
+            Straddle
+          </Button>
+        )}
       </div>
+        );
+      })()}
 
       <div className="mt-3 text-center">
         <Button

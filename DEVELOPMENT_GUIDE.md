@@ -290,6 +290,8 @@ npm run push         # Update PWA + git commit/push
    - Postflop: Normal sequence (straddle has no effect)
    - Hero straddle: Deducted from stack, tracked in investment
    - Opponent straddle: Updates pot and action sequence only
+   - Straddler can check when action returns if no one raised the straddle
+   - No auto-fold occurs when straddle is placed (all players get to act)
 
 4. **Hand Completion**:
    - All fold → Hero wins automatically

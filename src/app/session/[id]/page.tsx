@@ -674,32 +674,49 @@ export default function SessionPage() {
             userSeat={session.userSeat}
             onSeatClick={(position) => {
               if (position !== 'DEALER') {
-                // Check if user is trying to act after hero when hero hasn't acted yet
-                if (position !== session?.userSeat && currentHand?.nextToAct && session?.userSeat) {
-                  const fullActionSequence = currentHand.currentBettingRound === 'preflop'
-                    ? getPreflopActionSequence(session.tableSeats || 9)
-                    : getPostflopActionSequence(session.tableSeats || 9);
+                // Special case: Allow UTG or BTN to straddle at the start of preflop in cash games
+                if (currentHand && position !== session?.userSeat) {
+                  const currentRound = currentHand.bettingRounds[currentHand.currentBettingRound as 'preflop' | 'flop' | 'turn' | 'river'];
 
-                  const activePlayers = currentHand.playerStates.filter(p => p.status === 'active');
-                  const activePositions = activePlayers.map(p => p.position);
-                  const actionSequence = fullActionSequence.filter(pos => activePositions.includes(pos));
+                  const isStraddlePosition =
+                    (position === 'BTN' || position === 'UTG') &&
+                    currentHand.currentBettingRound === 'preflop' &&
+                    session.gameType === 'Cash Game' &&
+                    (!currentRound?.actions || currentRound.actions.length === 0);
 
-                  const nextToActIndex = actionSequence.indexOf(currentHand.nextToAct);
-                  const heroIndex = actionSequence.indexOf(session.userSeat);
-                  const clickedIndex = actionSequence.indexOf(position);
+                  // If it's a straddle position, allow it to proceed
+                  if (isStraddlePosition) {
+                    setSelectedPosition(position);
+                    setShowPositionActions(true);
+                    return;
+                  }
 
-                  // If next-to-act is before hero and clicked position is after hero
-                  const isNextBeforeHero = nextToActIndex < heroIndex;
-                  const isClickedAfterHero = clickedIndex > heroIndex;
+                  // Otherwise, check if user is trying to act after hero when hero hasn't acted yet
+                  if (currentHand?.nextToAct && session?.userSeat) {
+                    const fullActionSequence = currentHand.currentBettingRound === 'preflop'
+                      ? getPreflopActionSequence(session.tableSeats || 9)
+                      : getPostflopActionSequence(session.tableSeats || 9);
 
-                  if (isNextBeforeHero && isClickedAfterHero) {
-                    // Check if hero has already acted in this round
-                    const currentRound = currentHand.bettingRounds[currentHand.currentBettingRound as 'preflop' | 'flop' | 'turn' | 'river'];
-                    const heroHasActed = currentRound?.actions.some(action => action.position === session.userSeat);
+                    const activePlayers = currentHand.playerStates.filter(p => p.status === 'active');
+                    const activePositions = activePlayers.map(p => p.position);
+                    const actionSequence = fullActionSequence.filter(pos => activePositions.includes(pos));
 
-                    if (!heroHasActed) {
-                      setShowHeroMustActFirst(true);
-                      return;
+                    const nextToActIndex = actionSequence.indexOf(currentHand.nextToAct);
+                    const heroIndex = actionSequence.indexOf(session.userSeat);
+                    const clickedIndex = actionSequence.indexOf(position);
+
+                    // If next-to-act is before hero and clicked position is after hero
+                    const isNextBeforeHero = nextToActIndex < heroIndex;
+                    const isClickedAfterHero = clickedIndex > heroIndex;
+
+                    if (isNextBeforeHero && isClickedAfterHero) {
+                      // Check if hero has already acted in this round
+                      const heroHasActed = currentRound?.actions.some(action => action.position === session.userSeat);
+
+                      if (!heroHasActed) {
+                        setShowHeroMustActFirst(true);
+                        return;
+                      }
                     }
                   }
                 }
@@ -791,6 +808,7 @@ export default function SessionPage() {
           getCallAmount={getCallAmount}
           canCheck={canCheck}
           isCallAllIn={isCallAllIn}
+          handleStraddleClick={handleStraddleClick}
           onClose={() => {
             setShowPositionActions(false);
             setSelectedPosition(null);

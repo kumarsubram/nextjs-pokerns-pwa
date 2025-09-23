@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { SetUsernameDialog } from '@/components/dialog/SetUsernameDialog';
 import { SessionService } from '@/services/session.service';
 import { GameType, TableSeats } from '@/types/poker-v2';
 
@@ -29,6 +30,9 @@ export default function CreateSessionPage() {
   // Confirmation dialog state
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [activeSessionName, setActiveSessionName] = useState<string>('');
+
+  // Username dialog state
+  const [showUsernameDialog, setShowUsernameDialog] = useState(false);
 
   // Generate default session name on mount
   useEffect(() => {
@@ -48,6 +52,13 @@ export default function CreateSessionPage() {
   const handleCreateSession = () => {
     if (!sessionName || buyIn <= 0) return;
 
+    // Check if username is set
+    const username = localStorage.getItem('currentUser');
+    if (!username || username === 'Anonymous') {
+      setShowUsernameDialog(true);
+      return;
+    }
+
     // Check if there's an active session
     const activeSession = SessionService.getCurrentSession();
     if (activeSession && activeSession.status === 'active') {
@@ -59,6 +70,15 @@ export default function CreateSessionPage() {
 
     // Create new session directly if no active session
     createNewSession();
+  };
+
+  const handleUsernameSet = (username: string) => {
+    // Save username to localStorage
+    localStorage.setItem('currentUser', username);
+    setShowUsernameDialog(false);
+
+    // Continue with session creation
+    handleCreateSession();
   };
 
   const createNewSession = () => {
@@ -192,6 +212,14 @@ export default function CreateSessionPage() {
           Start Session
         </Button>
       </div>
+
+      {/* Username Dialog */}
+      <SetUsernameDialog
+        open={showUsernameDialog}
+        onOpenChange={setShowUsernameDialog}
+        onConfirm={handleUsernameSet}
+        onCancel={() => setShowUsernameDialog(false)}
+      />
 
       {/* Confirmation Dialog */}
       <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>

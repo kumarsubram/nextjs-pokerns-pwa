@@ -174,8 +174,8 @@ export function useBettingLogic({
     }
 
     // Track hero's money investment and reduce stack
-    // Skip for all-in since it's already handled in the confirm dialog
-    if (position === session.userSeat && amount && action !== 'all-in') {
+    // Skip for all-in and straddle since they're already handled in the confirm dialog
+    if (position === session.userSeat && amount && action !== 'all-in' && action !== 'straddle') {
       const currentBet = updatedHand.playerStates.find(p => p.position === position)?.currentBet || 0;
       const additionalInvestment = amount - currentBet;
       setHeroMoneyInvested(prev => prev + additionalInvestment);

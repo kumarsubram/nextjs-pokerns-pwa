@@ -5,6 +5,7 @@ import {
   BettingRound,
   BettingAction,
   CurrentHand,
+  SidePot,
   POSITION_LABELS_6,
   POSITION_LABELS_9
 } from '@/types/poker-v2';
@@ -195,7 +196,7 @@ export function processBettingAction(
         if (action.amount) {
           const allInAmount = action.amount - player.currentBet;
           player.currentBet = action.amount;
-          player.stack = 0;
+          player.stack = Math.max(0, player.stack - allInAmount);
           player.status = 'all-in';
           player.hasActed = true;
           updatedHand.pot += allInAmount;
@@ -208,6 +209,12 @@ export function processBettingAction(
                 p.hasActed = false;
               }
             });
+          }
+
+          // Calculate side pots whenever a player goes all-in
+          const hasAllInPlayers = updatedHand.playerStates.some(p => p.status === 'all-in');
+          if (hasAllInPlayers) {
+            updatedHand.sidePots = calculateSidePots(updatedHand.playerStates);
           }
         }
         break;
@@ -232,6 +239,12 @@ export function processBettingAction(
 
   // Never auto-set nextToAct - let user control manually
   updatedHand.nextToAct = undefined;
+
+  // Always recalculate side pots at the end if there are all-in players
+  const hasAllInPlayers = updatedHand.playerStates.some(p => p.status === 'all-in');
+  if (hasAllInPlayers) {
+    updatedHand.sidePots = calculateSidePots(updatedHand.playerStates);
+  }
 
   return updatedHand;
 }
@@ -286,4 +299,61 @@ export function advanceToNextRound(
   updatedHand.nextToAct = undefined;
 
   return updatedHand;
+}
+
+/**
+ * Calculate side pots when there are all-in players
+ * Simple and clean: just creates pots based on all-in amounts
+ */
+export function calculateSidePots(playerStates: PlayerState[]): SidePot[] {
+  // Get players who contributed to the pot
+  const contributors = playerStates.filter(p => p.currentBet > 0);
+
+  if (contributors.length === 0) {
+    return [];
+  }
+
+  // If no one is all-in, single pot with all active players
+  const hasAllIn = contributors.some(p => p.status === 'all-in');
+  if (!hasAllIn) {
+    const activePlayers = contributors.filter(p => p.status === 'active');
+    const totalPot = contributors.reduce((sum, p) => sum + p.currentBet, 0);
+
+    return [{
+      amount: totalPot,
+      eligiblePlayers: activePlayers.map(p => p.position),
+      maxContribution: Math.max(...contributors.map(p => p.currentBet))
+    }];
+  }
+
+  // Sort by bet amount (ascending) to build pots from smallest to largest
+  const sorted = [...contributors]
+    .filter(p => p.status === 'active' || p.status === 'all-in')
+    .sort((a, b) => a.currentBet - b.currentBet);
+
+  const sidePots: SidePot[] = [];
+  let processed = 0;
+
+  for (let i = 0; i < sorted.length; i++) {
+    const player = sorted[i];
+    const contribution = player.currentBet - processed;
+
+    if (contribution > 0) {
+      // Everyone at this level or higher can win this pot
+      const eligible = sorted.slice(i).map(p => p.position);
+
+      // Count everyone who put in at least this much (including folded players)
+      const contributorCount = contributors.filter(p => p.currentBet >= player.currentBet).length;
+
+      sidePots.push({
+        amount: contribution * contributorCount,
+        eligiblePlayers: eligible,
+        maxContribution: player.currentBet
+      });
+
+      processed = player.currentBet;
+    }
+  }
+
+  return sidePots;
 }

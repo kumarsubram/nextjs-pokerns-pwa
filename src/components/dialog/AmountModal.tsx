@@ -13,6 +13,7 @@ interface AmountModalProps {
   error: string | null;
   stack: number;
   currentBet: number;
+  heroPosition?: Position;
   onValueChange: (value: number) => void;
   onConfirm: () => void;
   onCancel: () => void;
@@ -28,14 +29,15 @@ export function AmountModal({
   error,
   stack,
   currentBet,
+  heroPosition,
   onValueChange,
   onConfirm,
   onCancel,
   getDialogClasses
 }: AmountModalProps) {
   const isRaise = action === 'raise';
+  const isHero = position === heroPosition;
   const minRaise = (currentBet || 0) * 2;
-  const maxAmount = stack;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = parseInt(e.target.value, 10);
@@ -54,7 +56,9 @@ export function AmountModal({
           <DialogDescription>
             {isRaise
               ? `Enter the total amount to raise to (minimum: ${minRaise})`
-              : `Going all-in with ${stack} chips`
+              : isHero
+              ? `Adjust your all-in amount (max: ${stack})`
+              : `Enter the all-in amount for ${position}`
             }
           </DialogDescription>
         </DialogHeader>
@@ -69,10 +73,10 @@ export function AmountModal({
               type="number"
               value={value}
               onChange={handleInputChange}
-              min={isRaise ? minRaise : stack}
-              max={maxAmount}
-              className="col-span-3 px-3 py-2 border rounded"
-              disabled={!isRaise}
+              min={1}
+              max={isHero ? stack : undefined}
+              className="col-span-3 px-3 py-2 border rounded text-base"
+              style={{ fontSize: '16px' }}
             />
           </div>
 

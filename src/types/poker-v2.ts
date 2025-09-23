@@ -130,6 +130,12 @@ export interface Comment {
   timestamp: string;
 }
 
+export interface SidePot {
+  amount: number;
+  eligiblePlayers: Position[]; // Players who can win this pot
+  maxContribution: number; // Max contribution per player for this pot
+}
+
 export interface CurrentHand {
   handNumber: number;
   userCards: [string, string] | null;
@@ -147,6 +153,7 @@ export interface CurrentHand {
   };
   playerStates: PlayerState[];
   pot: number;
+  sidePots?: SidePot[];
   smallBlind: number;
   bigBlind: number;
   nextToAct?: Position;

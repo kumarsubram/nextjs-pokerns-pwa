@@ -12,7 +12,8 @@ import {
   advanceToNextRound,
   getNextToAct,
   getPreflopActionSequence,
-  getPostflopActionSequence
+  getPostflopActionSequence,
+  calculateSidePots
 } from '@/utils/poker-logic';
 
 interface UseBettingLogicProps {
@@ -187,6 +188,41 @@ export function useBettingLogic({
     };
 
     updatedHand = processBettingAction(updatedHand, bettingAction);
+
+    // Simple refund logic: when someone goes all-in for less than hero's bet
+    if (action === 'all-in' && session) {
+      const allInPlayer = updatedHand.playerStates.find(p => p.position === position);
+      const heroState = updatedHand.playerStates.find(p => p.position === session.userSeat);
+
+      // Check if hero has bet more than the all-in amount
+      if (allInPlayer && heroState && heroState.currentBet > allInPlayer.currentBet) {
+        const refund = heroState.currentBet - allInPlayer.currentBet;
+
+        // Only process refund if it's just hero vs this all-in player
+        const activePlayers = updatedHand.playerStates.filter(p =>
+          p.status === 'active' || p.status === 'all-in'
+        );
+
+        if (activePlayers.length === 2) {
+          // Give hero back the excess
+          setStack(prev => prev + refund);
+          setHeroMoneyInvested(prev => prev - refund);
+
+          // Adjust hero's bet to match the all-in
+          heroState.currentBet = allInPlayer.currentBet;
+          updatedHand.pot -= refund;
+
+          // Update current bet for the round
+          const currentRound = updatedHand.bettingRounds[updatedHand.currentBettingRound as 'preflop' | 'flop' | 'turn' | 'river'];
+          if (currentRound) {
+            currentRound.currentBet = allInPlayer.currentBet;
+          }
+        }
+      }
+
+      // Recalculate side pots
+      updatedHand.sidePots = calculateSidePots(updatedHand.playerStates);
+    }
 
     // Special case: When BB checks in preflop, the round should be complete
     if (updatedHand.currentBettingRound === 'preflop' &&

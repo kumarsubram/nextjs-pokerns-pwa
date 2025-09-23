@@ -3,8 +3,8 @@
 ## Project Overview
 A Progressive Web App for tracking poker sessions, hands, and statistics. Built with Next.js 15, TypeScript, and Tailwind CSS.
 
-## Current Version: v2.18
-**Hand Replay System** - Complete interactive replay functionality for tracked hands with step-by-step visualization, variable speed controls, and accurate pot calculations.
+## Current Version: v2.19
+**Advanced All-In & Side Pot System** - Comprehensive all-in handling with proper side pot calculation, hero refund logic, and accurate profit/loss tracking for complex multi-way all-in scenarios.
 
 ## Core Architecture
 
@@ -180,6 +180,31 @@ interface TrackedHand extends StoredHand {
 - **Stack updates** in real-time
 - **Profit/loss calculation** per hand
 - **Side pot logic** for all-in scenarios
+- **Automatic refunds** when opponents go all-in for less
+
+### All-In & Side Pot System
+```typescript
+// Side pot structure
+interface SidePot {
+  amount: number;
+  eligiblePlayers: Position[];
+  maxContribution: number;
+}
+
+// Key scenarios handled:
+// 1. Hero bets 600, opponent all-in 400 → Hero refunded 200
+// 2. Opponent all-in 400, hero all-in 600 → Main pot 800, side pot 200
+// 3. Multi-way all-ins → Multiple side pots with correct eligibility
+// 4. Hero can edit all-in amount → Stack adjusted accordingly
+```
+
+### Hero All-In Flow
+1. Button shows remaining stack (total - invested)
+2. Modal opens with editable amount
+3. Hero can adjust amount (1 to remaining stack)
+4. Confirms → Stack reduced by additional investment
+5. Side pots calculated automatically
+6. Winnings limited to eligible pots only
 
 ### Hand Replay Implementation
 ```typescript
@@ -296,6 +321,15 @@ const CURRENT_DATA_VERSION = 2; // Increment for migrations
 - [ ] Offline functionality
 
 ## Recent Major Updates
+
+### v2.19 - Advanced All-In & Side Pot System
+- **Smart All-In Button**: Shows hero's remaining stack, updates with stack changes
+- **Editable All-In Amounts**: Hero can adjust all-in amount; non-hero positions fully editable
+- **Automatic Refund Logic**: When opponent goes all-in for less than hero's bet, excess is refunded
+- **Accurate Side Pot Calculation**: Clean algorithm for multi-way all-in scenarios
+- **Side Pot Display**: Shows side pots in showdown dialog with eligibility status
+- **Hero-Focused Tracking**: Ensures accurate profit/loss calculation based on actual winnable pots
+- **Proper Investment Tracking**: Hero's money invested and stack adjusted correctly in all scenarios
 
 ### v2.18 - Hand Replay System
 - Interactive hand replay with playback controls

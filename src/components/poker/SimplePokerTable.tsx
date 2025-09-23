@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { POSITION_LABELS_6, POSITION_LABELS_9, Position, TableSeats, PlayerState } from '@/types/poker-v2';
+import { POSITION_LABELS_6, POSITION_LABELS_9, Position, TableSeats, PlayerState, SidePot } from '@/types/poker-v2';
 
 interface SimplePokerTableProps {
   seats: TableSeats;
@@ -34,6 +34,7 @@ interface SimplePokerTableProps {
   showTurnSelectionPrompt?: boolean;
   showRiverSelectionPrompt?: boolean;
   potSize?: number;
+  sidePots?: SidePot[];
 }
 
 export function SimplePokerTable({
@@ -54,7 +55,8 @@ export function SimplePokerTable({
   showFlopSelectionPrompt = false,
   showTurnSelectionPrompt = false,
   showRiverSelectionPrompt = false,
-  potSize = 0
+  potSize = 0,
+  sidePots = []
 }: SimplePokerTableProps) {
   const positions = seats === 6 ? POSITION_LABELS_6 : POSITION_LABELS_9;
 
@@ -193,7 +195,12 @@ export function SimplePokerTable({
           {potSize > 0 && (
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 translate-y-5">
               <div className="bg-black/50 text-white px-2 py-0.5 rounded text-xs font-bold">
-                POT SIZE: {Math.floor(potSize)}
+                POT: {Math.floor(potSize)}
+                {sidePots && sidePots.length > 1 && (
+                  <div className="text-xs mt-0.5 text-yellow-300">
+                    {sidePots.length} side pots
+                  </div>
+                )}
               </div>
             </div>
           )}

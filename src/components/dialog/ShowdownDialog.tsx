@@ -56,8 +56,31 @@ export function ShowdownDialog({
         <div className="grid gap-4 mt-4 max-h-80 overflow-y-auto">
           <div className="text-center">
             <div className="text-lg font-medium text-gray-700">
-              Pot Size: {currentHand?.pot || 0}
+              Total Pot: {currentHand?.pot || 0}
             </div>
+
+            {/* Display side pots if they exist */}
+            {currentHand?.sidePots && currentHand.sidePots.length > 0 && (
+              <div className="mt-2 text-sm">
+                <div className="font-medium text-gray-600 mb-1">Side Pots:</div>
+                {currentHand.sidePots.map((sidePot, index) => {
+                  const isHeroEligible = sidePot.eligiblePlayers.includes(userSeat!);
+                  return (
+                    <div key={index} className={`${isHeroEligible ? 'text-blue-600' : 'text-gray-500'}`}>
+                      Pot {index + 1}: {sidePot.amount} chips
+                      {isHeroEligible ? ' (You can win)' : ' (You cannot win)'}
+                    </div>
+                  );
+                })}
+                <div className="mt-1 text-blue-700 font-medium">
+                  Your max winnings: {
+                    currentHand.sidePots
+                      .filter(sp => sp.eligiblePlayers.includes(userSeat!))
+                      .reduce((sum, sp) => sum + sp.amount, 0)
+                  } chips
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Hero Cards Section - Always show */}

@@ -7,7 +7,7 @@ import { TrackedHand } from '@/services/tracked-hand.service';
 import { BettingAction, Position, PlayerState } from '@/types/poker-v2';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Play, Pause, RotateCcw, SkipForward, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Play, Pause, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface HandReplayProps {
   trackedHand: TrackedHand;

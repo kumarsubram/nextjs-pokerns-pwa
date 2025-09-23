@@ -99,17 +99,34 @@ export function useHandFlow({
     return { isValid: true };
   }, [stack, smallBlind, bigBlind, heroMoneyInvested, currentHand]);
 
-  // Calculate effective pot winnings - simplified to return actual pot for now
+  // Calculate effective pot winnings based on side pots
   const calculateEffectivePotWinnings = useCallback((outcome: 'won' | 'lost' | 'folded', potWon?: number) => {
-    if (outcome !== 'won' || !currentHand || !potWon) {
+    if (outcome !== 'won' || !currentHand || !session) {
       return 0;
     }
 
-    // For now, return the full pot won amount
-    // Side pot logic should only apply in complex all-in scenarios
-    // When everyone folds to hero, hero wins the entire pot regardless of investment
-    return potWon;
-  }, [currentHand]);
+    // If there are no side pots or everyone folded, hero wins the entire pot
+    if (!currentHand.sidePots || currentHand.sidePots.length === 0) {
+      return potWon || currentHand.pot;
+    }
+
+    // Calculate how much hero can actually win based on side pots
+    let heroWinnings = 0;
+    const heroPosition = session.userSeat;
+
+    // Check each side pot to see if hero is eligible
+    for (const sidePot of currentHand.sidePots) {
+      if (sidePot.eligiblePlayers.includes(heroPosition!)) {
+        // Hero is eligible for this pot
+        heroWinnings += sidePot.amount;
+      }
+    }
+
+    // For hero's tracking purposes, return the minimum of:
+    // 1. What hero is eligible to win based on their investment
+    // 2. The actual pot amount (in case everyone else folded)
+    return Math.min(heroWinnings, potWon || currentHand.pot);
+  }, [currentHand, session]);
 
   // Function to start new hand with explicit session data
   const startNewHandWithPosition = useCallback((sessionData: SessionMetadata, userSeat: Position) => {

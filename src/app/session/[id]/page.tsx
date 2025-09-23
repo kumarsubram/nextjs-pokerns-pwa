@@ -692,6 +692,7 @@ export default function SessionPage() {
             showTurnSelectionPrompt={showTurnSelectionPrompt}
             showRiverSelectionPrompt={showRiverSelectionPrompt}
             potSize={currentHand?.pot || 0}
+            sidePots={currentHand?.sidePots || []}
             highlightedPositions={selectedPosition ? [selectedPosition] : []}
           />
         </div>
@@ -771,6 +772,7 @@ export default function SessionPage() {
             currentHand={currentHand}
             session={session}
             stack={stack}
+            heroMoneyInvested={heroMoneyInvested}
             isBettingComplete={isBettingComplete}
             showPositionActions={showPositionActions}
             selectedPosition={selectedPosition}
@@ -803,6 +805,7 @@ export default function SessionPage() {
           error={amountModalError}
           stack={stack}
           currentBet={currentBettingRound?.currentBet || 0}
+          heroPosition={session?.userSeat}
           onValueChange={setAmountModalValue}
           onConfirm={() => {
             if (amountModalPosition) {

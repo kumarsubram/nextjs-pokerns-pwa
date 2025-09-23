@@ -8,6 +8,7 @@ interface ActionButtonsSectionProps {
   currentHand: CurrentHand;
   session: SessionMetadata;
   stack: number;
+  heroMoneyInvested: number;
   isBettingComplete: boolean;
   showPositionActions: boolean;
   selectedPosition: Position | null;
@@ -36,6 +37,7 @@ export function ActionButtonsSection({
   currentHand,
   session,
   stack,
+  heroMoneyInvested,
   isBettingComplete,
   showPositionActions,
   selectedPosition,
@@ -223,14 +225,34 @@ export function ActionButtonsSection({
             <Button
               className="bg-purple-600 hover:bg-purple-700 text-white"
               onClick={() => {
+                const targetPosition = (showPositionActions && selectedPosition) ? selectedPosition : session.userSeat;
                 setAmountModalAction('all-in');
-                setAmountModalPosition((showPositionActions && selectedPosition) ? selectedPosition : (session.userSeat || null));
-                setAmountModalValue(stack);
+                setAmountModalPosition(targetPosition || null);
+
+                // For hero, set the actual remaining stack (total stack minus what's already invested)
+                // For other positions, don't set a default value - let them enter it
+                if (targetPosition === session.userSeat) {
+                  const remainingStack = stack - heroMoneyInvested;
+                  const playerState = currentHand.playerStates.find(p => p.position === targetPosition);
+                  const alreadyBet = playerState?.currentBet || 0;
+                  // Total all-in amount is what they've already bet plus their remaining stack
+                  setAmountModalValue(alreadyBet + remainingStack);
+                } else {
+                  setAmountModalValue(0); // No default for non-hero positions
+                }
+
                 setShowAmountModal(true);
                 setShowPositionActions(false);
               }}
             >
-              All-In
+              {(() => {
+                const targetPosition = (showPositionActions && selectedPosition) ? selectedPosition : session.userSeat;
+                if (targetPosition === session.userSeat) {
+                  const remainingStack = stack - heroMoneyInvested;
+                  return `All-In ${remainingStack}`;
+                }
+                return 'All-In';
+              })()}
             </Button>
 
             {/* Raise Button */}

@@ -6,7 +6,7 @@ import { HandHistory } from './HandHistory';
 import { TrackedHand } from '@/services/tracked-hand.service';
 import { BettingAction, Position, PlayerState } from '@/types/poker-v2';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Play, Pause, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface HandReplayProps {
@@ -76,7 +76,7 @@ export function HandReplay({ trackedHand, onClose }: HandReplayProps) {
       currentRound: 'preflop',
       currentActionIndex: -1, // Start before first action
       isPlaying: false,
-      playbackSpeed: 1000, // 1 second per action
+      playbackSpeed: 667, // ~0.67 seconds per action (1.5x faster than before)
       playerStates,
       communityCards: { flop: null, turn: null, river: null },
       currentPot: 0,
@@ -344,9 +344,9 @@ export function HandReplay({ trackedHand, onClose }: HandReplayProps) {
           {[0.5, 1, 2].map(speed => (
             <Button
               key={speed}
-              variant={replayState.playbackSpeed === 1000 / speed ? "default" : "outline"}
+              variant={replayState.playbackSpeed === 667 / speed ? "default" : "outline"}
               size="sm"
-              onClick={() => setReplayState(prev => ({ ...prev, playbackSpeed: 1000 / speed }))}
+              onClick={() => setReplayState(prev => ({ ...prev, playbackSpeed: 667 / speed }))}
               className="h-7 px-2 min-w-[40px]"
             >
               {speed}x
@@ -391,19 +391,15 @@ export function HandReplay({ trackedHand, onClose }: HandReplayProps) {
       </div>
 
       {/* Hand History Action Log */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Hand History</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <HandHistory
-            completedHands={[trackedHand]}
-            userSeat={trackedHand.userSeat}
-            defaultExpanded={true}
-            hideShareButtons={true}
-          />
-        </CardContent>
-      </Card>
+      <div className="bg-white rounded-lg shadow-sm">
+        <HandHistory
+          completedHands={[trackedHand]}
+          userSeat={trackedHand.userSeat}
+          defaultExpanded={true}
+          hideShareButtons={false}
+          showCustomShareInTracked={true}
+        />
+      </div>
     </div>
   );
 }

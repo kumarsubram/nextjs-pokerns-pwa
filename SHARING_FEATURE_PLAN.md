@@ -47,15 +47,22 @@
 - [ ] 3.6 Test all Server Actions with database (create test file)
 
 ### Phase 4: Shared Hands List Page
-**Create modular components**:
-- [ ] 4.1 Create `src/components/shared/cards/SharedHandCard.tsx` (reusable card)
+**Match tracked hands styling (src/app/tracked/page.tsx)**:
+- [ ] 4.1 Create `src/components/shared/cards/SharedHandCard.tsx`:
+  - **Card Layout** (same styling as tracked hands):
+    - **Top Row**: "By [username]" (left) + "X Likes" button (right, shows total)
+    - **Bottom Row**: 2 hero cards (left, w-10 h-14, poker card style) + timeAgo (right, small gray text)
+  - **Card Styling**: bg-white border rounded-lg p-3
+  - **Cards**: Same as AllFoldedDialog (w-10 h-14, border-2, shadow-md, red/black suits)
+  - **Bottom row clickable** → Navigate to `/shared/[token]`
+  - **Likes button** → Click to view detail page (not toggle on list)
 - [ ] 4.2 Create `src/hooks/useSharedHands.ts` (fetch shared hands hook)
-- [ ] 4.3 Create `/app/shared/page.tsx` (main list page - imports above)
-- [ ] 4.4 Card shows: username, cards, outcome, timeAgo, view count, like count
-- [ ] 4.5 Add empty state component (no shared hands yet)
-- [ ] 4.6 Link cards to `/shared/[token]` detail page
-- [ ] 4.7 List sorted by most recent first (createdAt DESC)
-- [ ] 4.8 Add pagination or infinite scroll logic in hook
+- [ ] 4.3 Create `/app/shared/page.tsx`:
+  - Header: "Shared Hands" title
+  - List info: "X shared hands" (left) + "Click any hand to see details" (right, italic hint)
+  - Empty state: Globe icon + "No shared hands yet"
+- [ ] 4.4 List sorted by most recent first (createdAt DESC)
+- [ ] 4.5 Add pagination or infinite scroll logic in hook
 
 ### Phase 5: Shared Hand Detail Page
 **Reuse existing components from tracked hands**:
@@ -84,8 +91,7 @@
 - [ ] 7.1 Create `src/hooks/useLikes.ts` (toggle like + optimistic UI)
 - [ ] 7.2 Create `src/components/shared/buttons/LikeButton.tsx` (heart icon + count)
 - [ ] 7.3 Show filled/unfilled heart based on like status
-- [ ] 7.4 Add LikeButton to SharedHandCard (list page)
-- [ ] 7.5 Add LikeButton to SharedHandHeader (detail page)
+- [ ] 7.4 Add LikeButton to SharedHandHeader (detail page ONLY - not on list)
 
 ### Phase 8: Share Flow
 **Create modular share system**:
@@ -650,26 +656,42 @@ export async function getLikeStatus(shareToken: string) {
 ## UI/UX Design (Based on Tracked Hands Pages)
 
 ### Shared Hands List (`/shared/page.tsx`)
-**Copy from**: `/tracked/page.tsx`
+**Match tracked hands layout and styling**:
 
-**Layout Structure**:
+**Page Header**:
 ```typescript
-// Header section
-- Title: "Shared Hands" (instead of "Tracked Hands")
-- No "Delete All" button (public hands can't be bulk deleted)
+- Title: "Shared Hands"
+- Info row: "X shared hands" (left) + "Click any hand to see details" (right, italic gray)
+```
 
-// Card layout (same as tracked)
-- Card with hand info
-- Show: "Shared by [username] • [timeAgo]" (instead of "Tracked [time]")
-- Display: hero cards, community cards, outcome badge
-- Add: view count badge, like count badge
-- Click: navigate to `/shared/[token]`
+**Card Layout** (copy from `/app/tracked/page.tsx`):
+```typescript
+// Card structure: bg-white border rounded-lg p-3
+
+// Top Row: Username + Likes
+- Left: "By [username]" (text-sm font-semibold, truncate)
+- Right: "X Likes" button (outline, gray, not interactive - just shows count)
+
+// Bottom Row: Cards + Time (CLICKABLE)
+- Left: 2 hero cards
+  - w-10 h-14, rounded-lg, border-2, shadow-md
+  - Suits with colors (red for ♥️♦️, black for ♠️♣️)
+  - Same styling as AllFoldedDialog.tsx
+- Right: timeAgo (text-sm text-gray-500)
+  - "5m ago", "2h ago", "3d ago", or "Jan 15"
 
 // Empty state
 - Icon: Globe/Share2 icon
 - Message: "No shared hands yet"
 - Subtext: "Explore hands shared by the community"
 ```
+
+**Key Differences from Tracked**:
+- **No session name** (shared hands don't need session context on list)
+- **"By [username]"** instead of session name
+- **Likes count** instead of Untrack button
+- **timeAgo** on bottom right instead of result/amount
+- **Whole bottom row clickable** (cards + time together)
 
 ### Shared Hand Detail (`/shared/[token]/page.tsx`)
 **Copy from**: `/tracked/[id]/page.tsx`

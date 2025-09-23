@@ -32,10 +32,10 @@ export function DeleteAllTrackedDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Delete All Tracked Hands</DialogTitle>
+          <DialogTitle>Untrack All Hands</DialogTitle>
           <DialogDescription>
-            Are you sure you want to delete all {count} tracked {count === 1 ? 'hand' : 'hands'}?
-            This action cannot be undone and will remove all hands from your tracked collection.
+            Are you sure you want to untrack all {count} {count === 1 ? 'hand' : 'hands'}?
+            This will remove all hands from your tracked collection.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -49,7 +49,7 @@ export function DeleteAllTrackedDialog({
             variant="destructive"
             onClick={handleConfirm}
           >
-            Delete All
+            Untrack All
           </Button>
         </DialogFooter>
       </DialogContent>

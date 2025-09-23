@@ -20,16 +20,43 @@ export function getActionSequence(tableSeats: TableSeats): Position[] {
 }
 
 /**
- * Get pre-flop action sequence (UTG acts first, BB acts last)
+ * Detect if there's a straddle in the current hand
  */
-export function getPreflopActionSequence(tableSeats: TableSeats): Position[] {
+export function getStraddlePosition(hand: CurrentHand): Position | undefined {
+  if (hand.currentBettingRound !== 'preflop') return undefined;
+
+  const preflopActions = hand.bettingRounds.preflop?.actions || [];
+  const straddleAction = preflopActions.find(action => action.action === 'straddle');
+
+  return straddleAction?.position;
+}
+
+/**
+ * Get pre-flop action sequence (UTG acts first, BB acts last)
+ * Modified if there's a straddle - straddler acts last
+ */
+export function getPreflopActionSequence(tableSeats: TableSeats, straddlePosition?: Position): Position[] {
+  let sequence: Position[];
+
   if (tableSeats === 6) {
     // 6-handed preflop: UTG → LJ → CO → BTN → SB → BB
-    return ['UTG', 'LJ', 'CO', 'BTN', 'SB', 'BB'];
+    sequence = ['UTG', 'LJ', 'CO', 'BTN', 'SB', 'BB'];
   } else {
     // 9-handed preflop: UTG → UTG+1 → UTG+2 → LJ → HJ → CO → BTN → SB → BB
-    return ['UTG', 'UTG+1', 'UTG+2', 'LJ', 'HJ', 'CO', 'BTN', 'SB', 'BB'];
+    sequence = ['UTG', 'UTG+1', 'UTG+2', 'LJ', 'HJ', 'CO', 'BTN', 'SB', 'BB'];
   }
+
+  // If there's a straddle, adjust the sequence so straddler acts last
+  if (straddlePosition) {
+    const straddleIndex = sequence.indexOf(straddlePosition);
+    if (straddleIndex !== -1) {
+      // Rotate sequence so action starts after straddler and straddler acts last
+      // E.g., UTG straddle: [UTG, LJ, CO, BTN, SB, BB] → [LJ, CO, BTN, SB, BB, UTG]
+      sequence = [...sequence.slice(straddleIndex + 1), ...sequence.slice(0, straddleIndex + 1)];
+    }
+  }
+
+  return sequence;
 }
 
 /**
@@ -232,6 +259,23 @@ export function processBettingAction(
           if (hasAllInPlayers) {
             updatedHand.sidePots = calculateSidePots(updatedHand.playerStates);
           }
+        }
+        break;
+
+      case 'straddle':
+        if (action.amount && currentRound) {
+          player.currentBet = action.amount;
+          player.stack -= action.amount;
+          player.hasActed = false; // Straddler gets to act again
+          currentRound.currentBet = action.amount;
+          updatedHand.pot += action.amount;
+
+          // Reset hasActed for other players who need to respond to straddle
+          updatedHand.playerStates.forEach(p => {
+            if (p.position !== action.position && p.status === 'active') {
+              p.hasActed = false;
+            }
+          });
         }
         break;
     }

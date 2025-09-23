@@ -61,7 +61,7 @@ export interface SessionConfig {
 
 export interface BettingAction {
   position: Position;
-  action: 'fold' | 'check' | 'call' | 'raise' | 'all-in';
+  action: 'fold' | 'check' | 'call' | 'raise' | 'all-in' | 'straddle';
   amount?: number;
   timestamp: string;
 }

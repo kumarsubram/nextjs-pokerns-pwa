@@ -13,7 +13,8 @@ import {
   getNextToAct,
   getPreflopActionSequence,
   getPostflopActionSequence,
-  calculateSidePots
+  calculateSidePots,
+  getStraddlePosition
 } from '@/utils/poker-logic';
 
 interface UseBettingLogicProps {
@@ -151,7 +152,7 @@ export function useBettingLogic({
   }, [session?.tableSeats]);
 
   // Handle betting actions for any position
-  const handleBettingAction = useCallback((position: Position, action: 'fold' | 'check' | 'call' | 'raise' | 'all-in', amount?: number) => {
+  const handleBettingAction = useCallback((position: Position, action: 'fold' | 'check' | 'call' | 'raise' | 'all-in' | 'straddle', amount?: number) => {
     if (!currentHand || !session) return;
 
     // If hero is folding, show confirmation
@@ -258,8 +259,9 @@ export function useBettingLogic({
       const currentRound = updatedHand.bettingRounds[updatedHand.currentBettingRound];
       if (currentRound) {
         // Manual nextToAct calculation to handle auto-folded players correctly
+        const straddlePosition = updatedHand.currentBettingRound === 'preflop' ? getStraddlePosition(updatedHand) : undefined;
         const fullActionSequence = updatedHand.currentBettingRound === 'preflop'
-          ? getPreflopActionSequence(session.tableSeats)
+          ? getPreflopActionSequence(session.tableSeats, straddlePosition)
           : getPostflopActionSequence(session.tableSeats);
 
         // Include both active and all-in players for round completion logic

@@ -16,6 +16,7 @@ import {
   ValidationErrorDialog,
   EndHandDialog
 } from '@/components/dialog';
+import { StraddleModal } from '@/components/dialog/StraddleModal';
 import {
   HeroCards,
   SessionHeader,
@@ -118,6 +119,11 @@ export default function SessionPage() {
   const [showAllFoldedDialog, setShowAllFoldedDialog] = useState(false);
   // End hand dialog
   const [showEndHandDialog, setShowEndHandDialog] = useState(false);
+  // Straddle modal state
+  const [showStraddleModal, setShowStraddleModal] = useState(false);
+  const [straddleModalPosition, setStraddleModalPosition] = useState<Position | null>(null);
+  const [straddleModalValue, setStraddleModalValue] = useState(0);
+  const [straddleModalError, setStraddleModalError] = useState<string | null>(null);
 
   // Calculate suggested next seat when showing seat selection
   useEffect(() => {
@@ -464,6 +470,38 @@ export default function SessionPage() {
     setFoldPosition(null);
   };
 
+  const handleStraddleClick = (position: Position) => {
+    const minStraddle = bigBlind * 2;
+    setStraddleModalPosition(position);
+    setStraddleModalValue(minStraddle);
+    setStraddleModalError(null);
+    setShowStraddleModal(true);
+  };
+
+  const handleStraddleConfirm = () => {
+    if (straddleModalPosition && session) {
+      const minStraddle = bigBlind * 2;
+      const amount = Math.floor(straddleModalValue);
+
+      if (amount < minStraddle) {
+        setStraddleModalError(`Straddle must be at least ${minStraddle}`);
+        return;
+      }
+
+      // If hero is straddling, deduct from stack and update investment
+      if (straddleModalPosition === session.userSeat) {
+        setStack(prev => prev - amount);
+        setHeroMoneyInvested(prev => prev + amount);
+      }
+
+      handleBettingAction(straddleModalPosition, 'straddle', amount);
+      setShowStraddleModal(false);
+      setStraddleModalPosition(null);
+      setStraddleModalError(null);
+      setSelectedPosition(null);
+    }
+  };
+
   const endSession = () => {
     SessionService.endCurrentSession();
     router.push('/');
@@ -783,6 +821,7 @@ export default function SessionPage() {
             setAmountModalPosition={setAmountModalPosition}
             setAmountModalValue={setAmountModalValue}
             setShowAmountModal={setShowAmountModal}
+            handleStraddleClick={handleStraddleClick}
             needsCommunityCards={needsCommunityCards}
             getAdvanceRoundMessage={getAdvanceRoundMessage}
             getAdvanceRoundButtonText={getAdvanceRoundButtonText}
@@ -842,6 +881,24 @@ export default function SessionPage() {
             setShowAmountModal(false);
             setAmountModalPosition(null);
             setAmountModalError(null);
+          }}
+          getDialogClasses={getDialogClasses}
+        />
+
+        <StraddleModal
+          open={showStraddleModal}
+          onOpenChange={setShowStraddleModal}
+          position={straddleModalPosition}
+          value={straddleModalValue}
+          error={straddleModalError}
+          bigBlind={bigBlind}
+          heroPosition={session?.userSeat}
+          onValueChange={setStraddleModalValue}
+          onConfirm={handleStraddleConfirm}
+          onCancel={() => {
+            setShowStraddleModal(false);
+            setStraddleModalPosition(null);
+            setStraddleModalError(null);
           }}
           getDialogClasses={getDialogClasses}
         />

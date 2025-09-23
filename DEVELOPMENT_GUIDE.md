@@ -3,8 +3,8 @@
 ## Project Overview
 A Progressive Web App for tracking poker sessions, hands, and statistics. Built with Next.js 15, TypeScript, and Tailwind CSS.
 
-## Current Version: v2.20
-**All-In & Betting Round Fixes** - Fixed critical betting round completion logic to allow players to act after all-ins, proper all-in detection for calls/raises, accurate side pot calculations excluding folded players, and correct hand profit/loss tracking for all-in scenarios.
+## Current Version: v2.21
+**Straddle Support for Cash Games** - Added full straddle functionality for UTG and Button positions in cash games, with dynamic action sequence adjustment (preflop only), proper pot tracking, and hero investment management.
 
 ## Core Architecture
 
@@ -280,7 +280,18 @@ npm run push         # Update PWA + git commit/push
    - Calling an all-in with matching amount marks caller as all-in
    - Betting round completes when all active/all-in players have acted and matched current bet
 
-3. **Hand Completion**:
+3. **Straddle Rules** (Cash Games Only):
+   - Available positions: UTG or BTN only
+   - Available when: Preflop, before any actions taken
+   - Minimum amount: 2x Big Blind (no maximum)
+   - Preflop action sequence changes:
+     - UTG straddle: LJ → CO → BTN → SB → BB → UTG (UTG acts last)
+     - BTN straddle: SB → BB → UTG → ... → BTN (BTN acts last)
+   - Postflop: Normal sequence (straddle has no effect)
+   - Hero straddle: Deducted from stack, tracked in investment
+   - Opponent straddle: Updates pot and action sequence only
+
+4. **Hand Completion**:
    - All fold → Hero wins automatically
    - Showdown → Outcome selection required
    - Hero fold → Confirmation dialog
@@ -321,6 +332,8 @@ const CURRENT_DATA_VERSION = 2; // Increment for migrations
 - [ ] Showdown with 2+ players
 - [ ] Hero fold with/without investment
 - [ ] Session switching and data persistence
+- [ ] Straddle with multiple players acting
+- [ ] Straddle followed by raise/re-raise
 
 ### Mobile Testing
 - [ ] No zoom on input focus
@@ -330,6 +343,19 @@ const CURRENT_DATA_VERSION = 2; // Increment for migrations
 - [ ] Offline functionality
 
 ## Recent Major Updates
+
+### v2.21 - Straddle Support for Cash Games
+- **Straddle Positions**: UTG and Button can straddle in cash games only
+- **Dynamic Action Sequence**: Preflop sequence adjusts so straddler acts last
+- **Straddle Modal**: Configurable amount with 2x BB minimum, no maximum
+- **Investment Tracking**: Hero straddles deducted from stack and tracked in investment
+- **Opponent Straddles**: Pot and action sequence updated, no stack tracking needed
+
+### v2.20 - All-In & Betting Round Fixes
+- **Betting Round Logic**: Removed incorrect early return, proper completion checks
+- **Auto All-In Detection**: Players auto-marked all-in when stack reaches 0
+- **Call Matching**: Calling all-in with matching amount marks caller as all-in
+- **Side Pot Accuracy**: Only active/all-in players considered, folded excluded
 
 ### v2.19 - Advanced All-In & Side Pot System
 - **Smart All-In Button**: Shows hero's remaining stack, updates with stack changes

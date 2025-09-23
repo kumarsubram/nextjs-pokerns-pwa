@@ -19,13 +19,14 @@ interface ActionButtonsSectionProps {
   setAmountModalPosition: (position: Position | null) => void;
   setAmountModalValue: (value: number) => void;
   setShowAmountModal: (show: boolean) => void;
+  handleStraddleClick: (position: Position) => void;
 
   // Functions from hooks
   needsCommunityCards: boolean | null;
   getAdvanceRoundMessage: () => string;
   getAdvanceRoundButtonText: () => string | null;
   handleAdvanceToNextRound: () => void;
-  handleBettingAction: (position: Position, action: 'fold' | 'check' | 'call' | 'raise' | 'all-in', amount?: number) => void;
+  handleBettingAction: (position: Position, action: 'fold' | 'check' | 'call' | 'raise' | 'all-in' | 'straddle', amount?: number) => void;
   getCurrentBettingRound: () => BettingRound | null | undefined;
   getCallAmount: (position: Position) => number;
   canCheck: (position: Position) => boolean;
@@ -47,6 +48,7 @@ export function ActionButtonsSection({
   setAmountModalPosition,
   setAmountModalValue,
   setShowAmountModal,
+  handleStraddleClick,
   needsCommunityCards,
   getAdvanceRoundMessage,
   getAdvanceRoundButtonText,
@@ -154,7 +156,18 @@ export function ActionButtonsSection({
             </h3>
             {renderAutoActionHint()}
           </div>
-          <div className="grid grid-cols-2 gap-3">
+
+          {/* Determine if straddle is available */}
+          {(() => {
+            const targetPosition = showPositionActions && selectedPosition ? selectedPosition : session.userSeat;
+            const canStraddle =
+              session.gameType === 'Cash Game' &&
+              currentHand.currentBettingRound === 'preflop' &&
+              (targetPosition === 'UTG' || targetPosition === 'BTN') &&
+              currentBettingRound?.actions.length === 0;
+
+            return (
+              <div className={canStraddle ? "grid grid-cols-2 gap-3" : "grid grid-cols-2 gap-3"}>
             {/* Fold Button */}
             <Button
               className="bg-red-600 hover:bg-red-700 text-white"
@@ -262,7 +275,25 @@ export function ActionButtonsSection({
             >
               Raise
             </Button>
+
+            {/* Straddle Button - only for UTG/BTN in preflop before any actions */}
+            {canStraddle && (
+              <Button
+                className="bg-orange-600 hover:bg-orange-700 text-white col-span-2"
+                onClick={() => {
+                  const targetPosition = showPositionActions && selectedPosition ? selectedPosition : session.userSeat;
+                  if (targetPosition) {
+                    handleStraddleClick(targetPosition);
+                  }
+                  setShowPositionActions(false);
+                }}
+              >
+                Straddle
+              </Button>
+            )}
           </div>
+            );
+          })()}
         </>
       ) : (
         // Waiting for other players

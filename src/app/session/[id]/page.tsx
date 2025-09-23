@@ -24,7 +24,8 @@ import {
   HandSettingsPanel,
   NextToAct,
   ActionButtonsSection,
-  PositionActionSelector
+  PositionActionSelector,
+  ActionHints
 } from '@/components/session';
 import { useHandFlow } from '@/hooks/useHandFlow';
 import { useBettingLogic } from '@/hooks/useBettingLogic';
@@ -668,7 +669,7 @@ export default function SessionPage() {
 
         {/* Table Display */}
         {!showSeatSelection && (
-          <div className="bg-white rounded-lg p-4 shadow-sm mb-4">
+          <div className="bg-white rounded-lg p-4 shadow-sm mb-2">
             <SimplePokerTable
             seats={session.tableSeats}
             userSeat={session.userSeat}
@@ -753,7 +754,18 @@ export default function SessionPage() {
         </div>
         )}
 
-        {/* Hero Cards, Next to Act, and End Hand Section - Below table, above action buttons */}
+        {/* Action Hints - Below table, above hero cards */}
+        {!showSeatSelection && currentHand && session && (
+          <ActionHints
+            userSeat={session.userSeat}
+            nextToAct={currentHand.nextToAct}
+            visible={currentHand.currentBettingRound !== 'showdown'}
+            sessionId={session.sessionId}
+            handNumber={currentHand.handNumber}
+          />
+        )}
+
+        {/* Hero Cards, Next to Act, and End Hand Section - Below hints, above action buttons */}
         {!showSeatSelection && currentHand && (
           <div className="flex gap-2 mb-2 items-stretch">
             <div className="flex-grow">

@@ -112,13 +112,7 @@ export function isBettingRoundComplete(
   playerStates: PlayerState[],
   bettingRound: BettingRound
 ): boolean {
-  // Include both active and all-in players who can still participate in the hand
   const activeAndAllInPlayers = playerStates.filter(p => p.status === 'active' || p.status === 'all-in');
-
-  if (activeAndAllInPlayers.filter(p => p.status === 'active').length <= 1) {
-    return true; // Only one active (non all-in) player left
-  }
-
   const currentBet = bettingRound.currentBet;
 
   // All active and all-in players must have acted and matched the current bet (or be all-in)
@@ -171,6 +165,21 @@ export function processBettingAction(
           player.stack -= callAmount;
           player.hasActed = true;
           updatedHand.pot += callAmount;
+
+          // Check if calling an all-in with matching amount (likely also all-in)
+          const otherAllInPlayer = updatedHand.playerStates.find(
+            p => p.status === 'all-in' && p.currentBet === currentRound.currentBet
+          );
+
+          // If calling matches an all-in amount exactly, mark as all-in too
+          if (otherAllInPlayer && player.currentBet === otherAllInPlayer.currentBet) {
+            player.status = 'all-in';
+            player.stack = 0;
+          } else if (player.stack <= 0) {
+            // Fallback: if stack calculation shows 0 or negative
+            player.stack = 0;
+            player.status = 'all-in';
+          }
         }
         break;
 
@@ -183,7 +192,13 @@ export function processBettingAction(
           currentRound.currentBet = action.amount;
           updatedHand.pot += raiseAmount;
 
-          // Reset hasActed for other players due to raise
+          // If player has 0 stack after raising, mark as all-in
+          if (player.stack <= 0) {
+            player.stack = 0;
+            player.status = 'all-in';
+          }
+
+          // Reset hasActed for other players due to raise (only if still active)
           updatedHand.playerStates.forEach(p => {
             if (p.position !== action.position && p.status === 'active') {
               p.hasActed = false;
@@ -193,7 +208,7 @@ export function processBettingAction(
         break;
 
       case 'all-in':
-        if (action.amount) {
+        if (action.amount && currentRound) {
           const allInAmount = action.amount - player.currentBet;
           player.currentBet = action.amount;
           player.stack = Math.max(0, player.stack - allInAmount);
@@ -201,7 +216,8 @@ export function processBettingAction(
           player.hasActed = true;
           updatedHand.pot += allInAmount;
 
-          if (currentRound && action.amount > currentRound.currentBet) {
+          // If all-in is a raise (higher than current bet), update bet and reset other players
+          if (action.amount > currentRound.currentBet) {
             currentRound.currentBet = action.amount;
             // Reset hasActed for other players due to raise
             updatedHand.playerStates.forEach(p => {
@@ -306,24 +322,31 @@ export function advanceToNextRound(
  * Simple and clean: just creates pots based on all-in amounts
  */
 export function calculateSidePots(playerStates: PlayerState[]): SidePot[] {
-  // Get players who contributed to the pot
-  const contributors = playerStates.filter(p => p.currentBet > 0);
+  // Only consider players still in the hand (active or all-in), not folded players
+  const activePlayers = playerStates.filter(p => p.status === 'active' || p.status === 'all-in');
+  const contributors = activePlayers.filter(p => p.currentBet > 0);
 
   if (contributors.length === 0) {
     return [];
   }
 
-  // If no one is all-in, single pot with all active players
+  // If no one is all-in, no side pots (just main pot)
   const hasAllIn = contributors.some(p => p.status === 'all-in');
   if (!hasAllIn) {
-    const activePlayers = contributors.filter(p => p.status === 'active');
-    const totalPot = contributors.reduce((sum, p) => sum + p.currentBet, 0);
+    return [];
+  }
 
-    return [{
-      amount: totalPot,
-      eligiblePlayers: activePlayers.map(p => p.position),
-      maxContribution: Math.max(...contributors.map(p => p.currentBet))
-    }];
+  // Get unique bet amounts from all-in players
+  const allInPlayers = contributors.filter(p => p.status === 'all-in');
+  const uniqueAllInAmounts = [...new Set(allInPlayers.map(p => p.currentBet))].sort((a, b) => a - b);
+
+  // If only ONE unique all-in amount and everyone still in matched it, no side pots
+  if (uniqueAllInAmounts.length === 1) {
+    const allInAmount = uniqueAllInAmounts[0];
+    const everyoneMatchedOrExceeded = contributors.every(p => p.currentBet >= allInAmount);
+    if (everyoneMatchedOrExceeded) {
+      return []; // No side pots, just main pot
+    }
   }
 
   // Sort by bet amount (ascending) to build pots from smallest to largest

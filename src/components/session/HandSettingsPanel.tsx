@@ -1,13 +1,11 @@
 'use client';
 
-import { SessionMetadata } from '@/types/poker-v2';
-
 interface HandSettingsPanelProps {
-  session: SessionMetadata;
   stack: number;
   smallBlind: number;
   bigBlind: number;
   ante: number;
+  heroMoneyInvested?: number;
   onStackChange: (value: number) => void;
   onSmallBlindChange: (value: number) => void;
   onBigBlindChange: (value: number) => void;
@@ -15,11 +13,11 @@ interface HandSettingsPanelProps {
 }
 
 export function HandSettingsPanel({
-  session,
   stack,
   smallBlind,
   bigBlind,
   ante,
+  heroMoneyInvested = 0,
   onStackChange,
   onSmallBlindChange,
   onBigBlindChange,
@@ -48,28 +46,12 @@ export function HandSettingsPanel({
             onFocus={(e) => e.target.select()}
             className="w-full px-2 py-1 text-base border rounded text-center"
           />
-          {/* Profit/Loss indicator */}
-          {session && session.buyIn && (
+          {/* Investment indicator (shows negative invested amount) */}
+          {heroMoneyInvested > 0 && (
             <div className="text-xs text-center mt-1">
-              {(() => {
-                const profitLoss = stack - session.buyIn;
-                const isProfit = profitLoss > 0;
-                const isLoss = profitLoss < 0;
-                return (
-                  <span
-                    className={
-                      isProfit
-                        ? 'text-green-600 font-medium'
-                        : isLoss
-                        ? 'text-red-600 font-medium'
-                        : 'text-gray-500'
-                    }
-                  >
-                    {isProfit ? '+' : ''}
-                    {profitLoss}
-                  </span>
-                );
-              })()}
+              <span className="text-red-600 font-medium">
+                -{heroMoneyInvested}
+              </span>
             </div>
           )}
         </div>

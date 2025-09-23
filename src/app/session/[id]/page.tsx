@@ -543,11 +543,11 @@ export default function SessionPage() {
         {/* Hand Settings Panel */}
         {currentHand && !showSeatSelection && session && (
           <HandSettingsPanel
-            session={session}
             stack={stack}
             smallBlind={smallBlind}
             bigBlind={bigBlind}
             ante={ante}
+            heroMoneyInvested={heroMoneyInvested}
             onStackChange={setStack}
             onSmallBlindChange={(value) => {
               setSmallBlind(value);
@@ -772,7 +772,6 @@ export default function SessionPage() {
             currentHand={currentHand}
             session={session}
             stack={stack}
-            heroMoneyInvested={heroMoneyInvested}
             isBettingComplete={isBettingComplete}
             showPositionActions={showPositionActions}
             selectedPosition={selectedPosition}
@@ -809,7 +808,24 @@ export default function SessionPage() {
           onValueChange={setAmountModalValue}
           onConfirm={() => {
             if (amountModalPosition) {
-              const amount = Math.floor(amountModalValue);
+              let amount = Math.floor(amountModalValue);
+
+              // For hero all-in, the value represents actual stack amount to bet ALL of it
+              if (amountModalAction === 'all-in' && amountModalPosition === session?.userSeat) {
+                const actualStack = amount; // User's actual stack (e.g., 485)
+                const additionalBet = actualStack; // Betting ALL of it
+
+                // Set stack to 0 (going all-in)
+                setStack(0);
+
+                // Update hero money invested
+                setHeroMoneyInvested(prev => prev + additionalBet);
+
+                // Calculate total bet for handleBettingAction
+                const playerState = currentHand?.playerStates.find(p => p.position === amountModalPosition);
+                const currentBet = playerState?.currentBet || 0;
+                amount = currentBet + additionalBet; // Total bet amount
+              }
 
               handleBettingAction(
                 amountModalPosition,

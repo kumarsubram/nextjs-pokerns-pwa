@@ -57,7 +57,7 @@ export function AmountModal({
             {isRaise
               ? `Enter the total amount to raise to (minimum: ${minRaise})`
               : isHero
-              ? `Adjust your all-in amount (max: ${stack})`
+              ? `Enter your actual stack to go all-in with (shown: ${stack})`
               : `Enter the all-in amount for ${position}`
             }
           </DialogDescription>

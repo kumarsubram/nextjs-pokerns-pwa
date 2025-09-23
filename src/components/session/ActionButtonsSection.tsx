@@ -8,7 +8,6 @@ interface ActionButtonsSectionProps {
   currentHand: CurrentHand;
   session: SessionMetadata;
   stack: number;
-  heroMoneyInvested: number;
   isBettingComplete: boolean;
   showPositionActions: boolean;
   selectedPosition: Position | null;
@@ -37,7 +36,6 @@ export function ActionButtonsSection({
   currentHand,
   session,
   stack,
-  heroMoneyInvested,
   isBettingComplete,
   showPositionActions,
   selectedPosition,
@@ -229,14 +227,11 @@ export function ActionButtonsSection({
                 setAmountModalAction('all-in');
                 setAmountModalPosition(targetPosition || null);
 
-                // For hero, set the actual remaining stack (total stack minus what's already invested)
+                // For hero, set the current stack as default (what they're going all-in with)
                 // For other positions, don't set a default value - let them enter it
                 if (targetPosition === session.userSeat) {
-                  const remainingStack = stack - heroMoneyInvested;
-                  const playerState = currentHand.playerStates.find(p => p.position === targetPosition);
-                  const alreadyBet = playerState?.currentBet || 0;
-                  // Total all-in amount is what they've already bet plus their remaining stack
-                  setAmountModalValue(alreadyBet + remainingStack);
+                  // Stack already accounts for invested money, so use it directly
+                  setAmountModalValue(stack);
                 } else {
                   setAmountModalValue(0); // No default for non-hero positions
                 }
@@ -248,8 +243,7 @@ export function ActionButtonsSection({
               {(() => {
                 const targetPosition = (showPositionActions && selectedPosition) ? selectedPosition : session.userSeat;
                 if (targetPosition === session.userSeat) {
-                  const remainingStack = stack - heroMoneyInvested;
-                  return `All-In ${remainingStack}`;
+                  return `All-In ${stack}`;
                 }
                 return 'All-In';
               })()}

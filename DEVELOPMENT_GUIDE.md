@@ -3,8 +3,8 @@
 ## Project Overview
 A Progressive Web App for tracking poker sessions, hands, and statistics. Built with Next.js 15, TypeScript, and Tailwind CSS.
 
-## Current Version: v2.19
-**Advanced All-In & Side Pot System** - Comprehensive all-in handling with proper side pot calculation, hero refund logic, and accurate profit/loss tracking for complex multi-way all-in scenarios.
+## Current Version: v2.20
+**All-In & Betting Round Fixes** - Fixed critical betting round completion logic to allow players to act after all-ins, proper all-in detection for calls/raises, accurate side pot calculations excluding folded players, and correct hand profit/loss tracking for all-in scenarios.
 
 ## Core Architecture
 
@@ -274,8 +274,11 @@ npm run push         # Update PWA + git commit/push
 2. **Betting Rules**:
    - Only BB can check preflop with no raises
    - Call amounts account for posted blinds
-   - Raises reset hasActed flags
+   - Raises reset hasActed flags for active players
    - Auto-fold skipped positions
+   - Players with 0 stack after call/raise are marked all-in
+   - Calling an all-in with matching amount marks caller as all-in
+   - Betting round completes when all active/all-in players have acted and matched current bet
 
 3. **Hand Completion**:
    - All fold → Hero wins automatically
@@ -305,6 +308,12 @@ const CURRENT_DATA_VERSION = 2; // Increment for migrations
 - [ ] Hero money tracking
 - [ ] Hand replay functionality
 - [ ] Tracked hands system
+
+### Side Pot Logic
+- Only players still in hand (active/all-in) contribute to side pots
+- Single all-in amount with everyone matching = no side pots (main pot only)
+- Multiple all-in amounts = side pots created by ascending bet order
+- Hero winnings limited to eligible pots based on investment
 
 ### Edge Cases
 - [ ] All-in with different stack sizes

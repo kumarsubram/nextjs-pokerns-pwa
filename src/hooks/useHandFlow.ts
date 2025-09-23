@@ -76,8 +76,8 @@ export function useHandFlow({
 
   // Validate required values before hand completion
   const validateHandRequirements = useCallback((): HandValidationResult => {
-    if (stack <= 0) {
-      return { isValid: false, error: 'Stack must be greater than 0' };
+    if (stack < 0) {
+      return { isValid: false, error: 'Stack cannot be negative' };
     }
     if (smallBlind <= 0) {
       return { isValid: false, error: 'Small Blind must be greater than 0' };
@@ -229,16 +229,24 @@ export function useHandFlow({
     // Calculate effective winnings based on side pot logic
     const effectivePotWon = calculateEffectivePotWinnings(outcome, potWon);
 
-    // Calculate new stack amount (stack was already reduced during betting)
+    // Calculate new stack amount and profit/loss
     const stackBefore = stack;
     let newStackAmount: number;
+    let profitOrLoss: number;
 
     if (outcome === 'won') {
-      // Win: Add the full pot to current stack (investment already deducted during betting)
-      newStackAmount = stackBefore + effectivePotWon;
-    } else {
-      // Loss/Fold: Stack stays at current amount (investment already deducted during betting)
+      // Hero wins the pot (use effectivePotWon for side pot scenarios)
+      const actualPotWon = potWon !== undefined ? potWon : (effectivePotWon || currentHand.pot);
+      newStackAmount = stackBefore + actualPotWon;
+      profitOrLoss = actualPotWon - heroMoneyInvested;
+    } else if (outcome === 'lost') {
+      // Loss: Stack stays at current amount (investment already lost)
       newStackAmount = stackBefore;
+      profitOrLoss = -heroMoneyInvested;
+    } else {
+      // Folded: Stack stays at current amount
+      newStackAmount = stackBefore;
+      profitOrLoss = heroMoneyInvested > 0 ? -heroMoneyInvested : 0;
     }
 
     // Save hand to storage
@@ -251,7 +259,7 @@ export function useHandFlow({
       bettingRounds: currentHand.bettingRounds,
       result: {
         winner: outcome === 'won' ? session.userSeat : undefined,
-        potWon: outcome === 'won' ? (effectivePotWon - heroMoneyInvested) : (outcome === 'lost' ? heroMoneyInvested : undefined),
+        potWon: profitOrLoss,
         stackAfter: newStackAmount,
         handOutcome: outcome,
         opponentCards: Object.keys(opponentCards).length > 0 ? opponentCards : undefined

@@ -173,7 +173,8 @@ export function useBettingLogic({
     }
 
     // Track hero's money investment and reduce stack
-    if (position === session.userSeat && amount) {
+    // Skip for all-in since it's already handled in the confirm dialog
+    if (position === session.userSeat && amount && action !== 'all-in') {
       const currentBet = updatedHand.playerStates.find(p => p.position === position)?.currentBet || 0;
       const additionalInvestment = amount - currentBet;
       setHeroMoneyInvested(prev => prev + additionalInvestment);
@@ -261,12 +262,14 @@ export function useBettingLogic({
           ? getPreflopActionSequence(session.tableSeats)
           : getPostflopActionSequence(session.tableSeats);
 
+        // Include both active and all-in players for round completion logic
         const activePlayers = updatedHand.playerStates.filter(p => p.status === 'active');
+        const activeAndAllInPlayers = updatedHand.playerStates.filter(p => p.status === 'active' || p.status === 'all-in');
         const activePositions = activePlayers.map(p => p.position);
         const actionSequence = fullActionSequence.filter(pos => activePositions.includes(pos));
         const currentBet = currentRound.currentBet;
 
-        // Find the next active player who needs to act
+        // Find the next active player who needs to act (all-in players can't act)
         let nextPlayer: Position | null = null;
 
         // For new betting rounds (flop/turn/river), start from beginning of sequence
@@ -296,17 +299,24 @@ export function useBettingLogic({
 
         updatedHand.nextToAct = nextPlayer || undefined;
 
-        // Check if round is complete: all active players have acted AND matched current bet (or are all-in)
-        const allActivePlayersHaveActedAndMatched = activePlayers.every(player => {
-          // Player must have acted in this round
-          const hasActedThisRound = player.hasActed;
-          // Player must match current bet or be all-in
-          const matchesBetOrAllIn = player.currentBet === currentBet || player.status === 'all-in';
-
-          return hasActedThisRound && matchesBetOrAllIn;
+        // Check if round is complete
+        // Active players must have acted AND matched the bet
+        // All-in players just need to have acted (they can't bet more)
+        const allActivesActedAndMatched = activePlayers.length > 0 && activePlayers.every(player => {
+          return player.hasActed && player.currentBet === currentBet;
         });
 
-        if (allActivePlayersHaveActedAndMatched || activePlayers.length <= 1) {
+        const allAllInsActed = activeAndAllInPlayers
+          .filter(p => p.status === 'all-in')
+          .every(p => p.hasActed);
+
+        // Round complete if:
+        // 1. All active players have acted and matched the bet AND all all-ins have acted
+        // 2. OR only 0 active players left (everyone is all-in or folded)
+        const roundComplete = (allActivesActedAndMatched && allAllInsActed) ||
+          (activePlayers.length === 0 && allAllInsActed);
+
+        if (roundComplete) {
           currentRound.isComplete = true;
           updatedHand.nextToAct = undefined;
         }
@@ -318,6 +328,30 @@ export function useBettingLogic({
     const activePlayers = updatedHand.playerStates.filter(p => p.status === 'active' || p.status === 'all-in');
     if (activePlayers.length === 1) {
       if (activePlayers[0].position === session.userSeat) {
+        // Calculate uncalled bet and refund to hero
+        const heroState = updatedHand.playerStates.find(p => p.position === session.userSeat);
+        if (heroState) {
+          // Find the highest bet among folded players (what they actually matched)
+          const foldedPlayers = updatedHand.playerStates.filter(p => p.status === 'folded');
+          const maxFoldedBet = foldedPlayers.length > 0
+            ? Math.max(...foldedPlayers.map(p => p.currentBet))
+            : 0;
+
+          // Uncalled amount is hero's bet minus the highest matched bet
+          const uncalledBet = Math.max(0, heroState.currentBet - maxFoldedBet);
+
+          if (uncalledBet > 0) {
+            // Refund uncalled bet to hero's stack
+            setStack(prev => prev + uncalledBet);
+            // Reduce hero's money invested by uncalled amount
+            setHeroMoneyInvested(prev => prev - uncalledBet);
+            // Remove uncalled amount from pot
+            updatedHand.pot -= uncalledBet;
+            // Update hero's current bet to reflect only matched amount
+            heroState.currentBet -= uncalledBet;
+          }
+        }
+
         // Show "All Folded" dialog instead of directly completing
         setCurrentHand(updatedHand);
         setShowAllFoldedDialog(true);
